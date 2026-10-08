@@ -10,6 +10,7 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;padding-block:12px;padding-inline:16px;background:var(--bg);color:var(--text);font-family:system-ui,"Malgun Gothic",sans-serif;font-size:14px;line-height:1.5}
 h2{font-size:13px;font-weight:500;color:var(--sub);margin:18px 0 8px}
 .card{background:var(--card);border-radius:12px;padding:12px}
@@ -17,6 +18,7 @@ h2{font-size:13px;font-weight:500;color:var(--sub);margin:18px 0 8px}
 .sub{color:var(--sub);font-size:12px}
 button{font:inherit;color:var(--text);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
 button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc-line);outline-offset:2px}
 button.on,.opt.on{background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text)}
 .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:4px 0 8px}
 .bar>i{display:block;height:100%}
@@ -52,9 +54,35 @@ summary{cursor:pointer;color:var(--sub);font-size:13px}
 .item button{padding:2px 10px;font-size:12px;flex:none}
 .sumrow{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
 .sumrow:last-child{border-bottom:0}
-#copybox[hidden]{display:none}
-#copybox{display:block;width:100%;min-height:160px;margin-top:8px;font:12px/1.5 ui-monospace,monospace;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
 .sumrow b{flex:0 0 112px;font-weight:500;color:var(--sub);word-break:keep-all}
+#copybox{display:block;width:100%;min-height:160px;margin-top:8px;font:12px/1.5 ui-monospace,monospace;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+/* 모험가 만들기 */
+.steps{display:flex;gap:6px;margin:18px 0 8px}
+.steps span{flex:1;text-align:center;font-size:12px;padding:4px 0;border-bottom:2px solid var(--line);color:var(--sub)}
+.steps span.done{color:var(--text)}
+.steps span.on{border-color:var(--acc-line);color:var(--acc-text);font-weight:500}
+.mk-title{font-size:16px;font-weight:600;margin-bottom:4px}
+.mk-body{display:grid;gap:10px}
+.rolls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.roll{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;background:var(--bg)}
+.roll b{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.roll small{font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums}
+.roll.on small{color:var(--acc-text)}
+.roll s{opacity:.55}
+.roll.used{opacity:.6}
+.mkstats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mkstat{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;background:var(--bg)}
+.mkstat b{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.mkstat.key{border-color:var(--acc-line)}
+.big{width:100%;padding:12px;font-weight:500;background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text)}
+.nav{display:flex;gap:8px}
+.nav button{flex:1;padding:10px}
+.nav .go{background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text);font-weight:500}
+.cls-name{font-size:15px;font-weight:600}
+input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+.sheet{background:var(--bg);border-radius:8px;padding:10px 12px}
+.sheet .stats{margin-top:6px}
+.sheet .stat{background:var(--card)}
 </style>
 </head>
 <body>
@@ -67,6 +95,9 @@ summary{cursor:pointer;color:var(--sub);font-size:13px}
   <div class="sub" id="clock" style="margin-top:10px"></div>
 </div>
 
+<div id="make" hidden></div>
+
+<div id="game">
 <h2>상태</h2>
 <div class="card">
   <div class="row" style="justify-content:space-between"><b id="hname"></b><span class="sub" id="hlv"></span></div>
@@ -138,6 +169,7 @@ summary{cursor:pointer;color:var(--sub);font-size:13px}
     <div class="sub" id="fhist" style="margin-top:6px"></div>
   </div>
 </details>
+</div>
 
 <div class="row" style="margin-top:18px"><button id="restart">처음부터 다시</button></div>
 </div>
@@ -147,7 +179,10 @@ summary{cursor:pointer;color:var(--sub);font-size:13px}
 const $=i=>document.getElementById(i);
 const SC=window.SCENARIO;
 const KEY='fantazy:'+SC.id;
-let S=null,rolling=false,ampOn=false,foOn=false;
+const CLASSES=SC.classes||[];
+const CLS_IDS=CLASSES.map(c=>c.id);
+const STATS=SC.stats.map(s=>s.n);
+let S=null,rolling=false,ampOn=false,foOn=false,mkRolling=false;
 
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 function arr(x){return x==null?[]:Array.isArray(x)?x:[x]}
@@ -155,17 +190,59 @@ function sign(v){return (v>=0?'+':'')+v}
 function copy(o){return JSON.parse(JSON.stringify(o))}
 function d(n){return 1+Math.floor(Math.random()*n)}
 
+// ── 직업별 문장, 낱말 치환, 조사
+function cls(id){id=id||S.cls;return CLASSES.find(c=>c.id===id)||CLASSES[0]}
+function isVariant(v){return !!v&&typeof v==='object'&&!Array.isArray(v)&&('_' in v||CLS_IDS.some(k=>k in v))}
+function pick(v){return isVariant(v)?(S.cls in v?v[S.cls]:v._):v}
+const JOSA=[['이','가'],['은','는'],['을','를'],['과','와'],['으로','로'],['이었다','였다'],['아','야'],['이여','여'],['이라는','라는'],['이라고','라고']];
+function batchim(w){const c=w.charCodeAt(w.length-1);return c>=0xAC00&&c<=0xD7A3?(c-0xAC00)%28:0}
+function josa(w,f){
+  const p=JOSA.find(x=>x.includes(f));if(!p)return w+f;
+  const b=batchim(w);
+  if(p[0]==='으로')return w+(b&&b!==8?'으로':'로');
+  return w+(b?p[0]:p[1]);
+}
+function tokens(){const c=cls(),h=S.hero||{};return {name:h.name||'떠돌이',cls:c.name,weapon:c.weapon,item:c.item,relic:c.relic,amp:(S.amp&&S.amp.name)||c.amp}}
+function tpl(s){if(typeof s!=='string')return s;const T=tokens();return s.replace(/\{(\w+)(?::([^}]+))?\}/g,(m,k,f)=>k in T?(f?josa(T[k],f):T[k]):m)}
+function txt(v){return tpl(pick(v))}
+function texts(list){
+  const out=[];
+  arr(list).forEach(p=>{
+    if(p&&typeof p==='object'&&!isVariant(p)&&'t' in p){if(ok(p.if)){const t=txt(p.t);if(t)out.push(t)}}
+    else{const t=txt(p);if(t)out.push(t)}
+  });
+  return out;
+}
+function fxOf(v){
+  const fx=pick(v);if(!fx)return fx;
+  const f=Object.assign({},fx);
+  if(f.items)f.items=arr(f.items).map(tpl);
+  if(f.drop)f.drop=arr(f.drop).map(tpl);
+  if(f.amp)f.amp=Object.assign({},f.amp,f.amp.source?{source:tpl(f.amp.source)}:{});
+  return f;
+}
+
 // ── 저장
+function freshMake(){return {step:1,rolls:[],assign:{},sel:null,rerolls:(SC.creation&&SC.creation.rerolls)||0,cls:null,name:''}}
 function fresh(){
-  const s={node:SC.start,hero:copy(SC.hero),stats:copy(SC.stats),amp:copy(SC.amp),skills:SC.skills.slice(),items:SC.items.slice(),
+  const s={phase:'create',mk:freshMake(),cls:null,node:SC.start,hero:null,stats:[],amp:null,skills:[],items:[],
     flags:{},counters:{},log:[],pending:null,lvl:0,sel:null,done:false};
-  // 다음 장 시나리오가 carryFrom을 지정하면, 끝까지 마친 이전 장의 기록을 이어받는다
+  // 다음 장 시나리오가 carryFrom을 지정하면, 끝까지 마친 이전 장의 기록을 이어받고 모험가 만들기를 건너뛴다
   if(SC.carryFrom){try{const p=JSON.parse(localStorage.getItem('fantazy:'+SC.carryFrom));
-    if(p&&p.done){['hero','stats','amp','skills','items','flags','counters'].forEach(k=>{if(p[k]!=null)s[k]=copy(p[k])});s.log.push('이전 장의 기록을 이어받았다.')}}catch(e){}}
+    if(p&&p.done){['cls','hero','stats','amp','skills','items','flags','counters'].forEach(k=>{if(p[k]!=null)s[k]=copy(p[k])});s.phase='play';s.log.push('이전 장의 기록을 이어받았다.')}}catch(e){}}
   return s;
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-function restore(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.hero&&SC.nodes[s.node])return s}catch(e){}return null}
+function restore(){
+  try{
+    const s=JSON.parse(localStorage.getItem(KEY));if(!s)return null;
+    // 모험가 만들기 이전 버전의 저장: 마법사로 이어서 진행
+    if(!s.phase&&s.hero){s.phase='play';s.cls=s.cls||'mage';if(s.amp&&!s.amp.name)s.amp.name='마력 증폭'}
+    if(s.phase==='create'&&s.mk)return s;
+    if(s.phase==='play'&&s.hero&&SC.nodes[s.node])return s;
+  }catch(e){}
+  return null;
+}
 
 function node(){return SC.nodes[S.node]}
 function enter(){S.sceneText=texts(node().text);if(node().end)S.done=true}
@@ -174,7 +251,7 @@ function ampCost(){return hasSkill('B')?1:S.amp.cost}
 function lvOptions(){return SC.levelUp.options.filter(id=>!hasSkill(id))}
 function needLevel(){return S.lvl>0&&lvOptions().length>0}
 
-// ── 조건: {flag, not, any, min, max, item, skill, or, nor} — 적힌 조건을 모두 만족해야 참
+// ── 조건: {flag, not, any, min, max, item, skill, cls, or, nor} — 적힌 조건을 모두 만족해야 참
 function ok(c){
   if(!c)return true;
   if(arr(c.flag).some(f=>!S.flags[f]))return false;
@@ -184,15 +261,16 @@ function ok(c){
   if(c.max)for(const k in c.max)if((S.counters[k]||0)>c.max[k])return false;
   if(arr(c.item).some(i=>!S.items.includes(i)))return false;
   if(arr(c.skill).some(i=>!hasSkill(i)))return false;
+  if(c.cls&&!arr(c.cls).includes(S.cls))return false;
   if(c.or&&!c.or.some(x=>ok(x)))return false;
   if(c.nor&&c.nor.some(x=>ok(x)))return false;
   return true;
 }
-function texts(list){return arr(list).filter(p=>typeof p==='string'||ok(p.if)).map(p=>typeof p==='string'?p:p.t)}
 
+function statOf(c){return c.stat==='class'?cls().key:pick(c.stat)}
 function statVal(n){const s=S.stats.find(x=>x.n===n);return s?s.v:0}
 function calc(c){
-  let mod=statVal(c.stat),dc=c.dc;const why=[];
+  let mod=statVal(statOf(c)),dc=c.dc;const why=[];
   arr(c.bonus).forEach(b=>{if(ok(b.if)){mod+=b.v;why.push(b.why+' '+sign(b.v))}});
   arr(c.dcMod).forEach(b=>{if(ok(b.if)){dc+=b.v;why.push(b.why+' DC '+sign(b.v))}});
   return {mod,dc,why};
@@ -203,14 +281,14 @@ function applyFx(fx,out){
   if(!fx)return;const h=S.hero;
   if(fx.hpFull){h.hp=h.hpMax;out.push('HP 모두 회복')}
   if(fx.hp){
-    if(fx.hp<0&&S.flags.shield){delete S.flags.shield;out.push('마력 방벽이 피해를 막음')}
+    if(fx.hp<0&&S.flags.shield){delete S.flags.shield;out.push('별빛 방벽이 피해를 막음')}
     else{h.hp=Math.min(h.hpMax,h.hp+fx.hp);out.push('HP '+sign(fx.hp))}
   }
   if(fx.mpFull){h.mp=h.mpMax;out.push('기력 모두 회복')}
   if(fx.mp){h.mp=Math.max(0,Math.min(h.mpMax,h.mp+fx.mp));out.push('기력 '+sign(fx.mp))}
   arr(fx.drop).forEach(i=>{const k=S.items.indexOf(i);if(k>=0){S.items.splice(k,1);out.push('잃음: '+i)}});
   arr(fx.items).forEach(i=>{S.items.push(i);out.push('획득: '+i)});
-  if(fx.amp){Object.assign(S.amp,fx.amp);out.push('마력 증폭 d'+S.amp.die)}
+  if(fx.amp){Object.assign(S.amp,fx.amp);out.push(S.amp.name+' d'+S.amp.die)}
   if(fx.stats)for(const n in fx.stats){const s=S.stats.find(x=>x.n===n);if(s){s.v+=fx.stats[n];out.push(n+' '+sign(fx.stats[n]))}}
   arr(fx.set).forEach(f=>{S.flags[f]=true});
   arr(fx.unset).forEach(f=>{delete S.flags[f]});
@@ -237,12 +315,13 @@ function resolve(c,rl){
   else{key=rl.success?'success':'fail';oc=c[key]}
   const text=texts(oc.text),out=[];
   if(rl&&rl.cost)out.push('기력 -'+rl.cost+' (사용)');
-  applyFx(oc.fx,out);
-  arr(oc.fxIf).forEach(e=>{if(ok(e.if))applyFx(e.fx,out)});
+  applyFx(fxOf(oc.fx),out);
+  arr(oc.fxIf).forEach(e=>{if(ok(e.if))applyFx(fxOf(e.fx),out)});
   if(key==='crit'&&!c.crit){S.hero.xp++;out.push('대성공 보너스 경험치 +1')}
   const down=settle(out);
-  if(oc.log)S.log.push((key==='crit'?'[대성공] ':key==='fumble'?'[대실패] ':'')+oc.log);
-  S.pending={choiceId:c.id,label:c.label,key,roll:rl,text,fx:out,down,next:oc.next};
+  const log=txt(oc.log);
+  if(log)S.log.push((key==='crit'?'[대성공] ':key==='fumble'?'[대실패] ':'')+log);
+  S.pending={choiceId:c.id,label:txt(c.label),key,roll:rl,text,fx:out,down,next:oc.next};
   save();render();
   const rw=$('reswrap');if(rw.scrollIntoView)rw.scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -268,13 +347,168 @@ function pickSkill(id){
   save();render();
 }
 
+// ── 모험가 만들기: 능력치 → 직업 → 이름
+function roll4d6(){const dice=[d(6),d(6),d(6),d(6)];const drop=dice.indexOf(Math.min.apply(null,dice));return {dice,drop,score:dice.reduce((a,b)=>a+b,0)-dice[drop]}}
+function scoreMod(s){return Math.floor((s-10)/2)}
+function mkStatFor(i){const a=S.mk.assign;return Object.keys(a).find(n=>a[n]===i)}
+function mkAutoSel(){const mk=S.mk;let best=null;mk.rolls.forEach((r,i)=>{if(mkStatFor(i)==null&&(best==null||r.score>mk.rolls[best].score))best=i});return best}
+function mkDone(){return STATS.every(n=>S.mk.assign[n]!=null)}
+function mkMod(n){const i=S.mk.assign[n];return i==null?null:scoreMod(S.mk.rolls[i].score)}
+function mkFinal(n,c){const m=mkMod(n)||0;return m+(c&&c.key===n?2:0)}
+
+function mkRoll(){
+  const mk=S.mk;if(mkRolling)return;
+  if(mk.rolls.length){if(mk.rerolls<=0)return;mk.rerolls--}
+  mkRolling=true;mk.assign={};mk.sel=null;
+  const t0=performance.now();
+  (function tick(){
+    if(performance.now()-t0<600){mk.rolls=STATS.map(roll4d6);renderMake();setTimeout(tick,70);return}
+    mk.rolls=STATS.map(roll4d6);mk.sel=mkAutoSel();mkRolling=false;save();renderMake();
+  })();
+}
+function mkAssign(n){
+  const mk=S.mk;
+  if(mk.sel!=null){mk.assign[n]=mk.sel;mk.sel=mkAutoSel()}
+  else if(mk.assign[n]!=null){mk.sel=mk.assign[n];delete mk.assign[n]}
+  save();renderMake();
+}
+
+function renderMake(){
+  const mk=S.mk,box=$('make');box.innerHTML='';
+  const steps=el('div','steps');
+  ['1 능력치','2 직업','3 이름'].forEach((t,i)=>steps.appendChild(el('span',i+1===mk.step?'on':i+1<mk.step?'done':'',t)));
+  box.appendChild(steps);
+  const card=el('div','card mk-body');box.appendChild(card);
+  if(mk.step===1)makeStats(card);else if(mk.step===2)makeClass(card);else makeName(card);
+}
+
+function makeStats(card){
+  const mk=S.mk;
+  card.appendChild(el('div','mk-title','능력치 정하기'));
+  card.appendChild(el('div','sub','주사위 네 개(4d6)를 굴려 가장 낮은 눈 하나를 버린 합이 능력치 점수가 됩니다. 네 번 굴려 나온 점수를 네 능력치에 하나씩 나눠 넣으세요. 점수 10~11이 보정 +0이고, 2점마다 1씩 오르내립니다.'));
+  if(!mk.rolls.length){
+    const b=el('button','big','주사위 굴리기 (4d6 × 4)');b.onclick=mkRoll;card.appendChild(b);
+    return;
+  }
+  const rolls=el('div','rolls');
+  mk.rolls.forEach((r,i)=>{
+    const used=mkStatFor(i)!=null;
+    const b=el('button','roll'+(mk.sel===i?' on':'')+(used?' used':''));
+    b.appendChild(el('b',null,String(r.score)));
+    const dl=el('small');r.dice.forEach((v,j)=>{if(j)dl.appendChild(document.createTextNode(' '));dl.appendChild(j===r.drop?el('s',null,String(v)):document.createTextNode(String(v)))});
+    b.appendChild(dl);
+    b.appendChild(el('small',null,used?'→ '+mkStatFor(i):sign(scoreMod(r.score))));
+    b.disabled=mkRolling||used;
+    b.setAttribute('aria-label',r.score+'점'+(used?', '+mkStatFor(i)+'에 넣음':''));
+    b.onclick=()=>{mk.sel=i;renderMake()};
+    rolls.appendChild(b);
+  });
+  card.appendChild(rolls);
+  card.appendChild(el('div','sub',mkRolling?'굴리는 중…':mk.sel!=null?mk.rolls[mk.sel].score+'점을 넣을 능력치를 고르세요':mkDone()?'배정을 마쳤습니다. 능력치를 누르면 다시 뺄 수 있습니다.':'넣을 점수를 고르세요'));
+  const grid=el('div','mkstats');
+  STATS.forEach(n=>{
+    const i=mk.assign[n];
+    const b=el('button','mkstat');
+    b.appendChild(el('span',null,n));
+    b.appendChild(el('b',null,i==null?'—':mk.rolls[i].score+' ('+sign(scoreMod(mk.rolls[i].score))+')'));
+    b.disabled=mkRolling||(mk.sel==null&&i==null);
+    b.onclick=()=>mkAssign(n);
+    grid.appendChild(b);
+  });
+  card.appendChild(grid);
+  const r=el('div','row');
+  const rr=el('button',null,'다시 굴리기 ('+mk.rerolls+'번 남음)');rr.disabled=mkRolling||mk.rerolls<=0;rr.onclick=mkRoll;r.appendChild(rr);
+  const rs=el('button',null,'배정 초기화');rs.disabled=mkRolling||!Object.keys(mk.assign).length;rs.onclick=()=>{mk.assign={};mk.sel=mkAutoSel();save();renderMake()};r.appendChild(rs);
+  card.appendChild(r);
+  const nav=el('div','nav');
+  const nx=el('button','go','다음: 직업 고르기 →');nx.disabled=mkRolling||!mkDone();nx.onclick=()=>{mk.step=2;save();renderMake();window.scrollTo(0,0)};nav.appendChild(nx);
+  card.appendChild(nav);
+}
+
+function makeClass(card){
+  const mk=S.mk;
+  card.appendChild(el('div','mk-title','직업 고르기'));
+  card.appendChild(el('div','sub','직업은 대표 능력치에 +2를 더하고, HP·기력과 증폭 기술, 처음 쥐는 무기를 정합니다. 장면마다 하나씩 있는 [직업] 선택지는 대표 능력치로 판정합니다.'));
+  const list=el('div');
+  CLASSES.forEach(c=>{
+    const b=el('button','opt'+(mk.cls===c.id?' on':''));
+    b.appendChild(el('span','cls-name',c.name+' · '+c.key));
+    b.appendChild(el('small',null,c.blurb));
+    b.appendChild(el('small',null,'HP '+c.hp+' · 기력 '+c.mp+' · '+SC.skillDefs[c.passive].name+' ('+c.key+' +2) · '+c.amp+' · '+c.item));
+    b.appendChild(el('small',null,'이 직업이면 → '+STATS.map(n=>n+' '+sign(mkFinal(n,c))).join(' / ')));
+    b.onclick=()=>{mk.cls=c.id;save();renderMake()};
+    list.appendChild(b);
+  });
+  card.appendChild(list);
+  const nav=el('div','nav');
+  const bk=el('button',null,'← 능력치');bk.onclick=()=>{mk.step=1;save();renderMake()};nav.appendChild(bk);
+  const nx=el('button','go','다음: 이름 정하기 →');nx.disabled=!mk.cls;nx.onclick=()=>{mk.step=3;save();renderMake();window.scrollTo(0,0)};nav.appendChild(nx);
+  card.appendChild(nav);
+}
+
+function makeName(card){
+  const mk=S.mk,c=cls(mk.cls);
+  card.appendChild(el('div','mk-title','이름 정하기'));
+  card.appendChild(el('div','sub','별이 그대를 부를 이름입니다. 비워 두면 ‘떠돌이’로 불립니다.'));
+  const inp=el('input');inp.type='text';inp.id='heroname';inp.maxLength=12;inp.placeholder='떠돌이';inp.value=mk.name;inp.autocomplete='off';
+  inp.setAttribute('aria-label','이름');
+  card.appendChild(inp);
+  const names=(SC.creation&&SC.creation.names)||[];
+  const r=el('div','row');
+  const nb=el('button',null,'이름 주사위 (d'+names.length+')');nb.disabled=!names.length;
+  nb.onclick=()=>{mk.name=names[d(names.length)-1];inp.value=mk.name;save();upd()};
+  r.appendChild(nb);card.appendChild(r);
+  const sheet=el('div','sheet');card.appendChild(sheet);
+  function upd(){
+    sheet.innerHTML='';
+    const nm=(mk.name||'').trim()||'떠돌이';
+    const top=el('div','row');top.style.justifyContent='space-between';
+    top.appendChild(el('b',null,nm+' ('+c.name+')'));top.appendChild(el('span','sub','레벨 1'));sheet.appendChild(top);
+    sheet.appendChild(el('div','sub','HP '+c.hp+' · 기력 '+c.mp+' · '+SC.skillDefs[c.passive].name+' · '+c.amp+' (d4) · '+c.item));
+    const st=el('div','stats');
+    STATS.forEach(n=>{const dv=el('div','stat');dv.appendChild(el('span','sub',n));dv.appendChild(el('b',null,sign(mkFinal(n,c))));st.appendChild(dv)});
+    sheet.appendChild(st);
+  }
+  inp.oninput=()=>{mk.name=inp.value;save();upd()};
+  upd();
+  const nav=el('div','nav');
+  const bk=el('button',null,'← 직업');bk.onclick=()=>{mk.step=2;save();renderMake()};nav.appendChild(bk);
+  const go=el('button','go','모험을 시작한다');go.onclick=startAdventure;nav.appendChild(go);
+  card.appendChild(nav);
+}
+
+function startAdventure(){
+  const mk=S.mk,c=cls(mk.cls);if(!mkDone()||!mk.cls)return;
+  const name=(mk.name||'').trim().slice(0,12)||'떠돌이';
+  S.cls=c.id;
+  S.hero=Object.assign(copy(SC.hero),{name,cls:c.name,hp:c.hp,hpMax:c.hp,mp:c.mp,mpMax:c.mp});
+  S.stats=STATS.map(n=>{
+    const sc=mk.rolls[mk.assign[n]].score,m=scoreMod(sc),b=n===c.key?2:0;
+    return {n,v:m+b,note:'점수 '+sc+' ('+sign(m)+')'+(b?', '+SC.skillDefs[c.passive].name+' +2':'')};
+  });
+  S.amp={die:4,cost:2,source:c.item,name:c.amp};
+  S.skills=['amp',c.passive];S.items=[c.item];
+  S.phase='play';S.node=SC.start;S.pending=null;S.sel=null;
+  S.log=[name+' ('+c.name+') · '+S.stats.map(s=>s.n+' '+sign(s.v)).join(' ')];
+  enter();save();render();window.scrollTo(0,0);
+}
+
 // ── 그리기
 function render(){
-  const n=node(),h=S.hero;
+  const making=S.phase==='create';
+  $('make').hidden=!making;$('game').hidden=making;
   $('saga').textContent=SC.title+' · '+SC.chapterTitle;
+  const sc=$('scene');sc.innerHTML='';
+  if(making){
+    $('stitle').textContent='모험가 만들기';
+    ((SC.creation&&SC.creation.intro)||[]).forEach(t=>sc.appendChild(el('p',null,t)));
+    $('clock').textContent='능력치 → 직업 → 이름';
+    renderMake();return;
+  }
+  const n=node(),h=S.hero;
   $('stitle').textContent=n.title;
-  const sc=$('scene');sc.innerHTML='';(S.sceneText||texts(n.text)).forEach(t=>sc.appendChild(el('p',null,t)));
-  $('clock').textContent=n.clock||'';
+  (S.sceneText||texts(n.text)).forEach(t=>sc.appendChild(el('p',null,t)));
+  $('clock').textContent=tpl(n.clock||'');
   $('hname').textContent=h.name+' ('+h.cls+')';
   $('hlv').textContent='레벨 '+h.level;
   $('hptxt').textContent='HP '+h.hp+' / '+h.hpMax;$('hpb').style.width=(100*h.hp/h.hpMax)+'%';
@@ -295,8 +529,9 @@ function renderSkills(){
   const sk=$('skills'),h=S.hero;sk.innerHTML='';
   S.skills.forEach(id=>{
     const s=SC.skillDefs[id];if(!s)return;
-    const desc=id==='amp'?'기력 '+ampCost()+'. 판정에 d'+S.amp.die+' 추가 ('+S.amp.source+')':s.desc;
-    const dv=el('div');dv.appendChild(el('b',null,s.name+' '));dv.appendChild(el('span','sub','['+s.kind+'] '+desc));sk.appendChild(dv);
+    const name=id==='amp'?S.amp.name:s.name;
+    const desc=id==='amp'?'기력 '+ampCost()+'. 판정에 d'+S.amp.die+' 추가 ('+S.amp.source+')':tpl(s.desc);
+    const dv=el('div');dv.appendChild(el('b',null,name+' '));dv.appendChild(el('span','sub','['+s.kind+'] '+desc));sk.appendChild(dv);
   });
   S.items.forEach(name=>{
     const def=(SC.itemDefs||{})[name]||{};
@@ -316,7 +551,7 @@ function renderLevelup(){
   lvOptions().forEach(id=>{
     const s=SC.skillDefs[id],b=el('button','opt');
     b.appendChild(document.createTextNode(id+'. '+s.name));
-    b.appendChild(el('small',null,'['+s.kind+'] '+s.desc));
+    b.appendChild(el('small',null,'['+s.kind+'] '+tpl(s.desc)));
     b.disabled=rolling;
     b.onclick=()=>pickSkill(id);
     box.appendChild(b);
@@ -328,11 +563,12 @@ function renderChoices(){
   n.choices.forEach(c=>{
     const locked=c.requires&&!ok(c.requires);
     const b=el('button','opt'+((p?p.choiceId:S.sel)===c.id?' on':''));
-    b.appendChild(document.createTextNode(c.id+'. '+c.label));
+    b.appendChild(document.createTextNode(c.id+'. '+txt(c.label)));
+    const note=txt(c.note);
     let info;
-    if(c.roll===false)info='판정 없음'+(c.note?' / '+c.note:'');
-    else{const k=calc(c);info=c.stat+' 판정 '+sign(k.mod)+' / DC '+k.dc+(k.why.length?' ('+k.why.join(', ')+')':'')+(c.note?' / '+c.note:'')}
-    if(locked)info='[잠김] 필요: '+(c.reqText||'조건 미달')+' / '+info;
+    if(c.roll===false)info='판정 없음'+(note?' / '+note:'');
+    else{const k=calc(c);info=(c.stat==='class'?'[직업] ':'')+statOf(c)+' 판정 '+sign(k.mod)+' / DC '+k.dc+(k.why.length?' ('+k.why.join(', ')+')':'')+(note?' / '+note:'')}
+    if(locked)info='[잠김] 필요: '+(txt(c.reqText)||'조건 미달')+' / '+info;
     b.appendChild(el('small',null,info));
     b.disabled=!!p||locked||rolling||needLevel();
     b.onclick=()=>{
@@ -350,7 +586,7 @@ function renderMods(){
   const a=el('label','sub'),ac=el('input');ac.type='checkbox';ac.id='ampchk';
   ac.checked=pr?!!pr.amp:ampOn;ac.disabled=lock||mp<ampCost();
   ac.onchange=()=>{ampOn=ac.checked;if(ampOn&&foOn&&ampCost()+1>S.hero.mp)foOn=false;renderMods()};
-  a.appendChild(ac);a.appendChild(document.createTextNode(' 마력 증폭 (기력 '+ampCost()+', d'+S.amp.die+' 추가)'));m.appendChild(a);
+  a.appendChild(ac);a.appendChild(document.createTextNode(' '+S.amp.name+' (기력 '+ampCost()+', d'+S.amp.die+' 추가)'));m.appendChild(a);
   if(hasSkill('A')){
     const f=el('label','sub'),fc=el('input');fc.type='checkbox';fc.id='fochk';
     fc.checked=pr?!!pr.fo:foOn;fc.disabled=lock||mp<1;
@@ -394,9 +630,10 @@ function renderResult(){
 function summaryRows(){
   const h=S.hero,rows=[];
   rows.push([h.name,'레벨 '+h.level+' '+h.cls+' · HP '+h.hp+'/'+h.hpMax+' · 기력 '+h.mp+'/'+h.mpMax]);
-  rows.push(['스킬',S.skills.map(id=>SC.skillDefs[id].name).join(', ')]);
+  rows.push(['능력치',S.stats.map(s=>s.n+' '+sign(s.v)).join(' · ')]);
+  rows.push(['스킬',S.skills.map(id=>id==='amp'?S.amp.name:SC.skillDefs[id].name).join(', ')]);
   rows.push(['소지품',S.items.join(', ')||'없음']);
-  (SC.summary||[]).forEach(r=>{const hit=r.cases.find(c=>ok(c.if));rows.push([r.label,hit?hit.t:(r.else||'-')])});
+  (SC.summary||[]).forEach(r=>{const hit=r.cases.find(c=>ok(c.if));rows.push([r.label,tpl(hit?hit.t:(r.else||'-'))])});
   for(const k in (SC.counterNames||{}))rows.push([SC.counterNames[k],String(S.counters[k]||0)]);
   rows.push(['쓰러진 횟수',(S.counters.falls||0)+'번']);
   return rows;
@@ -452,7 +689,7 @@ $('restart').onclick=()=>{
   if(Date.now()-armed>3000){armed=Date.now();b.textContent='정말 처음부터? 한 번 더 누르세요';setTimeout(()=>{if(Date.now()-armed>=3000)b.textContent='처음부터 다시'},3000);return}
   armed=0;b.textContent='처음부터 다시';
   try{localStorage.removeItem(KEY)}catch(e){}
-  S=fresh();enter();ampOn=foOn=false;save();render();window.scrollTo(0,0);
+  S=fresh();if(S.phase==='play')enter();ampOn=foOn=false;save();render();window.scrollTo(0,0);
 };
 
 // ── 자유 주사위
@@ -463,8 +700,8 @@ $('freset').onclick=()=>{fhist=[];ftype=20;$('fres').textContent='';$('fhist').t
 
 // ── 시작
 S=restore();
-if(!S){S=fresh();enter();save()}
-if(!S.sceneText)enter();
+if(!S){S=fresh();if(S.phase==='play')enter();save()}
+if(S.phase==='play'&&!S.sceneText)enter();
 render();
 </script>
 </body>
