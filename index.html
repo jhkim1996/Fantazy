@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>떠돌이의 모험</title>
+<style>
+:root{--bg:#faf9f5;--card:#f1efe8;--text:#2c2c2a;--sub:#5f5e5a;--acc-bg:#e6f1fb;--acc-line:#185fa5;--acc-text:#0c447c;--line:#d3d1c7;--ok:#27500a;--ok-bg:#eaf3de;--bad:#791f1f;--bad-bg:#fcebeb;--neu:#5c4813;--neu-bg:#f3ead2;--hp:#e24b4a;--mp:#378add;--xp:#ba7517}
+@media (prefers-color-scheme:dark){:root{--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17}}
+*{box-sizing:border-box}
+body{margin:0;padding:12px;background:var(--bg);color:var(--text);font-family:system-ui,"Malgun Gothic",sans-serif;font-size:14px;line-height:1.5}
+h2{font-size:13px;font-weight:500;color:var(--sub);margin:18px 0 8px}
+.card{background:var(--card);border-radius:12px;padding:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sub{color:var(--sub);font-size:12px}
+button{font:inherit;color:var(--text);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+button.on,.opt.on{background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text)}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:4px 0 8px}
+.bar>i{display:block;height:100%}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.stat{background:var(--bg);border-radius:8px;padding:6px;text-align:center}
+.stat b{display:block;font-size:18px;font-weight:500}
+.opt{display:block;width:100%;text-align:left;margin-bottom:6px;padding:8px 10px}
+.opt:disabled{opacity:.4}
+.opt small{display:block;color:var(--sub)}
+.opt.on small{color:var(--acc-text)}
+#die{width:120px;height:120px;border-radius:16px;background:var(--card);padding:0;display:flex;align-items:center;justify-content:center}
+#shape{transform-origin:70px 70px}
+.result{border-radius:12px;padding:12px}
+.result.ok{background:var(--ok-bg);color:var(--ok)}
+.result.bad{background:var(--bad-bg);color:var(--bad)}
+.result.neu{background:var(--neu-bg);color:var(--neu)}
+.result b{font-size:18px;font-weight:500}
+.result .sub{color:inherit;opacity:.85}
+ul{margin:0;padding-left:18px}
+details{margin-top:18px}
+summary{cursor:pointer;color:var(--sub);font-size:13px}
+.saga{font-size:12px;color:var(--sub)}
+#stitle{font-size:20px;font-weight:600;margin:2px 0 10px}
+.prose p{margin:0 0 10px;font-family:"Noto Serif KR","Nanum Myeongjo","AppleMyungjo","Batang",serif;font-size:15px;line-height:1.8;word-break:keep-all}
+.prose p:last-child{margin-bottom:0}
+.story{margin-top:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;background:var(--bg)}
+.down{margin-top:8px;padding:10px 12px;border-radius:8px;border:1px dashed var(--bad);color:var(--bad);font-size:13px}
+.next{display:block;width:100%;margin-top:12px;padding:10px;font-weight:500;background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text)}
+.item{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.item button{padding:2px 10px;font-size:12px;flex:none}
+.sumrow{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.sumrow:last-child{border-bottom:0}
+.sumrow b{flex:0 0 112px;font-weight:500;color:var(--sub);word-break:keep-all}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="saga" id="saga"></div>
+  <div id="stitle"></div>
+  <div class="prose" id="scene"></div>
+  <div class="sub" id="clock" style="margin-top:10px"></div>
+</div>
+
+<h2>상태</h2>
+<div class="card">
+  <div class="row" style="justify-content:space-between"><b id="hname"></b><span class="sub" id="hlv"></span></div>
+  <div class="sub" id="hptxt"></div><div class="bar"><i id="hpb" style="background:var(--hp)"></i></div>
+  <div class="sub" id="mptxt"></div><div class="bar"><i id="mpb" style="background:var(--mp)"></i></div>
+  <div class="sub" id="xptxt"></div><div class="bar"><i id="xpb" style="background:var(--xp)"></i></div>
+  <div class="stats" id="stats"></div>
+</div>
+
+<h2>스킬과 소지품</h2>
+<div class="card" id="skills"></div>
+
+<div id="lvwrap">
+  <h2 id="lvtitle"></h2>
+  <div id="lvopts"></div>
+</div>
+
+<div id="playwrap">
+  <h2>선택지</h2>
+  <div id="choices"></div>
+
+  <div id="rollwrap">
+    <h2>판정</h2>
+    <div class="card">
+      <div class="row" id="mods"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="die" aria-label="굴리기" disabled>
+          <svg width="100" height="100" viewBox="0 0 140 140">
+            <g id="shape">
+              <polygon points="70,10 122,40 122,100 70,130 18,100 18,40" fill="var(--acc-bg)" stroke="var(--acc-line)" stroke-width="2" stroke-linejoin="round"/>
+              <path d="M70,10 L18,100 M70,10 L122,100 M18,40 L122,40 M18,100 L122,100 M70,130 L18,40 M70,130 L122,40" stroke="var(--acc-line)" stroke-width="1" fill="none" opacity=".6"/>
+            </g>
+            <text id="num" x="70" y="82" text-anchor="middle" font-size="36" font-weight="500" fill="var(--acc-text)">?</text>
+          </svg>
+        </button>
+        <div style="flex:1;min-width:140px">
+          <div class="sub" id="hint">선택지를 고르고 주사위를 누르세요</div>
+          <div id="calc" style="font-size:18px;font-weight:500"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="reswrap">
+  <h2>결과</h2>
+  <div id="resbox"></div>
+</div>
+
+<div id="endwrap">
+  <h2>2장으로 이어지는 기록</h2>
+  <div class="card" id="summary"></div>
+  <div class="row" style="margin-top:8px"><button id="copy">기록 복사</button><span class="sub" id="copied"></span></div>
+</div>
+
+<h2>진행 기록</h2>
+<div class="card"><ul id="log"></ul></div>
+
+<details>
+  <summary>자유 주사위 (판정과 무관)</summary>
+  <div class="card" style="margin-top:8px">
+    <div class="row" id="ftypes"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="froll">굴리기</button>
+      <button id="freset">초기화</button>
+      <span id="fres" style="font-size:18px;font-weight:500"></span>
+    </div>
+    <div class="sub" id="fhist" style="margin-top:6px"></div>
+  </div>
+</details>
+
+<div class="row" style="margin-top:18px"><button id="restart">처음부터 다시</button></div>
+
+<script src="chapter1.js"></script>
+<script>
+const $=i=>document.getElementById(i);
+const SC=window.SCENARIO;
+const KEY='fantazy:'+SC.id;
+let S=null,rolling=false,ampOn=false,foOn=false;
+
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function arr(x){return x==null?[]:Array.isArray(x)?x:[x]}
+function sign(v){return (v>=0?'+':'')+v}
+function copy(o){return JSON.parse(JSON.stringify(o))}
+function d(n){return 1+Math.floor(Math.random()*n)}
+
+// ── 저장
+function fresh(){
+  const s={node:SC.start,hero:copy(SC.hero),stats:copy(SC.stats),amp:copy(SC.amp),skills:SC.skills.slice(),items:SC.items.slice(),
+    flags:{},counters:{},log:[],pending:null,lvl:0,sel:null,done:false};
+  // 다음 장 시나리오가 carryFrom을 지정하면, 끝까지 마친 이전 장의 기록을 이어받는다
+  if(SC.carryFrom){try{const p=JSON.parse(localStorage.getItem('fantazy:'+SC.carryFrom));
+    if(p&&p.done){['hero','stats','amp','skills','items','flags','counters'].forEach(k=>{if(p[k]!=null)s[k]=copy(p[k])});s.log.push('이전 장의 기록을 이어받았다.')}}catch(e){}}
+  return s;
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function restore(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.hero&&SC.nodes[s.node])return s}catch(e){}return null}
+
+function node(){return SC.nodes[S.node]}
+function enter(){S.sceneText=texts(node().text);if(node().end)S.done=true}
+function hasSkill(id){return S.skills.includes(id)}
+function ampCost(){return hasSkill('B')?1:S.amp.cost}
+function lvOptions(){return SC.levelUp.options.filter(id=>!hasSkill(id))}
+function needLevel(){return S.lvl>0&&lvOptions().length>0}
+
+// ── 조건: {flag, not, any, min, max, item, skill, or, nor} — 적힌 조건을 모두 만족해야 참
+function ok(c){
+  if(!c)return true;
+  if(arr(c.flag).some(f=>!S.flags[f]))return false;
+  if(arr(c.not).some(f=>S.flags[f]))return false;
+  if(c.any&&!arr(c.any).some(f=>S.flags[f]))return false;
+  if(c.min)for(const k in c.min)if((S.counters[k]||0)<c.min[k])return false;
+  if(c.max)for(const k in c.max)if((S.counters[k]||0)>c.max[k])return false;
+  if(arr(c.item).some(i=>!S.items.includes(i)))return false;
+  if(arr(c.skill).some(i=>!hasSkill(i)))return false;
+  if(c.or&&!c.or.some(x=>ok(x)))return false;
+  if(c.nor&&c.nor.some(x=>ok(x)))return false;
+  return true;
+}
+function texts(list){return arr(list).filter(p=>typeof p==='string'||ok(p.if)).map(p=>typeof p==='string'?p:p.t)}
+
+function statVal(n){const s=S.stats.find(x=>x.n===n);return s?s.v:0}
+function calc(c){
+  let mod=statVal(c.stat),dc=c.dc;const why=[];
+  arr(c.bonus).forEach(b=>{if(ok(b.if)){mod+=b.v;why.push(b.why+' '+sign(b.v))}});
+  arr(c.dcMod).forEach(b=>{if(ok(b.if)){dc+=b.v;why.push(b.why+' DC '+sign(b.v))}});
+  return {mod,dc,why};
+}
+
+// ── 결과 적용
+function applyFx(fx,out){
+  if(!fx)return;const h=S.hero;
+  if(fx.hpFull){h.hp=h.hpMax;out.push('HP 모두 회복')}
+  if(fx.hp){
+    if(fx.hp<0&&S.flags.shield){delete S.flags.shield;out.push('마력 방벽이 피해를 막음')}
+    else{h.hp=Math.min(h.hpMax,h.hp+fx.hp);out.push('HP '+sign(fx.hp))}
+  }
+  if(fx.mpFull){h.mp=h.mpMax;out.push('기력 모두 회복')}
+  if(fx.mp){h.mp=Math.max(0,Math.min(h.mpMax,h.mp+fx.mp));out.push('기력 '+sign(fx.mp))}
+  arr(fx.drop).forEach(i=>{const k=S.items.indexOf(i);if(k>=0){S.items.splice(k,1);out.push('잃음: '+i)}});
+  arr(fx.items).forEach(i=>{S.items.push(i);out.push('획득: '+i)});
+  if(fx.amp){Object.assign(S.amp,fx.amp);out.push('마력 증폭 d'+S.amp.die)}
+  if(fx.stats)for(const n in fx.stats){const s=S.stats.find(x=>x.n===n);if(s){s.v+=fx.stats[n];out.push(n+' '+sign(fx.stats[n]))}}
+  arr(fx.set).forEach(f=>{S.flags[f]=true});
+  arr(fx.unset).forEach(f=>{delete S.flags[f]});
+  if(fx.add)for(const k in fx.add){S.counters[k]=(S.counters[k]||0)+fx.add[k];const nm=(SC.counterNames||{})[k];if(nm)out.push(nm+' '+sign(fx.add[k]))}
+  if(fx.xp){h.xp+=fx.xp;out.push('경험치 '+sign(fx.xp))}
+}
+// HP가 0 이하로 떨어져도 이야기는 끝나지 않는다: 쓰러졌다가 일어난다
+function settle(out){
+  const h=S.hero,L=SC.levelUp;let down=false;
+  if(h.hp<=0){h.hp=Math.max(1,Math.ceil(h.hpMax/4));S.counters.falls=(S.counters.falls||0)+1;down=true;out.push('쓰러짐 → HP '+h.hp+'로 일어남')}
+  while(h.xp>=h.xpMax){
+    h.xp-=h.xpMax;h.level++;h.xpMax+=L.xpMax;h.hpMax+=L.hpMax;h.hp+=L.hpMax;h.mpMax+=L.mpMax;h.mp+=L.mpMax;
+    out.push('레벨 업! 레벨 '+h.level);
+    if(lvOptions().length>S.lvl)S.lvl++;
+  }
+  return down;
+}
+
+function resolve(c,rl){
+  let key,oc;
+  if(!rl){key='auto';oc=c.then}
+  else if(rl.nat20){key='crit';oc=c.crit||c.success}
+  else if(rl.nat1){key='fumble';oc=c.fumble||c.fail}
+  else{key=rl.success?'success':'fail';oc=c[key]}
+  const text=texts(oc.text),out=[];
+  if(rl&&rl.cost)out.push('기력 -'+rl.cost+' (사용)');
+  applyFx(oc.fx,out);
+  arr(oc.fxIf).forEach(e=>{if(ok(e.if))applyFx(e.fx,out)});
+  if(key==='crit'&&!c.crit){S.hero.xp++;out.push('대성공 보너스 경험치 +1')}
+  const down=settle(out);
+  if(oc.log)S.log.push((key==='crit'?'[대성공] ':key==='fumble'?'[대실패] ':'')+oc.log);
+  S.pending={choiceId:c.id,label:c.label,key,roll:rl,text,fx:out,down,next:oc.next};
+  save();render();
+  const rw=$('reswrap');if(rw.scrollIntoView)rw.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function advance(){
+  if(!S.pending)return;
+  S.node=S.pending.next;S.pending=null;S.sel=null;
+  enter();save();render();window.scrollTo(0,0);
+}
+
+function useItem(name){
+  const def=SC.itemDefs[name];if(!def||!def.use||rolling)return;
+  const out=[];applyFx(def.use,out);
+  const k=S.items.indexOf(name);if(k>=0)S.items.splice(k,1);
+  settle(out);S.log.push(name+' 사용 ('+out.join(', ')+')');
+  save();render();
+}
+
+function pickSkill(id){
+  if(!needLevel()||hasSkill(id))return;
+  S.skills.push(id);S.lvl--;
+  S.log.push('레벨 '+S.hero.level+': 스킬 「'+SC.skillDefs[id].name+'」 습득');
+  save();render();
+}
+
+// ── 그리기
+function render(){
+  const n=node(),h=S.hero;
+  $('saga').textContent=SC.title+' · '+SC.chapterTitle;
+  $('stitle').textContent=n.title;
+  const sc=$('scene');sc.innerHTML='';(S.sceneText||texts(n.text)).forEach(t=>sc.appendChild(el('p',null,t)));
+  $('clock').textContent=n.clock||'';
+  $('hname').textContent=h.name+' ('+h.cls+')';
+  $('hlv').textContent='레벨 '+h.level;
+  $('hptxt').textContent='HP '+h.hp+' / '+h.hpMax;$('hpb').style.width=(100*h.hp/h.hpMax)+'%';
+  $('mptxt').textContent='기력 '+h.mp+' / '+h.mpMax;$('mpb').style.width=(100*h.mp/h.mpMax)+'%';
+  $('xptxt').textContent='경험치 '+h.xp+' / '+h.xpMax;$('xpb').style.width=(100*h.xp/h.xpMax)+'%';
+  const st=$('stats');st.innerHTML='';
+  S.stats.forEach(s=>{const dv=el('div','stat');if(s.note)dv.title=s.note;dv.appendChild(el('span','sub',s.n));dv.appendChild(el('b',null,sign(s.v)));st.appendChild(dv)});
+  renderSkills();renderLevelup();
+  const end=!!n.end;
+  $('playwrap').style.display=end?'none':'';
+  $('endwrap').style.display=end?'':'none';
+  if(end)renderSummary();else{renderChoices();renderMods();updateRollBtn()}
+  renderResult();
+  const lg=$('log');lg.innerHTML='';S.log.forEach(t=>lg.appendChild(el('li',null,t)));
+}
+
+function renderSkills(){
+  const sk=$('skills'),h=S.hero;sk.innerHTML='';
+  S.skills.forEach(id=>{
+    const s=SC.skillDefs[id];if(!s)return;
+    const desc=id==='amp'?'기력 '+ampCost()+'. 판정에 d'+S.amp.die+' 추가 ('+S.amp.source+')':s.desc;
+    const dv=el('div');dv.appendChild(el('b',null,s.name+' '));dv.appendChild(el('span','sub','['+s.kind+'] '+desc));sk.appendChild(dv);
+  });
+  S.items.forEach(name=>{
+    const def=(SC.itemDefs||{})[name]||{};
+    const dv=el('div','item'),l=el('div');
+    l.appendChild(el('b',null,name));l.appendChild(el('span','sub',' ['+(def.kind||'소지품')+'] '+(def.desc||'')));dv.appendChild(l);
+    if(def.use){const b=el('button',null,'사용');b.disabled=rolling||(h.hp>=h.hpMax&&h.mp>=h.mpMax);b.onclick=()=>useItem(name);dv.appendChild(b)}
+    sk.appendChild(dv);
+  });
+}
+
+function renderLevelup(){
+  const w=$('lvwrap');
+  if(!needLevel()){w.style.display='none';return}
+  w.style.display='';
+  $('lvtitle').textContent='레벨 업! 새 스킬을 하나 고르세요';
+  const box=$('lvopts');box.innerHTML='';
+  lvOptions().forEach(id=>{
+    const s=SC.skillDefs[id],b=el('button','opt');
+    b.appendChild(document.createTextNode(id+'. '+s.name));
+    b.appendChild(el('small',null,'['+s.kind+'] '+s.desc));
+    b.disabled=rolling;
+    b.onclick=()=>pickSkill(id);
+    box.appendChild(b);
+  });
+}
+
+function renderChoices(){
+  const n=node(),box=$('choices'),p=S.pending;box.innerHTML='';
+  n.choices.forEach(c=>{
+    const locked=c.requires&&!ok(c.requires);
+    const b=el('button','opt'+((p?p.choiceId:S.sel)===c.id?' on':''));
+    b.appendChild(document.createTextNode(c.id+'. '+c.label));
+    let info;
+    if(c.roll===false)info='판정 없음'+(c.note?' / '+c.note:'');
+    else{const k=calc(c);info=c.stat+' 판정 '+sign(k.mod)+' / DC '+k.dc+(k.why.length?' ('+k.why.join(', ')+')':'')+(c.note?' / '+c.note:'')}
+    if(locked)info='[잠김] 필요: '+(c.reqText||'조건 미달')+' / '+info;
+    b.appendChild(el('small',null,info));
+    b.disabled=!!p||locked||rolling||needLevel();
+    b.onclick=()=>{
+      if(c.roll===false){resolve(c,null);return}
+      S.sel=c.id;save();renderChoices();updateRollBtn();
+    };
+    box.appendChild(b);
+  });
+  $('rollwrap').style.display=n.choices.some(c=>c.roll!==false)?'':'none';
+}
+
+function renderMods(){
+  const m=$('mods'),pr=S.pending&&S.pending.roll,lock=!!S.pending||rolling,mp=S.hero.mp;m.innerHTML='';
+  if(!pr){if(ampOn&&mp<ampCost())ampOn=false;if(foOn&&mp<(ampOn?ampCost():0)+1)foOn=false}
+  const a=el('label','sub'),ac=el('input');ac.type='checkbox';ac.id='ampchk';
+  ac.checked=pr?!!pr.amp:ampOn;ac.disabled=lock||mp<ampCost();
+  ac.onchange=()=>{ampOn=ac.checked;if(ampOn&&foOn&&ampCost()+1>S.hero.mp)foOn=false;renderMods()};
+  a.appendChild(ac);a.appendChild(document.createTextNode(' 마력 증폭 (기력 '+ampCost()+', d'+S.amp.die+' 추가)'));m.appendChild(a);
+  if(hasSkill('A')){
+    const f=el('label','sub'),fc=el('input');fc.type='checkbox';fc.id='fochk';
+    fc.checked=pr?!!pr.fo:foOn;fc.disabled=lock||mp<1;
+    fc.onchange=()=>{foOn=fc.checked;if(foOn&&ampOn&&ampCost()+1>S.hero.mp)ampOn=false;renderMods()};
+    f.appendChild(fc);f.appendChild(document.createTextNode(' 예지의 눈 (기력 1, d20 두 번)'));m.appendChild(f);
+  }
+}
+
+function selChoice(){const c=node().choices.find(x=>x.id===S.sel);return c&&c.roll!==false&&!(c.requires&&!ok(c.requires))?c:null}
+function updateRollBtn(){
+  const c=selChoice();
+  $('die').disabled=!(c&&!needLevel()&&!S.pending&&!rolling);
+  $('hint').textContent=S.pending?'결과를 확인하고 다음 장면으로 넘어가세요':
+    needLevel()?'먼저 레벨 업 스킬을 고르세요':
+    !c?'선택지를 고르고 주사위를 누르세요':'주사위를 눌러 굴리세요';
+}
+
+function calcText(r){
+  return 'd20 '+(r.fo?'['+r.rolls.join(', ')+'] → '+r.r:r.r)+(r.lucky?' (행운의 별)':'')+' '+sign(r.mod)+
+    (r.amp?' + d'+r.ampDie+'('+r.ampRoll+')':'')+' = '+r.total+' vs DC '+r.dc;
+}
+
+function renderResult(){
+  const p=S.pending,w=$('reswrap'),rb=$('resbox');rb.innerHTML='';
+  if(!p){w.style.display='none';if(!rolling){$('calc').textContent='';$('num').textContent='?'}return}
+  w.style.display='';
+  if(p.roll){$('num').textContent=p.roll.r;$('calc').textContent=calcText(p.roll)}
+  const good=p.key==='crit'||p.key==='success';
+  const head=el('div','result '+(p.key==='auto'?'neu':good?'ok':'bad'));
+  head.appendChild(el('b',null,p.key==='auto'?p.label:p.key==='crit'?'대성공! 성공':p.key==='fumble'?'대실패… 실패':good?'성공':'실패'));
+  if(p.roll)head.appendChild(el('div','sub',p.choiceId+'번 '+p.label+' · '+calcText(p.roll)));
+  rb.appendChild(head);
+  const story=el('div','card prose story');p.text.forEach(t=>story.appendChild(el('p',null,t)));rb.appendChild(story);
+  if(p.down)rb.appendChild(el('div','down',SC.downText));
+  if(p.fx.length){const cs=el('div','chips');p.fx.forEach(f=>cs.appendChild(el('span','chip',f)));rb.appendChild(cs)}
+  const nx=SC.nodes[p.next];
+  const b=el('button','next',nx&&nx.end?'기록 보기 →':'다음 장면으로 →');
+  b.onclick=advance;rb.appendChild(b);
+}
+
+function summaryRows(){
+  const h=S.hero,rows=[];
+  rows.push([h.name,'레벨 '+h.level+' '+h.cls+' · HP '+h.hp+'/'+h.hpMax+' · 기력 '+h.mp+'/'+h.mpMax]);
+  rows.push(['스킬',S.skills.map(id=>SC.skillDefs[id].name).join(', ')]);
+  rows.push(['소지품',S.items.join(', ')||'없음']);
+  (SC.summary||[]).forEach(r=>{const hit=r.cases.find(c=>ok(c.if));rows.push([r.label,hit?hit.t:(r.else||'-')])});
+  for(const k in (SC.counterNames||{}))rows.push([SC.counterNames[k],String(S.counters[k]||0)]);
+  rows.push(['쓰러진 횟수',(S.counters.falls||0)+'번']);
+  return rows;
+}
+function renderSummary(){
+  const box=$('summary');box.innerHTML='';
+  summaryRows().forEach(([k,v])=>{const dv=el('div','sumrow');dv.appendChild(el('b',null,k));dv.appendChild(el('span',null,v));box.appendChild(dv)});
+}
+$('copy').onclick=()=>{
+  const txt=SC.title+' · '+SC.chapterTitle+'\n'+summaryRows().map(r=>r[0]+': '+r[1]).join('\n')+'\n\n'+S.log.map(t=>'- '+t).join('\n');
+  const done=m=>{$('copied').textContent=m;setTimeout(()=>{$('copied').textContent=''},2000)};
+  try{navigator.clipboard.writeText(txt).then(()=>done('복사됨'),()=>done('복사 실패'))}catch(e){done('복사 실패')}
+};
+
+// ── 주사위
+function doRoll(){
+  if($('die').disabled)return;
+  const c=selChoice(),k=calc(c);
+  const useAmp=ampOn&&S.hero.mp>=ampCost();
+  const useFo=foOn&&hasSkill('A')&&S.hero.mp>=(useAmp?ampCost():0)+1;
+  rolling=true;renderChoices();renderMods();updateRollBtn();renderSkills();renderLevelup();
+  const t0=performance.now();
+  (function tick(){
+    const t=performance.now()-t0;
+    if(t<700){
+      $('shape').style.transform='rotate('+(t*.9)+'deg) scale('+(1+.08*Math.sin(t/60))+')';
+      $('num').textContent=d(20);
+      setTimeout(tick,60);return;
+    }
+    $('shape').style.transform='';
+    const rolls=useFo?[d(20),d(20)]:[d(20)];
+    const raw=Math.max.apply(null,rolls);
+    let r=raw,lucky=false;
+    if(raw===1&&hasSkill('C')){r=10;lucky=true}
+    const ampRoll=useAmp?d(S.amp.die):0;
+    const total=r+k.mod+ampRoll;
+    const nat20=raw===20,nat1=raw===1&&!lucky;
+    const success=nat20||(!nat1&&total>=k.dc);
+    const cost=(useAmp?ampCost():0)+(useFo?1:0);
+    S.hero.mp-=cost;
+    rolling=false;ampOn=false;foOn=false;
+    resolve(c,{rolls,r,lucky,mod:k.mod,amp:useAmp,ampRoll,ampDie:S.amp.die,fo:useFo,total,dc:k.dc,nat20,nat1,success,cost});
+  })();
+}
+$('die').onclick=doRoll;
+
+// ── 처음부터 (두 번 눌러 확인)
+let armed=0;
+$('restart').onclick=()=>{
+  const b=$('restart');
+  if(Date.now()-armed>3000){armed=Date.now();b.textContent='정말 처음부터? 한 번 더 누르세요';setTimeout(()=>{if(Date.now()-armed>=3000)b.textContent='처음부터 다시'},3000);return}
+  armed=0;b.textContent='처음부터 다시';
+  try{localStorage.removeItem(KEY)}catch(e){}
+  S=fresh();enter();ampOn=foOn=false;save();render();window.scrollTo(0,0);
+};
+
+// ── 자유 주사위
+let ftype=20,fhist=[];
+[4,8,20].forEach(n=>{const b=el('button',n===20?'on':'','d'+n);b.dataset.n=n;b.onclick=()=>{ftype=n;document.querySelectorAll('#ftypes button').forEach(x=>x.classList.toggle('on',+x.dataset.n===n))};$('ftypes').appendChild(b)});
+$('froll').onclick=()=>{const r=d(ftype);$('fres').textContent='d'+ftype+' = '+r;fhist.unshift('d'+ftype+':'+r);fhist=fhist.slice(0,8);$('fhist').textContent='최근: '+fhist.join(' / ')};
+$('freset').onclick=()=>{fhist=[];ftype=20;$('fres').textContent='';$('fhist').textContent='';document.querySelectorAll('#ftypes button').forEach(x=>x.classList.toggle('on',+x.dataset.n===20))};
+
+// ── 시작
+S=restore();
+if(!S){S=fresh();enter();save()}
+if(!S.sceneText)enter();
+render();
+</script>
+</body>
+</html>
