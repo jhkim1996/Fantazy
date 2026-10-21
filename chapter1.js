@@ -21,10 +21,19 @@ function RELIC(extra) {
   return Object.assign({ items: ['{relic}'], amp: { die: 8, source: '{relic}' }, mpFull: true }, extra);
 }
 
+// 천 개의 계단: 들킨 정찰병과의 전투
+const SCOUT_FIGHT = {
+  enemies: ['scout'],
+  win: { text: ['정찰병이 쓰러졌다. 목덜미의 회색 표식이 잿가루로 흩어졌다. 털 무늬가 아니었다 — 누군가 새겨 넣은 낙인이었다.'],
+    fx: { set: ['mark_seen'] }, log: '들킨 정찰병과 싸워 이겼다. 목에 박힌 회색 낙인을 보았다.', next: 'map' },
+  lose: { text: ['정찰병의 이빨이 그대를 쓰러뜨렸다. 놈은 길게 울부짖고는 안개 속으로 사라졌다.'],
+    log: '정찰병에게 쓰러졌다.', next: 'map' }
+};
+
 // 사냥개의 밤: 남은 사냥개와의 전투
 function HOUNDS(enemies) {
   return {
-    enemies: enemies, noFlee: true,
+    enemies: enemies, noFlee: true, art: { sky: 'star', bg: 'tomb', fx: ['motes'] },
     intro: '남은 사냥개들이 이빨을 드러내며 달려든다!',
     ally: { if: { min: { bond: 1 } }, name: '오르덴', atk: 5, dmg: '1d10+2' },
     win: {
@@ -46,7 +55,7 @@ function HOUNDS(enemies) {
 
 // 결계의 방: 잿빛 송곳니와의 결전
 const BOSS = {
-  enemies: ['alpha'], boss: true, noFlee: true,
+  enemies: ['alpha'], boss: true, noFlee: true, art: { sky: 'cave', bg: 'barrier' },
   intro: '결계가 빛난다. 잿빛 송곳니가 낮게 으르렁거린다. 이제 물러설 곳은 없다.',
   mods: [
     { if: { flag: 'alpha_hurt' }, hp: -15, why: '짓눌린 뒷다리 (HP -15)' },
@@ -99,6 +108,7 @@ window.SCENARIO = {
   start: 'prologue',
   startLoc: 'village',
   startGold: 20,
+  endArt: { sky: 'dawn', bg: 'mountains', actors: [{ k: 'hero', x: 0.5 }] },
 
   creation: {
     intro: [
@@ -110,6 +120,30 @@ window.SCENARIO = {
   },
 
   hero: { level: 1, xp: 0 },
+
+  // 기술과 그 기술이 쓰는 능력치. 숙련이면 숙련 보너스(+2, 레벨 5부터 +3)를 더하고, 두 곳에서 숙련이면 전문(두 배)
+  skillList: {
+    '운동': '힘', '곡예': '민첩', '손재주': '민첩', '은신': '민첩',
+    '비전': '지혜', '역사': '지혜', '지각': '지혜', '통찰': '지혜', '생존': '지혜', '의학': '지혜',
+    '설득': '매력', '기만': '매력', '위협': '매력', '공연': '매력'
+  },
+  pointBuy: { points: 20, min: 8, max: 15, cost: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 } },
+  races: [
+    { id: 'human', name: '인간', bonus: { 지혜: 1, 민첩: 1, 힘: 1, 매력: 1 }, trait: '어디서든 적응한다. 모든 능력치 점수 +1.' },
+    { id: 'elf', name: '엘프', bonus: { 민첩: 2, 지혜: 1 }, skills: ['지각'], trait: '예리한 감각. 민첩 +2, 지혜 +1, 지각 숙련.' },
+    { id: 'dwarf', name: '드워프', bonus: { 힘: 2, 지혜: 1 }, hpPerLevel: 1, poisonResist: true, trait: '단단한 몸. 힘 +2, 지혜 +1, 레벨마다 HP +1, 독 피해 절반.' },
+    { id: 'halfling', name: '하플링', bonus: { 민첩: 2, 매력: 1 }, lucky: true, trait: '타고난 행운. 민첩 +2, 매력 +1, d20에서 1이 나오면 한 번 다시 굴린다.' }
+  ],
+  // 배경: 숙련 기술 둘, 그리고 영감을 얻는 행동. 선택지의 insp 꼬리표가 배경과 맞으면 영감 +1
+  backgrounds: [
+    { id: 'soldier', name: '군인', skills: ['운동', '위협'], insp: 'brave', inspText: '정면으로 맞서거나 누군가를 지킬 때', items: ['은빛 물약'], blurb: '전장에서 살아 돌아온 사람.' },
+    { id: 'sage', name: '학자', skills: ['비전', '역사'], insp: 'lore', inspText: '옛 지식과 룬을 파고들 때', items: ['푸른 물약'], blurb: '먼지 쌓인 서고에서 별의 기록을 읽던 사람.' },
+    { id: 'minstrel', name: '떠돌이 악사', skills: ['공연', '설득'], insp: 'song', inspText: '노래와 이야기로 마음을 움직일 때', gold: 15, blurb: '마을에서 마을로 노래를 팔던 사람.' },
+    { id: 'urchin', name: '부랑아', skills: ['손재주', '은신'], insp: 'sly', inspText: '몰래, 재빠르게, 남의 눈을 피할 때', gold: 10, blurb: '뒷골목에서 혼자 자란 사람.' },
+    { id: 'pilgrim', name: '순례자', skills: ['통찰', '의학'], insp: 'mercy', inspText: '자비를 베풀거나 죽은 이를 기릴 때', items: ['은빛 물약'], blurb: '성지를 떠돌며 병자를 돌보던 사람.' },
+    { id: 'hunter', name: '사냥꾼', skills: ['생존', '지각'], insp: 'wild', inspText: '짐승을 읽고 자연의 흐름을 따를 때', items: ['은빛 물약'], blurb: '숲에서 짐승의 발자국을 읽던 사람.' }
+  ],
+  inspMax: 4,
   // 레벨 L → L+1 에 필요한 경험치
   xpTable: [12, 24, 40, 60, 84, 112, 144, 180, 220, 264],
   stats: [{ n: '지혜' }, { n: '민첩' }, { n: '힘' }, { n: '매력' }],
@@ -118,18 +152,22 @@ window.SCENARIO = {
     { id: 'mage', name: '마법사', key: '지혜', hp: 20, mp: 10, hpGain: 4, mpGain: 3, passive: 'eye', amp: '마력 증폭',
       weapon: '지팡이', item: '낡은 지팡이', fine: '잘 다듬은 지팡이', relic: '별빛 지팡이', armor: '여행자의 망토',
       skills: ['bolt', 'frost', 'starfire'],
+      profs: ['비전', '통찰'],
       blurb: '룬을 읽고 마력을 다루는 학자. 마력이 넉넉하고 강한 주문을 쓰지만 몸이 약하다.' },
     { id: 'warrior', name: '전사', key: '힘', hp: 26, mp: 4, hpGain: 7, mpGain: 1, passive: 'might', amp: '투지',
       weapon: '검', item: '낡은 검', fine: '잘 벼린 검', relic: '별빛 검', armor: '낡은 사슬 조끼',
       skills: ['smash', 'warcry', 'whirl'],
+      profs: ['운동', '생존'],
       blurb: '수많은 전장을 건너온 검사. HP와 방어가 가장 높아 앞에서 오래 버틴다.' },
     { id: 'rogue', name: '도적', key: '민첩', hp: 22, mp: 6, hpGain: 5, mpGain: 2, passive: 'shadow', amp: '급소 노리기',
       weapon: '단검', item: '낡은 단검', fine: '잘 벼린 단검', relic: '별빛 단검', armor: '가죽 조끼',
       skills: ['stab', 'smoke', 'venom'],
+      profs: ['은신', '곡예'],
       blurb: '그림자를 밟고 다니는 떠돌이. 치명타가 잘 터지고 도망에 능하다.' },
     { id: 'bard', name: '음유시인', key: '매력', hp: 22, mp: 8, hpGain: 5, mpGain: 2, passive: 'voice', amp: '영감',
       weapon: '류트', item: '낡은 류트', fine: '새 줄을 건 류트', relic: '별빛 류트', armor: '가죽 조끼',
       skills: ['discord', 'mend', 'anthem', 'starsong'],
+      profs: ['공연', '기만'],
       blurb: '옛 노래를 기억하는 가객. 노래로 적을 흔들고 스스로를 치유한다.' }
   ],
 
@@ -205,33 +243,33 @@ window.SCENARIO = {
 
   // 적. atk: 명중 보너스, ac: 방어, dmg: 피해 주사위
   enemies: {
-    wolf: { name: '굶주린 늑대', lv: 1, hp: 10, ac: 11, atk: 3, dmg: '1d6+1', xp: 5, gold: [2, 6],
+    wolf: { art: 'wolf', name: '굶주린 늑대', lv: 1, hp: 10, ac: 11, atk: 3, dmg: '1d6+1', xp: 5, gold: [2, 6],
       desc: '비에 젖은 털 사이로 갈비뼈가 드러난 늑대.' },
-    bats: { name: '안개 박쥐 떼', lv: 1, hp: 8, ac: 13, atk: 4, dmg: '1d4+1', xp: 4, gold: [1, 4],
+    bats: { art: 'bats', name: '안개 박쥐 떼', lv: 1, hp: 8, ac: 13, atk: 4, dmg: '1d4+1', xp: 4, gold: [1, 4],
       desc: '안개 속에서 날개 소리만 들리는 박쥐 떼.' },
-    boar: { name: '진흙 멧돼지', lv: 2, hp: 16, ac: 12, atk: 4, dmg: '1d8+2', xp: 8, gold: [3, 8],
+    boar: { art: 'boar', name: '진흙 멧돼지', lv: 2, hp: 16, ac: 12, atk: 4, dmg: '1d8+2', xp: 8, gold: [3, 8],
       drops: [{ item: '은빛 물약', p: 0.15 }], desc: '진흙을 뒤집어쓴 성난 멧돼지.' },
-    spider: { name: '검은 소나무 거미', lv: 2, hp: 14, ac: 12, atk: 4, dmg: '1d6+1', xp: 8, gold: [2, 7],
+    spider: { art: 'spider', name: '검은 소나무 거미', lv: 2, hp: 14, ac: 12, atk: 4, dmg: '1d6+1', xp: 8, gold: [2, 7],
       poison: { p: 0.35, turns: 2, dmg: '1d4' }, drops: [{ item: '푸른 물약', p: 0.1 }],
       desc: '송아지만 한 검은 거미. 송곳니에서 독이 떨어진다.' },
-    bear: { name: '이끼 곰', lv: 3, hp: 28, ac: 12, atk: 5, dmg: '1d10+3', xp: 14, gold: [5, 12],
+    bear: { art: 'bear', name: '이끼 곰', lv: 3, hp: 28, ac: 12, atk: 5, dmg: '1d10+3', xp: 14, gold: [5, 12],
       skills: [{ name: '짓누르기', p: 0.25, dmg: '2d8+3', hit: -1 }], drops: [{ item: '은빛 물약', p: 0.25 }],
       desc: '등에 이끼가 자란 거대한 곰. 숲의 주인이다.' },
-    scout: { name: '잿빛 사냥개 정찰병', lv: 2, hp: 14, ac: 13, atk: 4, dmg: '1d6+2', xp: 9, gold: [2, 6],
+    scout: { art: 'scout', name: '잿빛 사냥개 정찰병', lv: 2, hp: 14, ac: 13, atk: 4, dmg: '1d6+2', xp: 9, gold: [2, 6],
       drops: [{ item: '회색 낙인 조각', p: 0.5 }], desc: '목덜미에 회색 표식이 깜박이는 사냥개.' },
-    hound: { name: '잿빛 사냥개', lv: 3, hp: 20, ac: 13, atk: 5, dmg: '1d8+2', xp: 12, gold: [3, 9],
+    hound: { art: 'hound', name: '잿빛 사냥개', lv: 3, hp: 20, ac: 13, atk: 5, dmg: '1d8+2', xp: 12, gold: [3, 9],
       drops: [{ item: '회색 낙인 조각', p: 0.4 }], desc: '회색 사냥꾼에게 묶인 잿빛 사냥개.' },
-    leech: { name: '수로 거머리', lv: 3, hp: 18, ac: 11, atk: 5, dmg: '1d6+2', xp: 11, gold: [2, 6], drain: 0.5,
+    leech: { art: 'leech', name: '수로 거머리', lv: 3, hp: 18, ac: 11, atk: 5, dmg: '1d6+2', xp: 11, gold: [2, 6], drain: 0.5,
       desc: '사람 팔뚝만 한 거머리. 문 자리에서 피를 빨아 회복한다.' },
-    drowned: { name: '물에 잠긴 기사', lv: 5, hp: 44, ac: 15, atk: 6, dmg: '1d10+3', xp: 35, gold: [20, 35], elite: true,
+    drowned: { art: 'drowned', name: '물에 잠긴 기사', lv: 5, hp: 44, ac: 15, atk: 6, dmg: '1d10+3', xp: 35, gold: [20, 35], elite: true,
       skills: [{ name: '녹슨 대검 내려치기', p: 0.3, dmg: '2d10+3', hit: -2 }],
       drops: [{ item: '기사의 반지', p: 1, once: 'got_ring' }, { item: '엘레우스 기사의 흉갑', p: 1, once: 'got_cuirass' }, { item: '은빛 물약', p: 0.5 }],
       desc: '천 년 동안 수로 바닥에 잠들어 있던 기사. 녹슨 투구 속에서 푸른 불꽃이 탄다.' },
-    acolyte: { name: '회색 사냥꾼의 추종자', lv: 4, hp: 26, ac: 14, atk: 6, dmg: '1d8+3', xp: 20, gold: [10, 20],
+    acolyte: { art: 'acolyte', name: '회색 사냥꾼의 추종자', lv: 4, hp: 26, ac: 14, atk: 6, dmg: '1d8+3', xp: 20, gold: [10, 20],
       skills: [{ name: '사냥개 부르기', p: 0.3, summon: 'hound', once: true }],
       drops: [{ item: '회색 낙인 조각', p: 0.6 }, { item: '푸른 물약', p: 0.3 }],
       desc: '회색 두건을 쓴 사람. 손등에 사냥개와 같은 낙인이 있다.' },
-    alpha: { name: '잿빛 송곳니', lv: 6, hp: 90, ac: 15, atk: 7, dmg: '2d6+4', xp: 80, gold: [40, 60], boss: true,
+    alpha: { art: 'alpha', name: '잿빛 송곳니', lv: 6, hp: 90, ac: 15, atk: 7, dmg: '2d6+4', xp: 80, gold: [40, 60], boss: true,
       skills: [
         { name: '포효', p: 0.22, debuff: { atk: -2, turns: 2 }, text: '잿빛 송곳니가 포효한다. 다리가 굳는다! (2턴 동안 명중 -2)' },
         { name: '돌진', p: 0.25, dmg: '2d8+4', hit: -1 }
@@ -242,6 +280,7 @@ window.SCENARIO = {
   // ── 세계 지도. x, y는 지도 위 위치 (0~320, 0~240)
   locations: {
     village: {
+      art: { sky: 'rain', bg: 'village', fx: ['rain', 'fog'] },
       name: '마지막 마을', x: 60, y: 205, lv: '안전',
       desc: [
         '관문 아래 마지막 마을. 지붕은 내려앉았고, 우물에는 검은 빗물이 고였다.',
@@ -261,6 +300,7 @@ window.SCENARIO = {
       links: [{ to: 'slope' }, { to: 'forest' }]
     },
     slope: {
+      art: { sky: 'rain', bg: 'slope', fx: ['fog', 'rain'] },
       name: '안개 비탈', x: 140, y: 160, lv: '1~2',
       desc: [
         '마을과 계단 사이, 안개가 강물처럼 흐르는 비탈. 굶주린 늑대들의 울음이 끊이지 않는다.',
@@ -272,6 +312,7 @@ window.SCENARIO = {
       links: [{ to: 'village' }, { to: 'forest' }, { to: 'stairs' }, { to: 'aqueduct' }]
     },
     forest: {
+      art: { sky: 'rain', bg: 'forest', fx: ['rain', 'fog'] },
       name: '검은 소나무 숲', x: 50, y: 110, lv: '2~3',
       desc: [
         '빛이 들지 않는 검은 소나무 숲. 거미줄이 빗물에 무겁게 늘어지고, 이끼 곰의 발자국이 깊다.',
@@ -283,6 +324,7 @@ window.SCENARIO = {
       links: [{ to: 'village' }, { to: 'slope' }]
     },
     stairs: {
+      art: { sky: 'rain', bg: 'stairs', fx: ['rain'] },
       name: '천 개의 계단', x: 190, y: 105, lv: '2~3',
       desc: [
         '고대의 거인들이 산을 깎아 만든 천 개의 계단. 이끼 낀 룬 위로 그치지 않는 비가 흐른다.',
@@ -295,6 +337,7 @@ window.SCENARIO = {
       links: [{ to: 'slope' }, { to: 'gate' }]
     },
     aqueduct: {
+      art: { sky: 'cave', bg: 'aqueduct', fx: ['drip'] },
       name: '옛 수로', x: 270, y: 150, lv: '3~5', if: { flag: 'shortcut' },
       desc: [
         '천 년 전 기사들이 물을 길어 나르던 수로. 무릎까지 차는 물속에서 무언가가 미끄러진다.',
@@ -306,6 +349,11 @@ window.SCENARIO = {
       links: [{ to: 'slope' }, { to: 'gate' }]
     },
     gate: {
+      art: [
+        { if: { flag: 'done_n10' }, sky: 'dawn', bg: 'gate', props: ['campfire'], actors: [{ k: 'orden', x: 0.62 }] },
+        { if: { flag: 'done_n4' }, sky: 'rain', bg: 'gate', props: ['campfire'], actors: [{ k: 'orden', x: 0.62 }], fx: ['rain'] },
+        { sky: 'rain', bg: 'gate', actors: [{ k: 'statue', x: 0.5 }], fx: ['rain'] }
+      ],
       name: '울음의 관문', x: 215, y: 50, lv: '안전',
       desc: [
         '산 하나를 통째로 깎아 세운 거대한 돌문. 그 앞으로 부서진 기사 석상들이 줄지어 서 있다.',
@@ -321,6 +369,10 @@ window.SCENARIO = {
       links: [{ to: 'stairs' }, { to: 'aqueduct' }, { to: 'tomb' }]
     },
     tomb: {
+      art: [
+        { if: { flag: 'done_n5' }, sky: 'star', bg: 'tomb', fx: ['motes'] },
+        { sky: 'star', bg: 'tomb', props: ['relic'], fx: ['motes'] }
+      ],
       name: '별의 무덤', x: 150, y: 25, lv: '3~4', if: { flag: 'done_n4' },
       desc: [
         '비가 내리지 않는 거대한 원형 전당. 그 중심에 깨진 수정관이 하늘을 향해 열려 있다.',
@@ -332,6 +384,7 @@ window.SCENARIO = {
       links: [{ to: 'gate' }, { to: 'hall' }]
     },
     hall: {
+      art: { sky: 'cave', bg: 'hall', fx: ['dust'] },
       name: '무너지는 회랑', x: 275, y: 25, lv: '4~6', if: { flag: 'done_n6' },
       desc: [
         '천장이 진동할 때마다 돌가루가 쏟아지는 회랑. 사냥개들과 회색 두건의 추종자들이 어둠 속을 서성인다.',
@@ -375,6 +428,7 @@ window.SCENARIO = {
 
     // ───────────────────────── 서장 (모험가 만들기 직후)
     prologue: {
+      art: { sky: 'night', bg: 'mountains', props: ['stars7', 'fallingstar'], fx: ['stars'] },
       title: '서장 · 일곱째 별',
       clock: '이야기의 시작',
       text: [
@@ -399,6 +453,7 @@ window.SCENARIO = {
 
     // ───────────────────────── 마지막 등불 (마을)
     n1: {
+      art: { sky: 'cave', bg: 'hut', actors: [{ k: 'hero', x: 0.36 }, { k: 'crone', x: 0.62, face: -1 }] },
       title: '마지막 등불',
       clock: '등불지기 노파',
       text: [
@@ -407,7 +462,7 @@ window.SCENARIO = {
         '벽에는 빛바랜 양피지 지도 한 장이 걸려 있고, 기울어진 처마 사이로 빗물이 새어 든다.'
       ],
       choices: [
-        { id: 1, label: '노파 곁에 앉아 관문의 옛이야기를 청한다', stat: '매력', dc: 10,
+        { id: 1, skill: '설득', insp: 'song', label: '노파 곁에 앉아 관문의 옛이야기를 청한다', stat: '매력', dc: 10,
           note: '성공하면 옛 전승과 선물을 얻는다',
           success: {
             text: [
@@ -423,7 +478,7 @@ window.SCENARIO = {
             ],
             log: '노파는 입을 닫았다.', next: 'map' } },
 
-        { id: 2, label: '벽에 걸린 낡은 지도를 해독한다', stat: '지혜', dc: 12,
+        { id: 2, skill: '역사', insp: 'lore', label: '벽에 걸린 낡은 지도를 해독한다', stat: '지혜', dc: 12,
           note: '성공하면 숨겨진 길을 찾는다',
           success: {
             text: [
@@ -440,7 +495,7 @@ window.SCENARIO = {
             fx: { set: ['alerted'] },
             log: '지도 해독에 매달리다 밤이 깊었다. 사냥개들이 울기 시작했다.', next: 'map' } },
 
-        { id: 3, label: '무너져 가는 오두막을 손봐 준다', stat: '힘', dc: 11,
+        { id: 3, skill: '운동', insp: 'mercy', label: '무너져 가는 오두막을 손봐 준다', stat: '힘', dc: 11,
           note: '성공하면 노파의 마음을 얻는다',
           success: {
             text: [
@@ -460,6 +515,7 @@ window.SCENARIO = {
     },
 
     q_wolves_start: {
+      art: { sky: 'cave', bg: 'hut', actors: [{ k: 'hero', x: 0.36 }, { k: 'crone', x: 0.62, face: -1 }] },
       title: '노파의 부탁',
       clock: '마지막 마을',
       text: [
@@ -467,7 +523,7 @@ window.SCENARIO = {
         '“안개 비탈의 늑대 다섯만 쫓아 주면… 이 늙은이가 가진 것을 내주마.”'
       ],
       choices: [
-        { id: 1, label: '부탁을 들어준다', roll: false,
+        { id: 1, insp: 'mercy', label: '부탁을 들어준다', roll: false,
           then: { text: ['노파가 고개를 끄덕였다. “조심하거라. 그놈들은 무리로 다닌다.”'], fx: { set: ['q_wolves'] },
             log: '노파의 부탁을 받았다: 안개 비탈의 굶주린 늑대 5마리.', next: 'map' } },
         { id: 2, label: '지금은 어렵다고 말한다', roll: false,
@@ -476,6 +532,7 @@ window.SCENARIO = {
     },
 
     q_wolves_end: {
+      art: { sky: 'cave', bg: 'hut', actors: [{ k: 'hero', x: 0.36 }, { k: 'crone', x: 0.62, face: -1 }] },
       title: '노파의 부탁',
       clock: '마지막 마을',
       text: [
@@ -501,8 +558,8 @@ window.SCENARIO = {
         '세 조각을 맞추자 하나의 문양이 되었다. 왕관을 쓴 사냥개 — 그리고 그 아래, 낯선 룬으로 새겨진 이름 하나.'
       ],
       choices: [
-        { id: 1, label: '낙인의 룬을 읽어 낸다', stat: '지혜', dc: 12,
-          bonus: [{ if: { flag: 'lore' }, v: 2, why: '노파의 전승' }],
+        { id: 1, skill: '비전', insp: 'lore', label: '낙인의 룬을 읽어 낸다', stat: '지혜', dc: 12,
+          adv: [{ if: { flag: 'lore' }, why: '노파의 전승' }],
           note: '성공하면 낙인의 비밀을 안다',
           success: {
             text: [
@@ -520,6 +577,7 @@ window.SCENARIO = {
 
     // ───────────────────────── 천 개의 계단 (처음 도착하면)
     n2: {
+      art: { sky: 'rain', bg: 'stairs', actors: [{ k: 'scout', x: 0.64 }], fx: ['rain', 'fog'] },
       title: '천 개의 계단',
       clock: '사냥개 정찰병',
       text: [
@@ -559,8 +617,8 @@ window.SCENARIO = {
             fx: { hp: -3, set: ['alerted'] },
             log: '정찰병을 놓쳤다. 놈의 울음이 무리를 깨웠다 (HP -3).', next: 'map' } },
 
-        { id: 2, label: '바위 뒤에 숨어 놈이 지나가기를 기다린다', stat: '민첩', dc: 12,
-          dcMod: [{ if: { flag: 'alerted' }, v: 2, why: '놈이 경계 중' }],
+        { id: 2, skill: '은신', insp: 'sly', label: '바위 뒤에 숨어 놈이 지나가기를 기다린다', stat: '민첩', dc: 12,
+          dis: [{ if: { flag: 'alerted' }, why: '놈이 경계 중' }],
           note: '성공하면 놈의 정체를 살핀다',
           success: {
             text: [
@@ -575,15 +633,10 @@ window.SCENARIO = {
               '숨을 곳은 없다. 싸워야 한다.'
             ],
             fx: { set: ['alerted'] },
-            battle: {
-              enemies: ['scout'],
-              win: { text: ['정찰병이 쓰러졌다. 목덜미의 회색 표식이 잿가루로 흩어졌다. 털 무늬가 아니었다 — 누군가 새겨 넣은 낙인이었다.'],
-                fx: { set: ['mark_seen'] }, log: '들킨 정찰병과 싸워 이겼다. 목에 박힌 회색 낙인을 보았다.', next: 'map' },
-              lose: { text: ['정찰병의 이빨이 그대를 쓰러뜨렸다. 놈은 길게 울부짖고는 안개 속으로 사라졌다.'],
-                log: '정찰병에게 쓰러졌다.', next: 'map' } },
+            battle: SCOUT_FIGHT,
             log: '숨어 있다 들켰다.', next: 'map' } },
 
-        { id: 3, label: '정면으로 맞서 싸운다', roll: false, note: '전투',
+        { id: 3, insp: 'brave', label: '정면으로 맞서 싸운다', roll: false, note: '전투',
           then: {
             text: ['그대는 숨을 고르고 계단 위로 걸어 나갔다. 짐승이 낮게 으르렁거리며 돌아섰다.'],
             battle: {
@@ -592,12 +645,27 @@ window.SCENARIO = {
                 fx: { set: ['mark_seen'] }, log: '정찰병과 싸워 이겼다. 목에 박힌 회색 낙인을 보았다.', next: 'map' },
               lose: { text: ['정찰병의 이빨이 그대를 쓰러뜨렸다. 놈은 길게 울부짖고는 안개 속으로 사라졌다. 멀리서 대답하는 울음들이 들려온다.'],
                 fx: { set: ['alerted'] }, log: '정찰병에게 쓰러졌다. 놈의 울음이 무리를 깨웠다.', next: 'map' } },
-            next: 'map' } }
+            next: 'map' } },
+
+        { id: 4, label: '바람을 등지고 냄새를 숨긴 채 지나간다', stat: '지혜', skill: '생존', dc: 11, insp: 'wild',
+          note: '성공하면 놈의 정체를 살핀다',
+          success: {
+            text: [
+              '그대는 젖은 이끼를 손에 문질러 몸의 냄새를 덮고, 바람이 등 뒤에서 불어오는 쪽으로 한 계단씩 비켜 올랐다.',
+              '짐승은 코를 킁킁거렸지만 끝내 고개를 돌리지 않았다. 바로 곁을 지나칠 때, 그대는 놈의 목덜미에 박힌 회색 표식을 똑똑히 보았다. 털 무늬가 아니다. 누군가 새겨 넣은 낙인이다.'
+            ],
+            fx: { set: ['mark_seen'], xp: 3 },
+            log: '바람을 읽어 정찰병 곁을 지나쳤다. 목에 박힌 회색 낙인을 보았다.', next: 'map' },
+          fail: {
+            text: ['바람이 갑자기 방향을 바꿨다. 짐승의 코가 그대를 향했다.'],
+            battle: SCOUT_FIGHT,
+            log: '바람이 바뀌었다. 정찰병이 냄새를 맡았다.', next: 'map' } }
       ]
     },
 
     // ───────────────────────── 울음의 관문 (처음 도착하면)
     n3: {
+      art: { sky: 'rain', bg: 'gate', actors: [{ k: 'hero', x: 0.3 }, { k: 'statue', x: 0.55 }], fx: ['rain'] },
       title: '울음의 관문',
       clock: '관문을 깨운다',
       text: [
@@ -608,8 +676,8 @@ window.SCENARIO = {
         { if: { flag: 'alerted' }, t: '저 아래 계단에서, 사냥개들의 울음소리가 점점 가까워지고 있다. 서둘러야 한다.' }
       ],
       choices: [
-        { id: 1, label: '문에 새겨진 룬을 해독한다', stat: '지혜', dc: 13,
-          bonus: [{ if: { flag: 'lore' }, v: 2, why: '노파의 전승' }],
+        { id: 1, skill: '비전', insp: 'lore', label: '문에 새겨진 룬을 해독한다', stat: '지혜', dc: 13,
+          adv: [{ if: { flag: 'lore' }, why: '노파의 전승' }],
           note: '성공하면 문지기가 그대를 믿는다',
           success: {
             text: [
@@ -627,7 +695,7 @@ window.SCENARIO = {
             fx: { hp: -3, set: ['wary'] },
             log: '룬 해독에 실패해 반발을 맞았다 (HP -3). 석상 기사가 경계하며 깨어났다.', next: 'n4' } },
 
-        { id: 2, label: '꿈속에서 들은 별의 노래를 소리 내어 부른다', stat: '매력', dc: 13,
+        { id: 2, skill: '공연', insp: 'song', label: '꿈속에서 들은 별의 노래를 소리 내어 부른다', stat: '매력', dc: 13,
           note: '어렵다. 성공하면 기사의 마음을 크게 움직인다',
           success: {
             text: [
@@ -682,6 +750,7 @@ window.SCENARIO = {
     },
 
     n4: {
+      art: { sky: 'rain', bg: 'gate', actors: [{ k: 'hero', x: 0.32 }, { k: 'orden', x: 0.6, face: -1 }], fx: ['rain'] },
       title: '돌의 기사',
       clock: '문지기 오르덴',
       text: [
@@ -693,9 +762,9 @@ window.SCENARIO = {
         { if: { not: 'wary', max: { bond: 0 } }, t: '그는 창을 세운 채 그대를 오래 바라보았다. 그 눈빛에는 경계도 환영도 없었다. 다만 천 년의 피로가 있을 뿐이었다.' }
       ],
       choices: [
-        { id: 1, label: '꿈속의 별이 그대를 불렀다고 털어놓는다', stat: '매력', dc: 11,
-          bonus: [{ if: { min: { bond: 1 } }, v: 2, why: '이미 그대를 믿음' }],
-          dcMod: [{ if: { flag: 'wary' }, v: 2, why: '기사가 경계 중' }],
+        { id: 1, skill: '설득', insp: 'song', label: '꿈속의 별이 그대를 불렀다고 털어놓는다', stat: '매력', dc: 11,
+          adv: [{ if: { min: { bond: 1 } }, why: '이미 그대를 믿음' }],
+          dis: [{ if: { flag: 'wary' }, why: '기사가 경계 중' }],
           note: '성공하면 오르덴의 신뢰를 얻는다',
           success: {
             text: [
@@ -712,7 +781,7 @@ window.SCENARIO = {
             ],
             log: '오르덴은 믿지 않았지만 별의 무덤으로 가는 길을 내주었다.', next: 'map' } },
 
-        { id: 2, label: '엘레우스의 고어로 맹세의 구절을 읊는다', stat: '지혜', dc: 14,
+        { id: 2, skill: '역사', insp: 'lore', label: '엘레우스의 고어로 맹세의 구절을 읊는다', stat: '지혜', dc: 14,
           bonus: [{ if: { flag: 'lore' }, v: 3, why: '노파의 전승' }],
           note: '어렵다. 성공하면 오르덴이 충성을 맹세한다',
           success: {
@@ -731,7 +800,7 @@ window.SCENARIO = {
             fx: { hp: -4 },
             log: '맹세의 구절을 틀렸다 (HP -4). 그래도 오르덴은 길을 열었다.', next: 'map' } },
 
-        { id: 3, label: '창을 든 기사에게 겨루어 실력을 증명하겠다고 맞선다', stat: '민첩', dc: 14,
+        { id: 3, skill: '곡예', insp: 'brave', label: '창을 든 기사에게 겨루어 실력을 증명하겠다고 맞선다', stat: '민첩', dc: 14,
           note: '어렵다. 성공하면 오르덴이 동행을 맹세한다',
           success: {
             text: [
@@ -749,7 +818,7 @@ window.SCENARIO = {
             fx: { hp: -5, add: { bond: 1 }, unset: ['wary'] },
             log: '오르덴에게 맞서다 창대에 맞았다 (HP -5). 그래도 기사는 손을 내밀었다.', next: 'map' } },
 
-        { id: 4, label: '기사의 창대를 맨손으로 붙잡고 힘을 겨루자고 청한다', stat: '힘', dc: 14,
+        { id: 4, skill: '운동', insp: 'brave', label: '기사의 창대를 맨손으로 붙잡고 힘을 겨루자고 청한다', stat: '힘', dc: 14,
           note: '어렵다. 성공하면 오르덴이 동행을 맹세한다',
           success: {
             text: [
@@ -764,11 +833,29 @@ window.SCENARIO = {
               '“무모하군.” 기사가 창을 거두며 말했다. “그러나 맨손으로 내 창을 붙잡은 자는 오랜만이다. 일어나라.”'
             ],
             fx: { hp: -5, add: { bond: 1 }, unset: ['wary'] },
-            log: '오르덴과 힘을 겨루다 내던져졌다 (HP -5). 그래도 기사는 그대를 인정했다.', next: 'map' } }
+            log: '오르덴과 힘을 겨루다 내던져졌다 (HP -5). 그래도 기사는 그대를 인정했다.', next: 'map' } },
+
+        { id: 5, label: '엘레우스 왕가의 마지막 사자라고 둘러댄다', stat: '매력', skill: '기만', dc: 15, insp: 'sly',
+          note: '어렵다. 들키면 기사가 그대를 의심한다',
+          success: {
+            text: [
+              '“나는 엘레우스 왕가의 마지막 사자다. 왕께서 별의 무덤을 살피라 명하셨다.”',
+              '오르덴의 금빛 눈이 오래도록 그대를 훑었다. 그리고 — 창끝이 천천히 내려갔다. “왕가는 천 년 전에 끊겼다고 들었다만… 그 눈빛은 거짓을 말하는 자의 것이 아니로군.” 기사는 문 앞에 모닥불을 피웠다.'
+            ],
+            fx: { add: { bond: 1 }, unset: ['wary'], xp: 4 },
+            log: '왕가의 사자라고 둘러대 오르덴을 믿게 했다.', next: 'map' },
+          fail: {
+            text: [
+              '“엘레우스의 마지막 왕은 내 눈앞에서 돌이 되었다.” 오르덴의 목소리가 얼음처럼 식었다. “그 왕가의 사자라고?”',
+              '기사는 길을 비켜섰지만 그대에게서 눈을 떼지 않았다. 문 앞에 모닥불을 피우면서도, 창은 손에서 놓지 않았다.'
+            ],
+            fx: { set: ['wary', 'lied'] },
+            log: '거짓말이 들통났다. 오르덴이 그대를 의심한다.', next: 'map' } }
       ]
     },
 
     q_ring_end: {
+      art: { sky: 'rain', bg: 'gate', props: ['campfire'], actors: [{ k: 'hero', x: 0.3 }, { k: 'orden', x: 0.64, face: -1 }], fx: ['rain'] },
       title: '가라앉은 맹세',
       clock: '울음의 관문',
       text: [
@@ -776,7 +863,7 @@ window.SCENARIO = {
         '“카이론…” 기사는 반지 안쪽에 새겨진 이름을 손끝으로 쓸었다. “내 동생이다. 사냥꾼의 개들이 처음 몰려온 밤, 수로를 지키러 내려갔다가 돌아오지 못했지.”'
       ],
       choices: [
-        { id: 1, label: '반지를 오르덴에게 돌려준다', roll: false,
+        { id: 1, insp: 'mercy', label: '반지를 오르덴에게 돌려준다', roll: false,
           then: {
             text: [
               '오르덴은 반지를 자신의 새끼손가락에 끼웠다. 한참 동안 아무 말도 하지 않던 그가, 이윽고 그대를 바라보았다.',
@@ -789,6 +876,7 @@ window.SCENARIO = {
 
     // ───────────────────────── 별의 무덤
     n5: {
+      art: { sky: 'star', bg: 'tomb', props: ['relic'], actors: [{ k: 'hero', x: 0.3 }], fx: ['motes'] },
       title: '별의 무덤',
       clock: '{relic:을} 손에 넣는다',
       text: [
@@ -830,7 +918,7 @@ window.SCENARIO = {
             fx: RELIC({ hp: -4, set: ['starmark'] }),
             log: '별의 시험에서 화상을 입었다 (HP -4). 그래도 {relic:이} 그대를 택했다.', next: 'n6' } },
 
-        { id: 2, label: '오르덴과 함께 옛 의식을 올린다', stat: '매력', dc: 9,
+        { id: 2, skill: '공연', insp: 'song', label: '오르덴과 함께 옛 의식을 올린다', stat: '매력', dc: 9,
           requires: { min: { bond: 1 } }, reqText: '오르덴의 신뢰',
           note: '쉬움. 성공하면 크게 회복한다',
           success: {
@@ -848,7 +936,7 @@ window.SCENARIO = {
             fx: RELIC({ set: ['alerted'] }),
             log: '의식 끝에 {relic:을} 얻었지만, 새어 나간 빛을 사냥개들이 보았다.', next: 'n6' } },
 
-        { id: 3, label: '{item:을} 제물로 수정관에 바친다', stat: '지혜', dc: 9,
+        { id: 3, skill: '비전', label: '{item:을} 제물로 수정관에 바친다', stat: '지혜', dc: 9,
           note: '쉬움',
           success: {
             text: [
@@ -869,6 +957,7 @@ window.SCENARIO = {
 
     // ───────────────────────── 사냥개의 밤 (유물을 얻은 직후)
     n6: {
+      art: { sky: 'star', bg: 'tomb', actors: [{ k: 'orden', x: 0.12 }, { k: 'hero', x: 0.24 }, { k: 'hound', x: 0.52 }, { k: 'hound', x: 0.64 }, { k: 'pup', x: 0.74 }, { k: 'alpha', x: 0.87 }], fx: ['motes'] },
       title: '사냥개의 밤',
       clock: '밀려드는 사냥개 무리',
       text: [
@@ -880,8 +969,8 @@ window.SCENARIO = {
         { if: { flag: 'oath' }, t: '오르덴이 그대 앞으로 나서며 장창을 겨누었다. “내 등 뒤에 서라.”' }
       ],
       choices: [
-        { id: 1, label: '문턱의 룬을 덫으로 바꿔 무리를 한꺼번에 노린다', stat: '지혜', dc: 13,
-          dcMod: [{ if: { flag: 'alerted' }, v: 2, why: '놈들이 경계 중' }],
+        { id: 1, skill: '비전', insp: 'lore', label: '문턱의 룬을 덫으로 바꿔 무리를 한꺼번에 노린다', stat: '지혜', dc: 13,
+          dis: [{ if: { flag: 'alerted' }, why: '놈들이 경계 중' }],
           note: '성공하면 남는 놈이 적다',
           success: {
             text: [
@@ -907,7 +996,7 @@ window.SCENARIO = {
             fx: { hp: -4 }, battle: HOUNDS(['hound', 'hound']),
             log: '룬 덫이 반만 작동했다 (HP -4).', next: 'map' } },
 
-        { id: 2, label: '오르덴과 등을 맞대고 좁은 문턱을 지킨다', stat: '힘', dc: 12,
+        { id: 2, skill: '운동', insp: 'brave', label: '오르덴과 등을 맞대고 좁은 문턱을 지킨다', stat: '힘', dc: 12,
           bonus: [{ if: { min: { bond: 2 } }, v: 3, why: '오르덴과의 호흡' }],
           note: '오르덴과의 유대가 깊을수록 쉽다',
           success: {
@@ -941,12 +1030,27 @@ window.SCENARIO = {
               '빛은 터졌지만 너무 짧았다. 눈을 감고 있던 놈들이, 섬광이 사그라지자마자 달려들었다.'
             ],
             fx: { mp: -1 }, battle: HOUNDS(['hound', 'hound']),
-            log: '섬광이 짧았다 (마력 -1).', next: 'map' } }
+            log: '섬광이 짧았다 (마력 -1).', next: 'map' } },
+
+        { id: 4, label: '사냥꾼의 뿔피리보다 큰 포효로 무리를 주춤하게 만든다', stat: '매력', skill: '위협', dc: 13, insp: 'brave',
+          note: '성공하면 남는 놈이 적다',
+          success: {
+            text: [
+              '그대는 문턱 위에 서서, 산이 울리도록 포효했다. 앞장서던 사냥개들이 귀를 젖히며 주춤했다. 낙인의 명령보다 오래된 것 — 짐승의 두려움이 놈들을 붙잡은 것이다.',
+              '대부분이 꼬리를 말고 물러났다. 단 한 마리만이 이빨을 드러내며 달려든다!'
+            ],
+            fx: { xp: 4 }, battle: HOUNDS(['hound']),
+            log: '포효로 사냥개 무리를 물러서게 했다.', next: 'map' },
+          fail: {
+            text: ['포효는 뿔피리 소리에 묻혀 버렸다. 사냥개들은 오히려 그대를 향해 이를 드러냈다.'],
+            battle: HOUNDS(['hound', 'hound']),
+            log: '포효가 먹히지 않았다.', next: 'map' } }
       ]
     },
 
     // ───────────────────────── 무너지는 회랑 (우두머리 추격)
     n7: {
+      art: { sky: 'cave', bg: 'hall', actors: [{ k: 'hero', x: 0.24 }, { k: 'pup', x: 0.6 }, { k: 'alpha', x: 0.78 }], fx: ['dust'] },
       title: '무너지는 회랑',
       clock: '우두머리를 결계의 방으로 몰아넣는다',
       text: [
@@ -984,7 +1088,7 @@ window.SCENARIO = {
             fx: { hp: -6 },
             log: '석재 낙하에 실패해 우두머리에게 물렸다 (HP -6).', next: 'n8' } },
 
-        { id: 2, label: '회랑을 전력으로 달려 결계의 방까지 유인한다', stat: '민첩', dc: 12,
+        { id: 2, skill: '곡예', insp: 'wild', label: '회랑을 전력으로 달려 결계의 방까지 유인한다', stat: '민첩', dc: 12,
           note: '실패하면 HP 피해',
           success: {
             text: [
@@ -1001,7 +1105,7 @@ window.SCENARIO = {
             fx: { hp: -6 },
             log: '유인하다 발톱에 긁혔다 (HP -6). 그래도 놈은 따라 들어왔다.', next: 'n8' } },
 
-        { id: 3, label: '우두머리 이마의 회색 낙인을 노려 별빛을 쏜다', stat: '지혜', dc: 13,
+        { id: 3, skill: '비전', insp: 'lore', label: '우두머리 이마의 회색 낙인을 노려 별빛을 쏜다', stat: '지혜', dc: 13,
           requires: { flag: 'mark_seen' }, reqText: '회색 낙인의 비밀',
           note: '성공하면 결전에서 낙인을 부수기 쉬워진다',
           success: {
@@ -1024,6 +1128,7 @@ window.SCENARIO = {
 
     // ───────────────────────── 닫힌 결계 → 결전
     n8: {
+      art: { sky: 'cave', bg: 'barrier', actors: [{ k: 'orden', x: 0.13 }, { k: 'hero', x: 0.26 }, { k: 'pup', x: 0.6 }, { k: 'alpha', x: 0.77 }] },
       title: '닫힌 결계',
       clock: '결전 직전의 한 수',
       text: [
@@ -1053,7 +1158,7 @@ window.SCENARIO = {
             fx: { hp: -6 }, battle: BOSS,
             log: '전력을 쏟았지만 우두머리가 빛을 뚫고 덮쳤다 (HP -6).', next: 'n9' } },
 
-        { id: 2, label: '문지기에게 투창을 부탁한다', stat: '매력', dc: 8,
+        { id: 2, skill: '설득', adv: [{ if: { flag: 'oath' }, why: '맹세한 기사' }], label: '문지기에게 투창을 부탁한다', stat: '매력', dc: 8,
           requires: { min: { bond: 1 } }, reqText: '오르덴의 신뢰',
           note: '쉬움. 성공하면 결전에서 우두머리 방어 -2, 명중 -1',
           success: {
@@ -1071,7 +1176,7 @@ window.SCENARIO = {
             fx: { hp: -6, add: { bond: 1 } }, battle: BOSS,
             log: '투창이 빗나갔다. 오르덴을 감싸다 물렸다 (HP -6).', next: 'n9' } },
 
-        { id: 3, label: '몸을 굴려 피하며 새끼를 어미에게서 떼어 놓는다', stat: '민첩', dc: 12,
+        { id: 3, skill: '곡예', insp: 'mercy', label: '몸을 굴려 피하며 새끼를 어미에게서 떼어 놓는다', stat: '민첩', dc: 12,
           note: '성공하면 결전에서 우두머리가 이따금 머뭇거리고, 낙인을 부수기 쉬워진다',
           success: {
             text: [
@@ -1087,7 +1192,7 @@ window.SCENARIO = {
             fx: { hp: -6 }, battle: BOSS,
             log: '새끼에게 다가가다 우두머리의 분노를 샀다 (HP -6).', next: 'n9' } },
 
-        { id: 4, label: '룬 기둥의 힘을 빌려 별빛 방벽을 세운다', stat: '지혜', dc: 12,
+        { id: 4, skill: '비전', label: '룬 기둥의 힘을 빌려 별빛 방벽을 세운다', stat: '지혜', dc: 12,
           note: '성공하면 결전에서 첫 피해를 한 번 막는다',
           success: {
             text: [
@@ -1107,6 +1212,7 @@ window.SCENARIO = {
 
     // ───────────────────────── 비가 멎은 새벽
     n9: {
+      art: { sky: 'dawn', bg: 'gate', actors: [{ k: 'hero', x: 0.4 }, { k: 'orden', x: 0.58, face: -1 }] },
       title: '비가 멎은 새벽',
       clock: '1장 에필로그',
       text: [
@@ -1124,7 +1230,7 @@ window.SCENARIO = {
         '“하늘이… 울음을 그쳤다.” 기사의 목소리가 떨렸다. “아스텔께서 그대를 택하셨다는 뜻이다.”'
       ],
       choices: [
-        { id: 1, label: '옅어지는 새벽하늘에 남은 별자리를 읽는다', stat: '지혜', dc: 12,
+        { id: 1, skill: '비전', insp: 'lore', label: '옅어지는 새벽하늘에 남은 별자리를 읽는다', stat: '지혜', dc: 12,
           note: '성공하면 다음 여정의 길을 안다',
           success: {
             text: [
@@ -1140,7 +1246,7 @@ window.SCENARIO = {
             ],
             log: '별자리를 읽지 못했다. 그래도 {relic:이} 동쪽을 가리켰다.', next: 'n10' } },
 
-        { id: 2, label: '오르덴과 함께 돌이 된 기사들의 넋을 기린다', stat: '매력', dc: 10,
+        { id: 2, skill: '공연', insp: 'mercy', label: '오르덴과 함께 돌이 된 기사들의 넋을 기린다', stat: '매력', dc: 10,
           note: '성공하면 오르덴과의 유대가 깊어진다. 어느 쪽이든 쉬어 간다',
           success: {
             text: [
@@ -1161,6 +1267,7 @@ window.SCENARIO = {
     },
 
     n10: {
+      art: { sky: 'night', bg: 'mountains', props: ['stars6'], actors: [{ k: 'hero', x: 0.5 }], fx: ['stars'] },
       title: '사냥꾼의 뿔피리',
       clock: '1장 에필로그',
       text: [
@@ -1190,7 +1297,7 @@ window.SCENARIO = {
       title: '바위 틈의 반짝임', clock: '탐색',
       text: ['젖은 바위 틈 사이로 무언가가 반짝인다. 손을 넣기엔 틈이 좁고 미끄럽다.'],
       choices: [
-        { id: 1, label: '손을 밀어 넣어 꺼낸다', stat: '민첩', dc: 11,
+        { id: 1, skill: '손재주', insp: 'sly', label: '손을 밀어 넣어 꺼낸다', stat: '민첩', dc: 11,
           success: { text: ['손끝에 차가운 동전 몇 닢이 걸려 나왔다. 오래전 누군가 숨겨 둔 것이다.'], fx: { gold: [6, 14] }, log: '바위 틈에서 동전을 찾았다.', next: 'map' },
           fail: { text: ['손이 미끄러지며 날카로운 돌에 베였다. 반짝이던 것은 깨진 유리 조각이었다.'], fx: { hp: -2 }, log: '바위 틈에 손을 베였다 (HP -2).', next: 'map' } },
         { id: 2, label: '그냥 지나친다', roll: false,
@@ -1201,7 +1308,7 @@ window.SCENARIO = {
       title: '빗속의 약초', clock: '탐색',
       text: ['바위 그늘에 은빛 잎사귀가 돋아 있다. 상처에 좋다는 별꽃 약초 같기도 하고, 독초 같기도 하다.'],
       choices: [
-        { id: 1, label: '잎맥을 살펴 약초인지 가려낸다', stat: '지혜', dc: 10,
+        { id: 1, skill: '의학', insp: 'wild', label: '잎맥을 살펴 약초인지 가려낸다', stat: '지혜', dc: 10,
           success: { text: ['별꽃 약초가 맞다. 그대는 잎을 짓이겨 작은 병에 담았다.'], fx: { items: ['은빛 물약'], xp: 2 }, log: '별꽃 약초로 은빛 물약을 만들었다.', next: 'map' },
           fail: { text: ['잎을 씹는 순간 혀가 저려 왔다. 독초였다.'], fx: { hp: -2 }, log: '독초를 씹었다 (HP -2).', next: 'map' } },
         { id: 2, label: '건드리지 않는다', roll: false, then: { text: ['그대는 잎사귀를 그대로 두었다.'], next: 'map' } }
@@ -1211,26 +1318,27 @@ window.SCENARIO = {
       title: '버려진 덫', clock: '탐색',
       text: ['낙엽 아래 녹슨 덫이 입을 벌리고 있다. 덫 옆에는 사냥꾼의 것으로 보이는 주머니가 떨어져 있다.'],
       choices: [
-        { id: 1, label: '덫을 피해 주머니를 집는다', stat: '민첩', dc: 12,
+        { id: 1, skill: '손재주', insp: 'sly', label: '덫을 피해 주머니를 집는다', stat: '민첩', dc: 12,
           success: { text: ['그대는 덫의 이빨 사이로 손을 뻗어 주머니를 낚아챘다.'], fx: { gold: [8, 16], xp: 3 }, log: '버려진 덫 옆에서 주머니를 주웠다.', next: 'map' },
           fail: { text: ['덫이 철컥 닫히며 발목을 물었다. 겨우 빼냈지만 피가 흐른다.'], fx: { hp: -4 }, log: '덫에 발목을 물렸다 (HP -4).', next: 'map' } },
-        { id: 2, label: '덫을 힘으로 비틀어 연다', stat: '힘', dc: 12,
+        { id: 2, skill: '운동', label: '덫을 힘으로 비틀어 연다', stat: '힘', dc: 12,
           success: { text: ['녹슨 스프링이 끊어지며 덫이 활짝 열렸다. 주머니와 함께 덫에 걸려 있던 오래된 병도 하나 건졌다.'], fx: { gold: [8, 16], items: ['은빛 물약'], xp: 3 }, log: '덫을 부수고 주머니와 물약을 얻었다.', next: 'map' },
           fail: { text: ['덫이 튕겨 오르며 손등을 할퀴었다.'], fx: { hp: -3 }, log: '덫에 손을 다쳤다 (HP -3).', next: 'map' } }
       ]
     },
     ex_web: {
+      art: { sky: 'rain', bg: 'forest', props: ['web'], fx: ['rain'] },
       title: '거미줄에 걸린 배낭', clock: '탐색',
       text: ['나무 사이에 거대한 거미줄이 쳐져 있고, 그 한가운데 누군가의 배낭이 매달려 있다. 줄이 미세하게 떨린다.'],
       choices: [
-        { id: 1, label: '거미줄을 찢고 배낭을 끌어내린다', stat: '힘', dc: 12,
+        { id: 1, skill: '운동', label: '거미줄을 찢고 배낭을 끌어내린다', stat: '힘', dc: 12,
           success: { text: ['거미줄이 찢어지며 배낭이 떨어졌다. 안에는 푸른 병 하나와 동전이 들어 있었다.'], fx: { items: ['푸른 물약'], gold: [5, 12], xp: 3 }, log: '거미줄에서 배낭을 끌어내렸다.', next: 'map' },
           fail: { text: ['거미줄이 끈적하게 팔에 감겼다. 그리고 — 머리 위에서 무언가가 내려온다!'],
             battle: { enemies: ['spider'],
               win: { text: ['거미가 다리를 오그리며 쓰러졌다. 그대는 거미줄을 걷어 내고 배낭을 챙겼다.'], fx: { items: ['푸른 물약'], gold: [5, 12] }, log: '거미를 물리치고 배낭을 챙겼다.', next: 'map' },
               lose: { text: ['거미의 독이 온몸에 퍼졌다. 정신을 차렸을 때, 배낭은 이미 사라지고 없었다.'], log: '거미에게 쓰러졌다.', next: 'map' } },
             log: '거미줄에 걸렸다.', next: 'map' } },
-        { id: 2, label: '줄을 하나씩 조심스럽게 끊는다', stat: '민첩', dc: 13,
+        { id: 2, skill: '손재주', insp: 'sly', label: '줄을 하나씩 조심스럽게 끊는다', stat: '민첩', dc: 13,
           success: { text: ['떨림이 전해지지 않도록 줄을 하나씩 끊었다. 거미는 끝내 눈치채지 못했다.'], fx: { items: ['푸른 물약'], gold: [5, 12], xp: 3 }, log: '거미 몰래 배낭을 챙겼다.', next: 'map' },
           fail: { text: ['줄 하나가 튕기며 떨림이 퍼졌다. 머리 위에서 무언가가 내려온다!'],
             battle: { enemies: ['spider'],
@@ -1244,20 +1352,21 @@ window.SCENARIO = {
       title: '이끼 낀 룬', clock: '탐색',
       text: ['돌계단 한쪽에 이끼에 덮인 룬이 희미하게 빛난다. 별의 노래 한 소절이 새겨진 것 같다.'],
       choices: [
-        { id: 1, label: '룬을 읽어 그 힘을 받아들인다', stat: '지혜', dc: 13,
+        { id: 1, skill: '비전', insp: 'lore', label: '룬을 읽어 그 힘을 받아들인다', stat: '지혜', dc: 13,
           success: { text: ['룬의 노래가 그대의 숨결에 스며들었다. 마력이 차오른다.'], fx: { mp: 5, xp: 4 }, log: '룬의 힘으로 마력을 채웠다.', next: 'map' },
           fail: { text: ['룬이 낯선 손길을 거부하며 불꽃을 튀겼다.'], fx: { hp: -3 }, log: '룬이 그대를 거부했다 (HP -3).', next: 'map' } },
         { id: 2, label: '그냥 지나친다', roll: false, then: { text: ['그대는 룬을 지나쳤다.'], next: 'map' } }
       ]
     },
     ex_bones: {
+      art: { sky: 'cave', bg: 'aqueduct', props: ['bones'], fx: ['drip'] },
       title: '쓰러진 기사', clock: '탐색', if: { not: 'found_bones' },
       text: [
         '무릎까지 차는 물길을 따라가다, 그대는 오래전 이곳에서 쓰러진 기사의 유골과 마주쳤다.',
         '녹슨 장갑을 낀 손에 은빛 병 두 개가 아직 온전히 쥐어져 있었다. 그런데 — 다른 손가락에는 반지 자국만 남아 있다. 수로 깊은 곳에서 녹슨 갑주가 부딪히는 소리가 들려온다.'
       ],
       choices: [
-        { id: 1, label: '짧게 묵념하고 병을 거둔다', roll: false,
+        { id: 1, insp: 'mercy', label: '짧게 묵념하고 병을 거둔다', roll: false,
           then: { text: ['그대는 기사의 유골 앞에 잠시 고개를 숙였다. 반지는 어디로 간 것일까.'], fx: { set: ['found_bones'], items: ['은빛 물약', '은빛 물약'] },
             log: '옛 수로에서 쓰러진 기사의 유골을 찾았다. 반지가 사라져 있었다.', next: 'map' } }
       ]
@@ -1266,20 +1375,21 @@ window.SCENARIO = {
       title: '물속의 옛 동전', clock: '탐색',
       text: ['탁한 물 아래에서 옛 엘레우스의 동전들이 희미하게 빛난다. 그 사이로 무언가가 미끄러지듯 지나간다.'],
       choices: [
-        { id: 1, label: '재빨리 손을 넣어 건져 올린다', stat: '민첩', dc: 12,
+        { id: 1, skill: '손재주', insp: 'sly', label: '재빨리 손을 넣어 건져 올린다', stat: '민첩', dc: 12,
           success: { text: ['그대는 거머리가 돌아오기 전에 동전을 한 움큼 건져 올렸다.'], fx: { gold: [12, 22], xp: 3 }, log: '물속에서 옛 동전을 건졌다.', next: 'map' },
           fail: { text: ['손을 넣는 순간 무언가가 팔뚝에 달라붙었다. 떼어 냈을 때는 피가 흐르고 있었다.'], fx: { hp: -4 }, log: '거머리에게 물렸다 (HP -4).', next: 'map' } },
         { id: 2, label: '그냥 지나친다', roll: false, then: { text: ['그대는 동전을 물속에 그대로 두었다.'], next: 'map' } }
       ]
     },
     ex_depths: {
+      art: { sky: 'cave', bg: 'aqueduct', actors: [{ k: 'drowned', x: 0.66, face: -1 }], fx: ['drip'] },
       title: '수로의 깊은 곳', clock: '탐색', if: { flag: 'found_bones', not: 'got_ring' },
       text: [
         '물이 가슴까지 차오르는 수로의 가장 깊은 곳. 녹슨 갑주가 부딪히는 소리가 바로 앞에서 들린다.',
         '물속에서 투구 하나가 천천히 떠올랐다. 그 안에서 푸른 불꽃이 탄다. 손가락에 낀 은반지가 물빛에 번득였다.'
       ],
       choices: [
-        { id: 1, label: '물에 잠긴 기사와 싸운다 (권장 레벨 5)', roll: false, note: '전투',
+        { id: 1, insp: 'brave', label: '물에 잠긴 기사와 싸운다 (권장 레벨 5)', roll: false, note: '전투',
           then: {
             text: ['기사가 녹슨 대검을 물 밖으로 끌어 올렸다. 천 년의 침묵을 깨는 소리였다.'],
             battle: { enemies: ['drowned'],
@@ -1293,7 +1403,7 @@ window.SCENARIO = {
       title: '추종자의 시신', clock: '탐색',
       text: ['무너진 기둥 아래 회색 두건을 쓴 시신이 깔려 있다. 손등에 사냥개와 같은 낙인이 있다.'],
       choices: [
-        { id: 1, label: '시신의 소지품을 살핀다', stat: '지혜', dc: 12,
+        { id: 1, skill: '지각', label: '시신의 소지품을 살핀다', stat: '지혜', dc: 12,
           success: { text: ['두건 속주머니에서 낙인 조각과 금화 몇 닢이 나왔다.'], fx: { items: ['회색 낙인 조각'], gold: [8, 16], xp: 3 }, log: '추종자의 시신에서 낙인 조각을 찾았다.', next: 'map' },
           fail: { text: ['시신에 손을 대는 순간, 낙인이 회색 빛을 뿜으며 손끝을 태웠다.'], fx: { hp: -3 }, log: '낙인이 손끝을 태웠다 (HP -3).', next: 'map' } },
         { id: 2, label: '그냥 지나친다', roll: false, then: { text: ['그대는 시신을 지나쳤다.'], next: 'map' } }

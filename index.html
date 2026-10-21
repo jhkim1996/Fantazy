@@ -118,6 +118,21 @@ input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--
 .clog li.foe{border-color:var(--foe)}
 .clog li.sys{border-color:var(--star);color:var(--sub)}
 .clog li.old{opacity:.55}
+.art{display:block;width:100%;height:auto;aspect-ratio:640/280;border-radius:12px;margin-bottom:10px;background:#1b1f27}
+body.combat .art{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+body.combat #hud .stats{display:none}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;padding:8px}
+.buy{display:grid;gap:6px}
+.buyrow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;background:var(--bg);border-radius:8px;padding:6px 10px}
+.buyrow b{min-width:72px;text-align:center;font-variant-numeric:tabular-nums}
+.buyrow button{width:36px;padding:4px 0;font-size:16px}
+.skills{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;margin-top:6px}
+.skrow{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:baseline;font-size:13px;color:var(--sub)}
+.skrow.prof{color:var(--text)}
+.skrow b{font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
+.insp{color:var(--star);letter-spacing:.1em}
+.chip.gold{border-color:var(--star);color:var(--star)}
 .lvopt{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .lvopt .opt{margin:0}
 </style>
@@ -125,6 +140,7 @@ input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--
 <body>
 <div class="wrap">
 
+<canvas id="art" class="art" aria-hidden="true"></canvas>
 <div class="card">
   <div class="saga" id="saga"></div>
   <div id="stitle"></div>
@@ -208,6 +224,7 @@ input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--
 </div>
 
 <script src="chapter1.js"></script>
+<script src="art.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
