@@ -145,10 +145,10 @@ function skillMod(sk){return statVal(SC.skillList[sk])+profCount(sk)*profBonus()
 function wpn(){return SC.items[S.equip.weapon]||{dice:'1d4',bonus:0}}
 function arm(){return SC.items[S.equip.armor]||{ac:0}}
 function prof(){return Math.floor(S.hero.level/2)}
-function heroAC(){return 10+statVal('민첩')+(arm().ac||0)+bsum('ac')}
+function heroAC(){return 10+statVal('민첩')+(arm().ac||0)+(tfx('hero').ac||0)+bsum('ac')}
 function atkStat(){return cls().key}
-function weaponHit(extra){return statVal(atkStat())+prof()+(wpn().bonus||0)+(extra||0)+bsum('atk')}
-function weaponDmgBonus(){return statVal(atkStat())+(wpn().bonus||0)+bsum('dmg')}
+function weaponHit(extra){return statVal(atkStat())+prof()+(wpn().bonus||0)+(extra||0)+(tfx('hero').hit||0)+bsum('atk')}
+function weaponDmgBonus(){return statVal(atkStat())+(wpn().bonus||0)+(tfx('hero').dmg||0)+bsum('dmg')}
 function clsSkills(){return cls().skills||[]}
 function knownSkills(){return clsSkills().filter(k=>SC.combatSkills[k].lv<=S.hero.level)}
 function hasRelic(){return S.items.some(i=>i===cls().relic)}
@@ -159,7 +159,59 @@ function autoEquip(){
     S.items.forEach(n=>{const it=SC.items[n];if(it&&it.slot===slot&&itemScore(it)>itemScore(SC.items[best]))best=n});
     S.equip[slot]=best;
   });
+  // 장신구는 그대의 자리가 비어 있을 때만 가장 귀한 것을 찬다 (나머지는 직접 고른다)
+  if(S.equip.trinket&&!S.items.includes(S.equip.trinket))setTrinket('hero',null);
+  if(!S.equip.trinket){let best=null;S.items.forEach(n=>{const it=SC.items[n];if(it&&it.slot==='trinket'&&!wearer(n)&&(!best||(RANK[it.rar]||0)>(RANK[SC.items[best].rar]||0)))best=n});if(best)setTrinket('hero',best)}
 }
+
+// ── 장신구와 아이템 등급
+const RAR={uncommon:'고급',rare:'희귀',legendary:'전설'},RANK={uncommon:1,rare:2,legendary:3};
+const DTN={fire:'불',cold:'냉기',arcane:'마력',radiant:'별빛',thunder:'천둥',psychic:'정신',poison:'독',phys:'물리'};
+function trinketOn(who){return who==='hero'?S.equip.trinket||null:(S.comp&&S.comp[who]&&S.comp[who].trinket)||null}
+function tfx(who){const n=trinketOn(who),it=n&&SC.items[n];return (it&&it.fx)||{}}
+function wearer(n){if(S.equip.trinket===n)return 'hero';for(const id in (S.comp||{}))if(S.comp[id].trinket===n)return id;return null}
+function whoName(who){return who==='hero'?'그대':COMP(who).name}
+function trinketText(fx){
+  const p=[];if(fx.hp)p.push('최대 HP +'+fx.hp);if(fx.ac)p.push('방어 +'+fx.ac);if(fx.hit)p.push('명중 +'+fx.hit);if(fx.dmg)p.push('피해 +'+fx.dmg);
+  if(fx.fire)p.push('불 피해 +'+fx.fire);if(fx.init)p.push('주도권 +'+fx.init);if(fx.save)p.push('내성 +'+fx.save);if(fx.check)p.push('이야기 판정 +'+fx.check);
+  if(fx.resist)p.push(fx.resist.map(d=>DTN[d]).join('·')+' 저항');if(fx.hide)p.push('숨기 유리');if(fx.death)p.push('죽음 내성 유리');
+  return p.join(', ');
+}
+// 장신구를 바꿔 찬다. 최대 HP가 바뀌면 지금 HP도 같이 움직인다
+function setTrinket(who,n){
+  const old=tfx(who).hp||0;
+  if(who==='hero')S.equip.trinket=n;else S.comp[who].trinket=n;
+  const dl=(tfx(who).hp||0)-old;
+  if(who==='hero'){S.hero.hpMax+=dl;S.hero.hp=Math.max(1,Math.min(S.hero.hpMax,S.hero.hp+dl))}else syncComps();
+}
+function equipTrinket(n,who){const prev=wearer(n);if(prev===who)return;if(prev)setTrinket(prev,null);setTrinket(who,n);logp(josa(whoName(who),'이')+' '+josa(n,'을')+' 찼다.');save();render()}
+function unequipTrinket(n){const prev=wearer(n);if(!prev)return;setTrinket(prev,null);save();render()}
+function rarName(n){const it=SC.items[n]||{};return el('b',it.rar?'rar-'+it.rar:null,n)}
+
+// ── 동료의 호감: 함께 있는 동료만 그대의 선택에 반응한다
+function apVal(id){return S.counters[COMP(id).ap]||0}
+function apTier(v){return v<=-3?{n:'냉담',hit:-1}:v>=6?{n:'깊은 신뢰',hit:1,ac:1}:v>=3?{n:'호의',hit:1}:{n:'보통'}}
+// 동료의 전투 보너스: 호감 단계 + 개인 보상(perks) + 장신구
+function compMod(id,k){let v=(apTier(apVal(id))[k]||0)+(tfx(id)[k]||0);arr(COMP(id).perks).forEach(p=>{if(ok(p.if))v+=p[k]||0});return v}
+function approve(map,out){
+  if(!map)return;
+  for(const id in map){
+    const C=(SC.companions||{})[id];if(!C||!map[id]||!compHere(id))continue;
+    S.counters[C.ap]=(S.counters[C.ap]||0)+map[id];
+    out.push(C.name+' '+(C.apName||'호감')+' '+sign(map[id]));
+  }
+}
+// 호감이 바닥나면 떠난다
+function checkLeave(out,text){
+  for(const id in (SC.companions||{})){
+    const C=SC.companions[id];if(C.leaveAt==null||!compKnown(id))continue;
+    if((S.counters[C.ap]||0)<=C.leaveAt){
+      S.flags[id+'_left']=true;if(S.comp&&S.comp[id])S.comp[id].trinket=null;
+      if(C.leaveText)text.push(C.leaveText);out.push(josa(C.name,'이')+' 일행을 떠났다');logp(josa(C.name,'이')+' 일행을 떠났다.');
+    }
+  }
+}
+function campTalk(){return arr(SC.camp).find(id=>{const e=SC.events[id];return e&&!S.flags['done_'+id]&&ok(e.if)})}
 
 // ── 결과 적용
 function applyFx(fx,out){
@@ -452,7 +504,11 @@ function longRest(){
   for(const id in S.comp)S.comp[id].hp=fill(S.comp[id].hp,S.comp[id].hpMax);
   S.rest={short:2};recharge('long');
   logp(l.name+'에서 '+(full?'':'빈속으로 ')+'긴 휴식을 했다.');
-  notice(tpl(l.rest)+' — '+(full?'밤이 지나고, 모두 HP와 마력을 되찾았다.':'먹을 것이 없어 잠을 설쳤다. 절반만 회복했다.')+(!free&&has?' (야영 물자 -1)':'')+' 짧은 휴식과 기술이 모두 충전되었다.');
+  const msg=tpl(l.rest)+' — '+(full?'밤이 지나고, 모두 HP와 마력을 되찾았다.':'먹을 것이 없어 잠을 설쳤다. 절반만 회복했다.')+(!free&&has?' (야영 물자 -1)':'')+' 짧은 휴식과 기술이 모두 충전되었다.';
+  // 모닥불 곁에서 동료가 이야기를 꺼낸다
+  const talk=campTalk();
+  if(talk){startEvent(talk);S.notice=msg;save();render();return}
+  notice(msg);
 }
 // 짧은 휴식: 어디서나, 긴 휴식 사이에 두 번. HP 절반 회복, 짧은 휴식 기술 충전
 function shortRest(){
@@ -493,9 +549,12 @@ function calc(c){
   let mod=statVal(statOf(c)),dc=c.dc;const why=[];
   if(c.stat==='class'){mod+=profBonus();why.push('직업 숙련 +'+profBonus())}
   else if(c.skill){const n=profCount(c.skill);if(n){mod+=n*profBonus();why.push((n>1?'전문 +':'숙련 +')+n*profBonus())}}
+  const tc=tfx('hero').check;if(tc){mod+=tc;why.push('장신구 '+sign(tc))}
   arr(c.bonus).forEach(b=>{if(ok(b.if)){mod+=b.v;why.push(b.why+' '+sign(b.v))}});
   arr(c.dcMod).forEach(b=>{if(ok(b.if)){dc+=b.v;why.push(b.why+' DC '+sign(b.v))}});
   const adv=arr(c.adv).filter(a=>ok(a.if)).map(a=>a.why),dis=arr(c.dis).filter(a=>ok(a.if)).map(a=>a.why);
+  // 그 기술에 능한 동료가 곁에 있으면 돕는다
+  if(c.skill)party().forEach(id=>{if(arr(COMP(id).profs).includes(c.skill))adv.push(COMP(id).name+'의 도움')});
   if(S.opt&&S.opt.karmic&&(S.failStreak||0)>=2)adv.push('업보 주사위');
   return {mod,dc,why,adv,dis};
 }
@@ -511,6 +570,8 @@ function applyOutcome(oc,meta){
   applyFx(fxOf(oc.fx),out);
   arr(oc.fxIf).forEach(e=>{if(ok(e.if))applyFx(fxOf(e.fx),out)});
   syncComps().forEach(id=>{out.push('동료 합류: '+COMP(id).name);logp(josa(COMP(id).name,'이')+' 동료가 되었다.')});
+  approve(meta.approve,out);approve(oc.approve,out);
+  checkLeave(out,text);
   if(meta.key==='crit'&&!meta.ownCrit){S.hero.xp+=2;out.push('대성공 보너스 경험치 +2')}
   if(meta.extra)out.unshift.apply(out,meta.extra);
   if(meta.insp)out.push(meta.insp);
@@ -529,7 +590,8 @@ function resolve(c,rl){
   if(rl)S.failStreak=rl.success?0:(S.failStreak||0)+1;
   let insp=null;
   if(inspMatch(c)&&S.insp<(SC.inspMax||4)){S.insp++;insp='영감 +1 ('+bg().name+'다운 선택)'}
-  applyOutcome(oc,{choiceId:c.id,label:txt(c.label),key,roll:rl,ownCrit:!!c.crit,insp});
+  S.notice=null;
+  applyOutcome(oc,{choiceId:c.id,label:txt(c.label),key,roll:rl,ownCrit:!!c.crit,insp,approve:c.approve});
   save();render();
   const rw=$('reswrap');if(rw.scrollIntoView)rw.scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -551,7 +613,7 @@ function compKnown(id){return !!S.hero&&ok(COMP(id).joinIf)}
 // 지금 이 장소에서 함께 다니는가 (오르덴은 관문 근처에서만)
 function compHere(id){const c=COMP(id);return compKnown(id)&&(!c.locs||c.locs.includes(S.loc)||ok(c.anywhereIf))}
 function party(){return Object.keys(SC.companions||{}).filter(compHere)}
-function compMaxHp(id){const c=COMP(id);return c.hp+c.hpGain*(S.hero.level-1)}
+function compMaxHp(id){const c=COMP(id);return c.hp+c.hpGain*(S.hero.level-1)+(tfx(id).hp||0)}
 // 동료 기록을 레벨에 맞춘다. full이면 모두 회복. 새로 합류한 동료 id를 돌려준다
 function syncComps(full){
   S.comp=S.comp||{};const fresh=[];
@@ -606,14 +668,15 @@ function hk(u){return u.side==='pc'?'foe':'me'}   // 그 대상이 당한 일
 function bsumU(u,k){return ((u&&u.buffs)||[]).reduce((a,b)=>a+(b[k]||0),0)}
 function bsum(k){const B=S.battle;return B&&B.units?bsumU(U('hero'),k):0}
 function lvB(){return Math.floor((S.hero.level-1)/2)}
-function acOf(u){return u.kind==='hero'?heroAC():(u.kind==='comp'?COMP(u.id).ac:u.ac)+bsumU(u,'ac')}
+function ufx(u){return u.side==='pc'?tfx(u.kind==='hero'?'hero':u.id):{}}
+function acOf(u){return u.kind==='hero'?heroAC():(u.kind==='comp'?COMP(u.id).ac+compMod(u.id,'ac'):u.ac)+bsumU(u,'ac')}
 function saveMod(u,stat){
-  if(u.kind==='hero')return statVal(stat);
-  if(u.kind==='comp'){const c=COMP(u.id);return ({힘:c.str,민첩:c.dex,지혜:c.wis})[stat]||0}
+  if(u.kind==='hero')return statVal(stat)+(tfx('hero').save||0);
+  if(u.kind==='comp'){const c=COMP(u.id);return (({힘:c.str,민첩:c.dex,지혜:c.wis})[stat]||0)+(tfx(u.id).save||0)}
   const E=E_(u);return Math.floor(u.lv/2)+((E.saves&&E.saves[stat])||0)+(E.big&&stat==='힘'?2:0);
 }
-function iniMod(u){return u.kind==='hero'?statVal('민첩'):u.kind==='comp'?COMP(u.id).init:(E_(u).init!=null?E_(u).init:Math.floor(u.lv/2))}
-function spellHit(sk){return statVal(sk.stat||atkStat())+prof()+(sk.hit||0)+bsum('atk')}
+function iniMod(u){return u.kind==='hero'?statVal('민첩')+(tfx('hero').init||0):u.kind==='comp'?COMP(u.id).init+(tfx(u.id).init||0):(E_(u).init!=null?E_(u).init:Math.floor(u.lv/2))}
+function spellHit(sk){return statVal(sk.stat||atkStat())+prof()+(sk.hit||0)+(tfx('hero').hit||0)+bsum('atk')}
 function spellDC(u,ab){return 8+profBonus()+(u.kind==='hero'?statVal(ab.stat||atkStat()):(COMP(u.id).dc||2))}
 function d20(u,mode){if(u.kind==='hero')return rollD20(mode);const a=d(20);if(mode==='normal')return {r:a,dice:[a],notes:[]};const b=d(20);return {r:mode==='adv'?Math.max(a,b):Math.min(a,b),dice:[a,b],notes:[]}}
 // 공격 정보: 이름·명중·원거리·치명 범위·피해 종류·피해 굴림
@@ -625,8 +688,8 @@ function profile(u,ab){
     return {name:ab?ab.name:thrown?'단검 던지기':'공격',hit:weaponHit(ab&&ab.hit),ranged:thrown,crit:Math.min(w.crit||20,(ab&&ab.crit)||20),dtype:'phys',weapon:true,
       dice:w.dice+sign(weaponDmgBonus())+(ab&&ab.extra?'+'+ab.extra:''),dmg:c=>rollDice(w.dice,c).total+weaponDmgBonus()+(ab&&ab.extra?rollDice(ab.extra,c).total:0)};
   }
-  const A=COMP(u.id).attack,b=A.dmgB+lvB()+bsumU(u,'dmg');
-  return {name:ab?ab.name:A.name,hit:A.hit+lvB()+((ab&&ab.hit)||0)+bsumU(u,'atk'),ranged:!!A.ranged,reach:!!A.reach,crit:(ab&&ab.crit)||20,dtype:A.dtype||'phys',burn:!!A.burn,weapon:true,
+  const A=COMP(u.id).attack,b=A.dmgB+lvB()+bsumU(u,'dmg')+compMod(u.id,'dmg')+(A.dtype==='fire'?tfx(u.id).fire||0:0);
+  return {name:ab?ab.name:A.name,hit:A.hit+lvB()+((ab&&ab.hit)||0)+bsumU(u,'atk')+compMod(u.id,'hit'),ranged:!!A.ranged,reach:!!A.reach,crit:(ab&&ab.crit)||20,dtype:A.dtype||'phys',burn:!!A.burn,weapon:true,
     dice:A.dice+sign(b)+(ab&&ab.extra?'+'+ab.extra:''),dmg:c=>rollDice(A.dice,c).total+b+(ab&&ab.extra?rollDice(ab.extra,c).total:0)};
 }
 function foeProfile(e,sk){
@@ -669,6 +732,7 @@ function mult(t,dt){
   if(t.side==='foe'){const E=E_(t);if(arr(E.vuln).includes(dt)){m*=2;why.push('약점')}if(arr(E.resist).includes(dt)){m/=2;why.push('저항')}}
   if(dt==='fire'&&t.st.wet){m/=2;why.push('젖음')}
   if(dt==='poison'&&t.kind==='hero'&&race()&&race().poisonResist){m/=2;why.push('드워프')}
+  if(t.side==='pc'&&arr(ufx(t).resist).includes(dt)){m/=2;why.push('장신구')}
   return {m,why};
 }
 // 피해를 준다. 쓰러진 아군을 때리면 죽음 내성 실패가 쌓인다. 실제로 준 피해를 돌려준다
@@ -783,6 +847,7 @@ function startBattle(def,kind,ambush){
   const B=S.battle={def,kind,units,order:ord.map(o=>o.uid),turn:-1,round:1,log:[],target:en[0].uid,surf:{},field,nE:en.length,
     surprise:ambush?'pc':def.surprise||null,over:null,res:null,last:null,tr:null};
   if(field.water)ZONES.forEach(z=>B.surf[z]={t:'water',r:99});
+  for(const z in (def.surf||{}))B.surf[z]={t:def.surf[z],r:def.surf[z]==='fire'?fireLife():SURF[def.surf[z]].r};
   S.mode='combat';S.notice=null;cmenu=null;fxDelay=0;
   logB(def.intro?tpl(def.intro):(ambush?'매복이다! ':'')+josa(nameList(ids),'이')+' 나타났다!','sys');
   if(pids.length)logB('함께 싸운다: '+pids.map(id=>COMP(id).name).join(', '),'sys');
@@ -801,7 +866,7 @@ function startRandomBattle(ambush){
   for(const x of pool){r-=x.w;if(r<0){g=x;break}}
   // 동료와 함께 다니면 적도 더 몰려온다
   const ids=g.e.slice(),n=party().length,extra=n?n+(n>=2&&Math.random()<0.25?1:0):0;
-  const singles=pool.filter(x=>x.e.length===1&&!SC.enemies[x.e[0]].elite).map(x=>x.e[0]);
+  const singles=pool.filter(x=>x.e.length===1&&!SC.enemies[x.e[0]].elite&&!arr(SC.enemies[x.e[0]].skills).some(k=>k.summon)).map(x=>x.e[0]);
   for(let i=0;i<extra&&ids.length<5&&singles.length;i++)ids.push(singles[rint(0,singles.length-1)]);
   startBattle({enemies:ids,perPC:{hp:12}},'random',ambush);
 }
@@ -824,7 +889,7 @@ function startTurn(u){
 }
 function deathSave(u){
   if(u.out||u.stable)return;
-  const r=d(20);
+  const r=ufx(u).death?Math.max(d(20),d(20)):d(20);
   if(r===20){R(u).hp=1;u.saves={s:0,f:0};u.st={prone:1};logB(nm(u)+' — 죽음 내성 20! 스스로 일어났다 (HP 1)','me');afx({type:'heal',target:u.uid,val:1,delay:fxDelay});return}
   if(r===1)u.saves.f+=2;else if(r>=10)u.saves.s++;else u.saves.f++;
   logB(nm(u)+' — 죽음 내성 d20('+r+') '+(r>=10?'성공':'실패')+' · 성공 '+Math.min(3,u.saves.s)+'/3 · 실패 '+Math.min(3,u.saves.f)+'/3',r>=10?'sys':'foe');
@@ -873,6 +938,7 @@ function foeTurn(e){
   for(const s of arr(E.skills)){
     if(s.once&&e.used[s.name])continue;
     if(s.needFront&&standing('pc','front').length<s.needFront)continue;
+    if(s.summon&&alive().length>=5)continue;   // 전장에 적이 다섯을 넘지 않는다
     if(Math.random()<s.p){sk=s;break}
   }
   if(sk&&sk.summon){
@@ -1075,8 +1141,8 @@ function doIt(u,kind,arg,au){
     return;
   }
   if(kind==='hide'){
-    B.tr[rogue(u)?'bonus':'act']=0;const mode=B.field.cover?'adv':'normal',rr=d20(u,mode),tot=rr.r+hideMod(u),dc=hideDC();
-    B.last={r:rr.r,dice:rr.dice,txt:'숨기 '+(rr.dice.length>1?'d20['+rr.dice.join(', ')+'] 엄폐로 유리→'+rr.r:'d20('+rr.r+')')+' '+sign(hideMod(u))+' = '+tot+' vs '+dc+(tot>=dc?' → 숨었다':' → 들켰다')};
+    B.tr[rogue(u)?'bonus':'act']=0;const mode=B.field.cover||ufx(u).hide?'adv':'normal',rr=d20(u,mode),tot=rr.r+hideMod(u),dc=hideDC();
+    B.last={r:rr.r,dice:rr.dice,txt:'숨기 '+(rr.dice.length>1?'d20['+rr.dice.join(', ')+'] 유리→'+rr.r:'d20('+rr.r+')')+' '+sign(hideMod(u))+' = '+tot+' vs '+dc+(tot>=dc?' → 숨었다':' → 들켰다')};
     if(tot>=dc){u.hid=tot;logB(josa(nm(u),'이')+' 숨었다. 적이 노릴 수 없고, 다음 공격이 유리하다','me');afx({type:'text',target:u.uid,text:'숨음',color:'#c8ccd4'})}
     else logB(nm(u)+' — 숨으려 했지만 들켰다','me');
     return;
@@ -1135,7 +1201,7 @@ function useAb(u,k,t,au){
   }
   if(ab.kind==='save'){
     const tg=ab.area==='all'?alive():ab.area==='row'?zoneUnits(zk(t)):[t];
-    const dc=spellDC(u,ab),base=rollDice(ab.dmg).total+(u.kind==='hero'?(ab.addStat?statVal(ab.stat):0)+bsum('dmg'):0),parts=[];
+    const dc=spellDC(u,ab),base=rollDice(ab.dmg).total+(u.kind==='hero'?(ab.addStat?statVal(ab.stat):0)+bsum('dmg'):0)+(ab.dtype==='fire'?ufx(u).fire||0:0),parts=[];
     tg.forEach((x,i)=>{
       const sv=d(20)+saveMod(x,ab.save),okS=sv>=dc,v=okS?(ab.half?Math.floor(base/2):0):base;
       afx({type:'cast',from:u.uid,to:x.uid,color:ab.dtype==='fire'?'#ffa95e':ab.dtype==='radiant'?'#ffe6a0':ab.dtype==='thunder'?'#d8c8ff':'#f0a8ff'});
@@ -1301,8 +1367,13 @@ function artSpec(){
   if(m==='end')return SC.endArt||{sky:'dawn',bg:'mountains'};
   const loc=pickArt(L().art)||{sky:'rain',bg:'mountains'};
   if(m==='combat'){const b=pickArt(S.battle.def.art)||{sky:loc.sky,bg:loc.bg,fx:loc.fx};return {sky:b.sky,bg:b.bg,fx:b.fx,props:b.props,battle:true}}
-  if(m==='event')return pickArt(ev().art)||loc;
+  if(m==='event')return ev().art==='camp'?campArt():pickArt(ev().art)||loc;
   return loc;
+}
+// 야영지: 그대와 지금 함께 있는 동료들이 불가에 둘러앉는다
+function campArt(){
+  const xs=[.6,.72,.84],act=[{k:'hero',x:.3}].concat(party().map((id,i)=>({k:COMP(id).art,x:xs[i],face:-1})));
+  return S.loc==='village'?{sky:'cave',bg:'hut',actors:act}:{sky:'night',bg:'gate',props:['campfire'],fx:['stars'],actors:act};
 }
 function artInfo(){
   const B=S.mode==='combat'&&S.battle&&S.battle.units?S.battle:null;let bat=null;
@@ -1325,7 +1396,7 @@ function render(){
   $('logwrap').hidden=m!=='world'&&m!=='end';
   $('freedice').hidden=m!=='world';
   $('lvwrap').hidden=m==='create'||m==='combat'||!needLevel();
-  const nt=$('notice');nt.hidden=!S.notice||m!=='world';nt.textContent=S.notice||'';
+  const nt=$('notice');nt.hidden=!S.notice||!(m==='world'||(m==='event'&&ev()&&ev().camp&&!S.pending));nt.textContent=S.notice||'';
   $('saga').textContent=SC.title+' · '+SC.chapterTitle;
   const sc=$('scene');sc.innerHTML='';
   const para=list=>list.forEach(t=>sc.appendChild(el('p',null,t)));
@@ -1403,7 +1474,7 @@ function renderWorld(){
   arr(l.actions).filter(a=>ok(a.if)).forEach(a=>actBtn(acts,a.label,null,()=>startEvent(a.event),{star:a.star}));
   if(l.encounters)actBtn(acts,'사냥한다','전투를 벌여 경험치와 금화를 얻는다 · 이곳의 적 레벨 '+l.lv,()=>{S.notice=null;startRandomBattle(false)});
   if(l.encounters||arr(l.explore).length)actBtn(acts,'탐색한다','무언가를 찾아내거나, 무언가와 마주친다',explore);
-  if(canRest()){const sup=countItem('야영 물자');actBtn(acts,'긴 휴식 — '+tpl(l.rest),l.restFree?'모두 회복 · 짧은 휴식과 기술 충전':sup?'야영 물자 1 (보유 '+sup+') · 모두 회복 · 짧은 휴식과 기술 충전':'야영 물자가 없다 — 절반만 회복',longRest)}
+  if(canRest()){const sup=countItem('야영 물자');actBtn(acts,'긴 휴식 — '+tpl(l.rest),(l.restFree?'모두 회복 · 짧은 휴식과 기술 충전':sup?'야영 물자 1 (보유 '+sup+') · 모두 회복 · 짧은 휴식과 기술 충전':'야영 물자가 없다 — 절반만 회복')+(campTalk()?' · ✦ 모닥불 곁에서 동료가 할 말이 있다':''),longRest)}
   const sr=(S.rest&&S.rest.short)||0;
   actBtn(acts,'짧은 휴식 ('+sr+'/2)','HP 절반 회복 · 짧은 휴식 기술 충전'+(S.cls==='mage'?' · 마력 절반 회복':'')+(S.cls==='bard'?' · 휴식의 노래 +1d6':'')+' · 긴 휴식으로 다시 채운다',shortRest,{disabled:sr<=0});
   if(l.shop)actBtn(acts,(shopOpen?'▾ ':'▸ ')+l.shop.name,'물약과 장비를 판다 · 금화 '+S.gold,()=>{shopOpen=!shopOpen;render()});
@@ -1413,7 +1484,7 @@ function renderWorld(){
       const it=SC.items[n];if(!it)return;
       const owned=it.slot&&S.items.includes(n);
       const row=el('div','item'),info=el('div');
-      info.appendChild(el('b',null,n+' '));info.appendChild(el('span','sub','['+it.kind+'] '+itemInfo(n)));
+      info.appendChild(rarName(n));info.appendChild(el('span','sub',' ['+kindName(n)+'] '+itemInfo(n)));
       row.appendChild(info);
       const b=el('button',null,owned?'보유':'금화 '+it.price);b.disabled=owned||S.gold<it.price;b.onclick=()=>buy(n);row.appendChild(b);
       sh.appendChild(row);
@@ -1450,20 +1521,30 @@ function renderWorld(){
 
   box.appendChild(el('h2',null,'장비와 소지품'));
   const inv=el('div','card');box.appendChild(inv);
-  ['weapon','armor'].forEach(slot=>{const n=S.equip[slot];if(!n)return;const d1=el('div');d1.appendChild(el('b',null,(slot==='weapon'?'무기: ':'방어구: ')+n+' '));d1.appendChild(el('span','sub',itemInfo(n)));inv.appendChild(d1)});
-  const counts={};S.items.forEach(n=>{if(n!==S.equip.weapon&&n!==S.equip.armor)counts[n]=(counts[n]||0)+1});
+  [['weapon','무기'],['armor','방어구'],['trinket','장신구']].forEach(([slot,lab])=>{const n=S.equip[slot];const d1=el('div');d1.appendChild(el('b',null,lab+': '));if(n){d1.appendChild(rarName(n));d1.appendChild(el('span','sub',' '+itemInfo(n)))}else d1.appendChild(el('span','sub','없음'));inv.appendChild(d1)});
+  const known=Object.keys(S.comp||{}).filter(compKnown);
+  const counts={};S.items.forEach(n=>{if(n!==S.equip.weapon&&n!==S.equip.armor&&n!==S.equip.trinket)counts[n]=(counts[n]||0)+1});
   Object.keys(counts).forEach(n=>{
     const it=SC.items[n]||{};
     const row=el('div','item'),info=el('div');
-    info.appendChild(el('b',null,n+(counts[n]>1?' ×'+counts[n]:'')+' '));info.appendChild(el('span','sub','['+(it.kind||'소지품')+'] '+itemInfo(n)));row.appendChild(info);
+    info.appendChild(rarName(n));if(counts[n]>1)info.appendChild(document.createTextNode(' ×'+counts[n]));
+    const w=it.slot==='trinket'?wearer(n):null;
+    info.appendChild(el('span','sub',' ['+kindName(n)+(w?' · '+whoName(w)+' 착용':'')+'] '+itemInfo(n)));row.appendChild(info);
+    const bx=el('div','row');bx.style.flex='none';bx.style.gap='4px';
     if(it.use){
-      const bx=el('div','row');bx.style.flex='none';bx.style.gap='4px';
-      const b=el('button',null,Object.keys(S.comp||{}).length&&it.use.hp?'그대':'사용');b.disabled=(it.use.hp&&h.hp>=h.hpMax&&!it.use.mp)||(it.use.mp&&h.mp>=h.mpMax&&!it.use.hp);b.onclick=()=>useItem(n);bx.appendChild(b);
-      if(it.use.hp)Object.keys(S.comp||{}).forEach(id=>{const c=S.comp[id],b2=el('button',null,COMP(id).name);b2.disabled=c.hp>=c.hpMax;b2.onclick=()=>useItem(n,id);bx.appendChild(b2)});
-      row.appendChild(bx);
+      const b=el('button',null,known.length&&it.use.hp?'그대':'사용');b.disabled=(it.use.hp&&h.hp>=h.hpMax&&!it.use.mp)||(it.use.mp&&h.mp>=h.mpMax&&!it.use.hp);b.onclick=()=>useItem(n);bx.appendChild(b);
+      if(it.use.hp)known.forEach(id=>{const c=S.comp[id],b2=el('button',null,COMP(id).name);b2.disabled=c.hp>=c.hpMax;b2.onclick=()=>useItem(n,id);bx.appendChild(b2)});
     }
+    // 장신구: 누구에게 채울지 고른다
+    if(it.slot==='trinket'){
+      ['hero'].concat(known).forEach(who=>{const b2=el('button',null,whoName(who));b2.disabled=w===who;b2.title=whoName(who)+'에게 채운다';b2.onclick=()=>equipTrinket(n,who);bx.appendChild(b2)});
+      if(w){const b3=el('button',null,'벗기');b3.onclick=()=>unequipTrinket(n);bx.appendChild(b3)}
+    }
+    if(bx.children.length)row.appendChild(bx);
     inv.appendChild(row);
   });
+  if(S.equip.trinket){const n=S.equip.trinket,row=el('div','item'),info=el('div');info.appendChild(el('span','sub','그대가 찬 장신구를 동료에게 넘기려면: '));info.appendChild(rarName(n));row.appendChild(info);
+    const bx=el('div','row');bx.style.flex='none';bx.style.gap='4px';known.forEach(id=>{const b2=el('button',null,COMP(id).name);b2.onclick=()=>equipTrinket(n,id);bx.appendChild(b2)});const b3=el('button',null,'벗기');b3.onclick=()=>unequipTrinket(n);bx.appendChild(b3);row.appendChild(bx);inv.appendChild(row)}
 
   box.appendChild(el('h2',null,'전투 기술과 재능'));
   const sk=el('div','card');box.appendChild(sk);
@@ -1499,20 +1580,31 @@ function renderParty(box){
   pc.appendChild(el('div','sub','전투는 앞열·뒷열로 나뉜다. 근접 공격은 앞열에서만 하고, 적의 근접 공격은 앞열에 선 자가 있는 한 뒷열에 닿지 않는다. 시작 위치를 정해 두자.'));
   const rowSeg=id=>{const sg=el('div','seg');sg.style.marginTop='4px';['front','back'].forEach(r=>{const b=el('button',rowPref(id)===r?'on':'',ROWN[r]);b.onclick=()=>{S.rows[id]=r;save();render()};sg.appendChild(b)});return sg};
   const me=el('div');me.style.marginTop='8px';me.appendChild(el('b',null,S.hero.name+' '));me.appendChild(el('span','sub','시작 위치'));me.appendChild(rowSeg('hero'));pc.appendChild(me);
+  pc.appendChild(el('div','sub','동료는 곁에 있을 때 그대의 선택에 반응한다. 호감이 높으면 더 잘 싸우고, 바닥나면 떠난다. 동료가 능한 기술의 이야기 판정은 곁에 있으면 유리하다.'));
+  Object.keys(SC.companions||{}).filter(id=>S.flags[id+'_left']).forEach(id=>pc.appendChild(el('div','sub',COMP(id).name+' — 그대 곁을 떠났다')));
   if(!ids.length){pc.appendChild(el('div','sub','아직 함께하는 동료가 없다. 숲과 계단에서 누군가를 만날지도 모른다.'));return}
   ids.forEach(id=>{
     const C=COMP(id),r=S.comp[id],here=compHere(id),d1=el('div');d1.style.marginTop='10px';
     const t=el('div','hudtop');t.appendChild(el('b',null,C.name+' · '+C.title));t.appendChild(el('span','mini',here?'함께 있다':'지금은 떨어져 있다'));d1.appendChild(t);
-    if(r){d1.appendChild(el('div','mini','HP '+r.hp+'/'+r.hpMax+' · 방어 '+C.ac+' · '+C.attack.name+' 명중 '+sign(C.attack.hit+lvB())+' 피해 '+C.attack.dice+sign(C.attack.dmgB+lvB())+(C.attack.ranged?' (원거리)':C.attack.reach?' (긴 창)':'')));d1.appendChild(bar('var(--hp)',r.hp,r.hpMax))}
+    if(r){d1.appendChild(el('div','mini','HP '+r.hp+'/'+r.hpMax+' · 방어 '+(C.ac+compMod(id,'ac'))+' · '+C.attack.name+' 명중 '+sign(C.attack.hit+lvB()+compMod(id,'hit'))+' 피해 '+C.attack.dice+sign(C.attack.dmgB+lvB()+compMod(id,'dmg')+(C.attack.dtype==='fire'?tfx(id).fire||0:0))+(C.attack.ranged?' (원거리)':C.attack.reach?' (긴 창)':'')));d1.appendChild(bar('var(--hp)',r.hp,r.hpMax))}
+    // 호감
+    const v=apVal(id),tr=apTier(v),ef=[];if(tr.hit)ef.push('명중 '+sign(tr.hit));if(tr.ac)ef.push('방어 +'+tr.ac);
+    const apl=el('div','mini');apl.appendChild(el('span','ap '+(v>=3?'up':v<=-3?'down':''),(C.apName||'호감')+' '+sign(v)+' · '+tr.n));apl.appendChild(document.createTextNode((ef.length?' ('+ef.join(', ')+')':'')+(C.leaveAt!=null&&v<=C.leaveAt+2?' · 이대로라면 떠날지도 모른다':'')));d1.appendChild(apl);
+    const pk=arr(C.perks).filter(p=>ok(p.if));if(pk.length)d1.appendChild(el('div','mini','보상: '+pk.map(p=>p.name+' ('+['hit','ac','dmg'].filter(k=>p[k]).map(k=>({hit:'명중',ac:'방어',dmg:'피해'})[k]+' +'+p[k]).join(', ')+')').join(', ')));
+    const tn=trinketOn(id);if(tn){const tl=el('div','mini','장신구: ');tl.appendChild(rarName(tn));tl.appendChild(document.createTextNode(' — '+trinketText(SC.items[tn].fx)));d1.appendChild(tl)}
+    if(arr(SC.camp).some(t=>!S.flags['done_'+t]&&ok(SC.events[t].if)&&arr(SC.events[t].if.party).includes(id)))d1.appendChild(el('div','sub','✦ 쉼터에서 긴 휴식을 하면 할 말이 있는 것 같다'));
     d1.appendChild(el('div','sub',C.blurb));
     if(!here&&C.awayText)d1.appendChild(el('div','sub',C.awayText));
+    d1.appendChild(el('div','sub','도와주는 판정: '+arr(C.profs).join(', ')));
     (C.skills||[]).forEach(k=>{const ab=SC.combatSkills[k],kn=ab.lv<=S.hero.level;const x=el('div','sub');if(!kn)x.style.opacity='.6';x.textContent='· '+ab.name+' ['+abCost(ab)+(ab.uses&&kn&&r?', 남은 '+usesLeft({kind:'comp',id},k):'')+'] '+ab.desc+(kn?'':' · 레벨 '+ab.lv);d1.appendChild(x)});
     const rl=el('div','sub','시작 위치');rl.style.marginTop='4px';d1.appendChild(rl);d1.appendChild(rowSeg(id));
     pc.appendChild(d1);
   });
 }
+function kindName(n){const it=SC.items[n]||{};return (it.rar?RAR[it.rar]+' ':'')+(it.kind||'소지품')}
 function itemInfo(n){
   const it=SC.items[n]||{};
+  if(it.slot==='trinket')return trinketText(it.fx||{})+(it.desc?' · '+it.desc:'');
   if(it.slot==='weapon')return it.dice+(it.bonus?' +'+it.bonus:'')+(it.crit?' · '+it.crit+'~20 치명타':'')+(it.desc?' · '+it.desc:'');
   if(it.slot==='armor')return '방어 +'+it.ac+(it.desc?' · '+it.desc:'');
   return it.desc||'';
@@ -1636,7 +1728,7 @@ function renderCombat(){
     const its=[...new Set(S.items.filter(n=>SC.items[n]&&SC.items[n].battle))];
     add((cmenu==='item'?'▾ ':'')+'물품·던지기',its.length?its.length+'종':'돌 던지기',tog('item'),{ok:true},cmenu==='item'?'on':'');
     c=canDo(u,'shove');add('밀치기',c.ok?'행동 · 성공 '+pct(shoveP(u,t))+' · 뒷열로 밀고 넘어뜨림':c.why,()=>pcAct('shove'),c);
-    c=canDo(u,'hide');add('숨기',c.ok?(rogue(u)?'보조':'행동')+' · 성공 '+pct(chance(hideMod(u),hideDC(),B.field.cover?'adv':'normal',0,{}))+(B.field.cover?' (엄폐 유리)':''):c.why,()=>pcAct('hide'),c);
+    c=canDo(u,'hide');const hAdv=B.field.cover||ufx(u).hide;add('숨기',c.ok?(rogue(u)?'보조':'행동')+' · 성공 '+pct(chance(hideMod(u),hideDC(),hAdv?'adv':'normal',0,{}))+(hAdv?' (유리)':''):c.why,()=>pcAct('hide'),c);
     if(pcs().some(p=>!up(p)&&!p.out)){c=canDo(u,'help');add('돕기',c.ok||c.pick?'행동 · 쓰러진 동료를 HP 1로':c.why,()=>pcAct('help'),c)}
     c=canDo(u,'dodge');add('회피',c.ok?'행동 · 받는 공격 불리'+(u.kind==='hero'?', 마력 +1':''):c.why,()=>pcAct('dodge'),c);
     if(rogue(u)){c=canDo(u,'dis');add('물러서기',c.ok?'보조 · 기회 공격 없이 물러남':'쓸 수 없다',()=>pcAct('dis'),c)}
@@ -1770,7 +1862,7 @@ function renderResult(){
   rb.appendChild(head);
   const story=el('div','card prose story');p.text.forEach(t=>story.appendChild(el('p',null,t)));rb.appendChild(story);
   if(p.down)rb.appendChild(el('div','down',SC.downText));
-  if(p.fx.length){const cs=el('div','chips');p.fx.forEach(f=>cs.appendChild(el('span','chip'+(/^영감/.test(f)?' gold':''),f)));rb.appendChild(cs)}
+  if(p.fx.length){const cs=el('div','chips');p.fx.forEach(f=>cs.appendChild(el('span','chip'+(/^영감/.test(f)?' gold':/(호감|유대) \+/.test(f)?' up':/(호감|유대) -|떠났다/.test(f)?' down':''),f)));rb.appendChild(cs)}
   const label=p.battle?'전투 시작 →':p.next==='end'?'기록 보기 →':!p.next||p.next==='map'?'지도로 →':'다음 장면으로 →';
   const b=el('button','next',label);b.onclick=advance;rb.appendChild(b);
 }

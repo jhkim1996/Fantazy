@@ -6,9 +6,9 @@
 <title>떠돌이의 모험</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&display=swap">
 <style>
-:root{--bg:#faf9f5;--card:#f1efe8;--text:#2c2c2a;--sub:#5f5e5a;--acc-bg:#e6f1fb;--acc-line:#185fa5;--acc-text:#0c447c;--line:#d3d1c7;--ok:#27500a;--ok-bg:#eaf3de;--bad:#791f1f;--bad-bg:#fcebeb;--neu:#5c4813;--neu-bg:#f3ead2;--hp:#e24b4a;--mp:#378add;--xp:#ba7517;--foe:#a03a2c;--star:#b8860b}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;--foe:#e8836f;--star:#f0c75e;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;--foe:#e8836f;--star:#f0c75e;color-scheme:dark}
+:root{--bg:#faf9f5;--card:#f1efe8;--text:#2c2c2a;--sub:#5f5e5a;--acc-bg:#e6f1fb;--acc-line:#185fa5;--acc-text:#0c447c;--line:#d3d1c7;--ok:#27500a;--ok-bg:#eaf3de;--bad:#791f1f;--bad-bg:#fcebeb;--neu:#5c4813;--neu-bg:#f3ead2;--hp:#e24b4a;--mp:#378add;--xp:#ba7517;--foe:#a03a2c;--star:#b8860b;--r-unc:#2f7a2f;--r-rare:#1f5fbf;--r-leg:#b0570f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;--foe:#e8836f;--star:#f0c75e;--r-unc:#93d493;--r-rare:#8ab8ff;--r-leg:#f2a65a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;--foe:#e8836f;--star:#f0c75e;--r-unc:#93d493;--r-rare:#8ab8ff;--r-leg:#f2a65a;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;padding-block:12px;padding-inline:16px;background:var(--bg);color:var(--text);font-family:system-ui,"Malgun Gothic",sans-serif;font-size:14px;line-height:1.5}
@@ -158,6 +158,11 @@ body.combat #hud{display:none}
 .skrow b{font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
 .insp{color:var(--star);letter-spacing:.1em}
 .chip.gold{border-color:var(--star);color:var(--star)}
+.chip.up,.ap.up{border-color:var(--ok);color:var(--ok)}
+.chip.down,.ap.down{border-color:var(--bad);color:var(--bad)}
+.rar-uncommon{color:var(--r-unc)}
+.rar-rare{color:var(--r-rare)}
+.rar-legendary{color:var(--r-leg)}
 .lvopt{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .lvopt .opt{margin:0}
 </style>

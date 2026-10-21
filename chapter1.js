@@ -79,7 +79,7 @@ const BOSS = {
       '그대가 그 이름을 외치는 순간, {relic}의 별빛이 창날처럼 길게 뻗어 나갔다. 빛의 창이 잿빛 송곳니의 가슴을 꿰뚫었다.',
       '거대한 짐승이 무릎을 꿇었다. 이마의 낙인이 잿가루가 되어 흩어졌고, 짐승은 마지막으로 새끼 쪽을 바라보며 — 조용히 눈을 감았다.'
     ],
-    fx: { set: ['alpha_slain'] },
+    fx: { set: ['alpha_slain'] }, approve: { bran: -1 },
     fxIf: [{ if: { flag: 'pup_safe' }, fx: { items: ['잿빛 새끼'] } }].concat(AFTER_BATTLE),
     log: '결계 안에서 잿빛 송곳니를 쓰러뜨렸다.', next: 'n9' },
   freed: {
@@ -89,7 +89,7 @@ const BOSS = {
       { if: { flag: 'pup_safe' }, t: '그대가 품에 안고 있던 새끼를 내려놓자, 새끼는 비틀거리며 어미에게 달려가 그 다리에 몸을 비볐다.' },
       '잿빛 송곳니는 오랫동안 그대를 바라보았다. 그리고 천천히, 그대의 발치에 머리를 숙였다. 짐승이 몸을 일으킨 자리에는 잿빛 털 한 줌이 떨어져 있었다.'
     ],
-    fx: { set: ['alpha_freed'], items: ['잿빛 털 한 줌'], xp: 80 }, fxIf: AFTER_BATTLE,
+    fx: { set: ['alpha_freed'], items: ['잿빛 털 한 줌'], xp: 80 }, fxIf: AFTER_BATTLE, approve: { sena: 2, bran: 2 },
     log: '잿빛 송곳니의 낙인을 부숴 사냥꾼의 사슬에서 해방했다.', next: 'n9' },
   lose: {
     text: [
@@ -147,6 +147,54 @@ function BRAN_FIGHT(surprise) {
         '“빚을 졌으니 갚아야겠지. 그대와 함께 가겠소.”'
       ],
       log: '사냥개에게 쓰러졌지만 브란이 불길로 구해 냈다. 브란이 동료가 되었다.', next: 'map' }
+  };
+}
+
+// 이끼 곰의 둥지: 늙은 이끼 곰과의 전투 (지면 꽃은 둥지에 남는다 — 다시 찾아갈 수 있다)
+function NEST_FIGHT(surprise) {
+  return {
+    enemies: ['oldbear'], noFlee: true, surprise: surprise ? 'foe' : null, perPC: { hp: 15 },
+    art: { sky: 'night', bg: 'forest', fx: ['fog'] },
+    intro: '늙은 이끼 곰이 몸을 일으켰다. 빈터 전체가 그 그림자에 덮였다.',
+    win: {
+      text: [
+        '늙은 곰이 무릎을 꿇었다. 그 등에서 이끼가 우수수 떨어져 내렸다.',
+        '그대는 은빛 꽃을 꺾었다. 꽃잎이 손바닥 위에서 희미하게 떨렸다.',
+        { if: { party: 'sena' }, t: '세나는 쓰러진 곰 곁에 한참 서 있었다. “…미안해.” 그녀가 작게 말했다.' }
+      ],
+      fx: { items: ['달빛 별꽃'], set: ['moonflower_got'] }, approve: { sena: -1 },
+      log: '늙은 이끼 곰을 쓰러뜨리고 달빛 별꽃을 꺾었다.', next: 'map' },
+    lose: {
+      text: [
+        '곰의 앞발이 그대를 빈터 밖으로 날려 보냈다.',
+        { if: { party: 'sena' }, t: '정신을 차렸을 때, 세나가 그대를 끌고 숲길까지 나와 있었다. “다음엔… 다른 방법을 찾아요.”' },
+        '빈터 한가운데에서, 은빛 꽃은 여전히 곰의 품 안에서 빛나고 있었다.'
+      ],
+      log: '늙은 이끼 곰에게 쓰러졌다. 꽃은 아직 둥지에 있다.', next: 'map' }
+  };
+}
+
+// 회색 두건의 은신처: 추종자 우두머리와의 전투 (지면 우두머리는 달아난다 — 다시 찾아갈 수 있다)
+function CULT_FIGHT(surprise, burning) {
+  return {
+    enemies: burning ? ['chief'] : ['chief', 'acolyte', 'acolyte'], noFlee: true, surprise: surprise ? 'foe' : null, perPC: { hp: 12 },
+    surf: burning ? { 'foe-front': 'fire', 'foe-back': 'fire' } : null,
+    art: { sky: 'cave', bg: 'hall', fx: ['dust'] },
+    intro: '“별의 아이로구나.” 우두머리가 웃었다. “사냥꾼께서 기뻐하시겠군.”',
+    win: {
+      text: [
+        '우두머리가 무너지듯 쓰러졌다. 이마의 낙인이 잿가루가 되어 흩어지고, 그 아래에서 늙고 지친 얼굴이 드러났다.',
+        '그대는 그의 허리에서 회색 장부를 풀어냈다. 생각보다 무거웠다. 이름 하나하나가 돌처럼 무거웠다.',
+        { if: { party: 'bran' }, t: '브란은 장부를 바로 받지 않았다. 그는 한참 동안 쓰러진 우두머리를 내려다보다가, 그의 눈을 감겨 주었다.' }
+      ],
+      fx: { items: ['회색 장부'], set: ['ledger_got'] }, approve: { bran: 1 },
+      log: '추종자 우두머리를 쓰러뜨리고 회색 장부를 빼앗았다.', next: 'map' },
+    lose: {
+      text: [
+        '낙인의 속삭임이 머릿속을 가득 채웠다. 무릎이 꺾였다.',
+        '정신을 차렸을 때, 예배실은 비어 있었다. 우두머리는 장부를 품고 회랑 더 깊은 곳으로 숨었다. 다시 찾아야 한다.'
+      ],
+      log: '추종자 우두머리에게 쓰러졌다. 그는 장부를 들고 숨었다.', next: 'map' }
   };
 }
 
@@ -296,20 +344,30 @@ window.SCENARIO = {
 
   // 동료. joinIf: 함께하게 되는 조건, locs: 이 장소들에서만 함께 싸운다 (anywhereIf가 맞으면 어디서나)
   // attack: 기본 공격 (hit 명중, dice+dmgB 피해, ranged 원거리, reach 뒷열에서도 적 앞열을 찌른다). 레벨마다 조금씩 강해진다
+  // ap: 호감을 담는 카운터 (선택지의 approve로 오르내린다), apName: 호감의 이름, leaveAt: 호감이 이만큼 떨어지면 떠난다
+  // profs: 이야기 판정에서 이 기술이면 함께 있을 때 유리 (동료의 도움), perks: 조건이 맞으면 붙는 전투 보너스
   companions: {
     orden: { name: '오르덴', title: '맹세기사', art: 'orden', joinIf: { flag: 'done_n4', min: { bond: 1 } },
       locs: ['gate', 'tomb', 'hall', 'stairs', 'aqueduct'], anywhereIf: { flag: 'orden_joins' },
       awayText: '관문을 멀리 떠날 수 없다. 계단·관문·수로·무덤·회랑에서만 함께 싸운다',
+      ap: 'bond', apName: '유대', profs: ['역사', '운동', '위협'],
+      perks: [{ if: { flag: 'kairon_kept' }, ac: 1, name: '형제의 반지' }],
       hp: 30, hpGain: 7, ac: 17, init: 0, row: 'front', str: 4, dex: 0, wis: 2,
       attack: { name: '장창', hit: 5, dice: '1d10', dmgB: 3, reach: true },
       skills: ['pierce', 'taunt'], guard: true,
       blurb: '엘레우스의 마지막 맹세기사. 장창이 길어 뒷열에서도 적 앞열을 찌른다. 앞열에 서 있으면 다른 동료를 노린 근접 공격 하나를 라운드마다 불리하게 만든다 (수호).' },
-    sena: { name: '세나', title: '약초꾼 궁수', art: 'sena', joinIf: { flag: 'sena_met' },
+    sena: { name: '세나', title: '약초꾼 궁수', art: 'sena', joinIf: { flag: 'sena_met', not: 'sena_left' },
+      ap: 'ap_sena', apName: '호감', profs: ['생존', '의학', '지각'], leaveAt: -5,
+      leaveText: '“당신이랑은 더 못 가겠어요.” 세나가 활을 메고 돌아섰다. “할머니한테 돌아갈게요. 찾지 마세요.”',
+      perks: [{ if: { flag: 'sena_kept_arrow' }, hit: 1, name: '어머니의 화살촉' }],
       hp: 18, hpGain: 5, ac: 14, init: 3, row: 'back', str: 0, dex: 3, wis: 2,
       attack: { name: '사냥 활', hit: 5, dice: '1d8', dmgB: 3, ranged: true },
       skills: ['aimed', 'herb', 'net'],
       blurb: '등불지기 노파의 손녀. 뒷열에서 활을 쏘고, 약초로 쓰러진 동료를 일으킨다.' },
-    bran: { name: '브란', title: '낙인을 지진 자', art: 'bran', joinIf: { flag: 'bran_met' },
+    bran: { name: '브란', title: '낙인을 지진 자', art: 'bran', joinIf: { flag: 'bran_met', not: 'bran_left' },
+      ap: 'ap_bran', apName: '호감', profs: ['비전', '기만', '은신'], leaveAt: -5,
+      leaveText: '“사냥꾼이나 그대나, 결국 같은 부류였군.” 브란이 지팡이를 집어 들었다. 그 뒷모습은 금세 안개 속으로 사라졌다.',
+      perks: [{ if: { flag: 'ledger_burned' }, hit: 1, name: '풀려난 손' }],
       hp: 16, hpGain: 4, ac: 12, init: 1, row: 'back', str: 0, dex: 1, wis: 3, dc: 3,
       attack: { name: '불씨', hit: 5, dice: '1d10', dmgB: 0, ranged: true, dtype: 'fire', burn: true },
       skills: ['oil', 'wave'],
@@ -318,32 +376,46 @@ window.SCENARIO = {
 
   items: {
     '낡은 지팡이': { kind: '무기', slot: 'weapon', dice: '1d6', bonus: 0, desc: '오랜 여정을 함께한 지팡이' },
-    '잘 다듬은 지팡이': { kind: '무기', slot: 'weapon', dice: '1d6', bonus: 1, price: 45, desc: '단단한 흑단으로 다시 깎은 지팡이' },
-    '별빛 지팡이': { kind: '무기', slot: 'weapon', dice: '1d8', bonus: 2, desc: '일곱째 별 아스텔의 마지막 빛' },
+    '잘 다듬은 지팡이': { kind: '무기', slot: 'weapon', rar: 'uncommon', dice: '1d6', bonus: 1, price: 45, desc: '단단한 흑단으로 다시 깎은 지팡이' },
+    '별빛 지팡이': { kind: '무기', slot: 'weapon', rar: 'legendary', dice: '1d8', bonus: 2, desc: '일곱째 별 아스텔의 마지막 빛' },
     '낡은 검': { kind: '무기', slot: 'weapon', dice: '1d8', bonus: 0, desc: '이가 조금 빠진 낡은 검' },
-    '잘 벼린 검': { kind: '무기', slot: 'weapon', dice: '1d8', bonus: 1, price: 45, desc: '행상인이 숫돌에 갈아 준 검' },
-    '별빛 검': { kind: '무기', slot: 'weapon', dice: '1d10', bonus: 2, desc: '일곱째 별 아스텔의 마지막 빛' },
+    '잘 벼린 검': { kind: '무기', slot: 'weapon', rar: 'uncommon', dice: '1d8', bonus: 1, price: 45, desc: '행상인이 숫돌에 갈아 준 검' },
+    '별빛 검': { kind: '무기', slot: 'weapon', rar: 'legendary', dice: '1d10', bonus: 2, desc: '일곱째 별 아스텔의 마지막 빛' },
     '낡은 단검': { kind: '무기', slot: 'weapon', dice: '1d6', bonus: 0, crit: 19, desc: '손때 묻은 단검. 19~20 치명타' },
-    '잘 벼린 단검': { kind: '무기', slot: 'weapon', dice: '1d6', bonus: 1, crit: 19, price: 45, desc: '날이 선 단검. 19~20 치명타' },
-    '별빛 단검': { kind: '무기', slot: 'weapon', dice: '1d8', bonus: 2, crit: 18, desc: '일곱째 별 아스텔의 마지막 빛. 18~20 치명타' },
+    '잘 벼린 단검': { kind: '무기', slot: 'weapon', rar: 'uncommon', dice: '1d6', bonus: 1, crit: 19, price: 45, desc: '날이 선 단검. 19~20 치명타' },
+    '별빛 단검': { kind: '무기', slot: 'weapon', rar: 'legendary', dice: '1d8', bonus: 2, crit: 18, desc: '일곱째 별 아스텔의 마지막 빛. 18~20 치명타' },
     '낡은 류트': { kind: '무기', slot: 'weapon', dice: '1d6', bonus: 0, desc: '줄 하나가 늘어진 낡은 류트. 울림으로 친다' },
-    '새 줄을 건 류트': { kind: '무기', slot: 'weapon', dice: '1d6', bonus: 1, price: 45, desc: '은실 줄을 새로 건 류트' },
-    '별빛 류트': { kind: '무기', slot: 'weapon', dice: '1d8', bonus: 2, desc: '일곱째 별 아스텔의 마지막 빛' },
+    '새 줄을 건 류트': { kind: '무기', slot: 'weapon', rar: 'uncommon', dice: '1d6', bonus: 1, price: 45, desc: '은실 줄을 새로 건 류트' },
+    '별빛 류트': { kind: '무기', slot: 'weapon', rar: 'legendary', dice: '1d8', bonus: 2, desc: '일곱째 별 아스텔의 마지막 빛' },
     '여행자의 망토': { kind: '방어구', slot: 'armor', ac: 0, desc: '비를 겨우 막는 망토' },
     '가죽 조끼': { kind: '방어구', slot: 'armor', ac: 1, desc: '얇은 가죽 조끼' },
     '낡은 사슬 조끼': { kind: '방어구', slot: 'armor', ac: 2, desc: '군데군데 고리가 빠진 사슬 조끼' },
     '가죽 갑옷': { kind: '방어구', slot: 'armor', ac: 2, price: 40, desc: '기름 먹인 두꺼운 가죽 갑옷' },
-    '사슬 갑옷': { kind: '방어구', slot: 'armor', ac: 3, price: 90, desc: '촘촘한 사슬 갑옷' },
-    '엘레우스 기사의 흉갑': { kind: '방어구', slot: 'armor', ac: 4, desc: '물에 잠겨서도 녹슬지 않은 은빛 흉갑' },
+    '사슬 갑옷': { kind: '방어구', slot: 'armor', rar: 'uncommon', ac: 3, price: 90, desc: '촘촘한 사슬 갑옷' },
+    '엘레우스 기사의 흉갑': { kind: '방어구', slot: 'armor', rar: 'rare', ac: 4, desc: '물에 잠겨서도 녹슬지 않은 은빛 흉갑' },
     '은빛 물약': { kind: '물약', use: { hp: 15 }, battle: true, price: 15, desc: 'HP 15 회복' },
     '푸른 물약': { kind: '물약', use: { mp: 8 }, battle: true, price: 20, desc: '마력 8 회복' },
     '기름 병': { kind: '투척', throw: { surface: 'oil' }, battle: true, price: 8, desc: '전투에서 던지면 그 열의 바닥이 기름으로 덮인다. 불이 닿으면 폭발' },
-    '불꽃 병': { kind: '투척', throw: { dmg: '1d6', dtype: 'fire', surface: 'fire' }, battle: true, price: 14, desc: '전투에서 던진다. 맞으면 불 1d6, 그 열에 불이 붙는다' },
+    '불꽃 병': { kind: '투척', rar: 'uncommon', throw: { dmg: '1d6', dtype: 'fire', surface: 'fire' }, battle: true, price: 14, desc: '전투에서 던진다. 맞으면 불 1d6, 그 열에 불이 붙는다' },
     '야영 물자': { kind: '물자', price: 6, desc: '쉼터 밖에서 긴 휴식을 할 때 하나를 쓴다' },
     '회색 낙인 조각': { kind: '재료', desc: '사냥개의 목에서 떨어진 낙인 조각. 세 개를 모으면 살펴볼 수 있다' },
     '기사의 반지': { kind: '증표', desc: '물에 잠긴 기사가 끼고 있던 은반지. 오르덴이 알아볼지도 모른다' },
     '잿빛 새끼': { kind: '동료', desc: '어미를 잃은 사냥개 새끼. 이마에 아직 낙인이 없다' },
-    '잿빛 털 한 줌': { kind: '증표', desc: '해방된 잿빛 송곳니가 남긴 털. 언젠가 그 울음이 그대를 도울 것이다' }
+    '잿빛 털 한 줌': { kind: '장신구', slot: 'trinket', rar: 'legendary', fx: { init: 3, hit: 1, death: true }, desc: '해방된 잿빛 송곳니가 남긴 털. 언젠가 그 울음이 그대를 도울 것이다' },
+    // 장신구: 그대나 동료 한 명이 찬다. fx: hp(최대 HP) ac hit dmg fire(불 피해) init save check(이야기 판정) resist[] hide(숨기 유리) death(죽음 내성 유리)
+    '여행자의 행운 부적': { kind: '장신구', slot: 'trinket', rar: 'uncommon', fx: { check: 1 }, price: 45, desc: '길 떠나는 이의 목에 걸어 주던 은방울' },
+    '회색 두건': { kind: '장신구', slot: 'trinket', rar: 'uncommon', fx: { hide: true, init: 1 }, desc: '추종자의 두건. 그림자에 녹아든다' },
+    '곰 송곳니 목걸이': { kind: '장신구', slot: 'trinket', rar: 'uncommon', fx: { dmg: 1 }, desc: '이끼 곰의 송곳니를 꿴 목걸이' },
+    '거미 비단 장갑': { kind: '장신구', slot: 'trinket', rar: 'uncommon', fx: { init: 2 }, desc: '거미줄로 짠 가벼운 장갑' },
+    '이끼 왕관': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hp: 8 }, desc: '늙은 이끼 곰의 둥지에서 자란 이끼가 왕관처럼 엉긴 것' },
+    '등불지기의 등불': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { check: 1, save: 1 }, desc: '잿빛 안개 속에서도 꺼지지 않는 등불지기 대대의 불씨' },
+    '세나 어머니의 화살촉': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hit: 1, init: 1 }, desc: '사냥개 세 마리를 쏜 화살촉. 지켜야 할 사람에게 넘겨준다' },
+    '브란의 불씨 반지': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { fire: 2, resist: ['fire'] }, desc: '회색 장부를 태운 불씨가 깃든 무쇠 반지' },
+    '카이론의 반지': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { ac: 1, save: 1 }, desc: '오르덴의 동생이 끼던 맹세기사의 은반지' },
+    '사냥꾼의 휘장': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hit: 1, resist: ['psychic'] }, desc: '추종자 우두머리가 지니던 회색 왕관 문양. 속삭임을 막아 준다' },
+    '달빛 별꽃': { kind: '약초', desc: '달빛도 없는데 은빛으로 빛나는 꽃. 낙인의 빛이 남긴 상처를 씻는다' },
+    '회색 장부': { kind: '증표', desc: '낙인이 찍힌 모든 이름이 적힌 장부. 브란이 이것을 찾고 있었다' },
+    '회색 장부의 마지막 장': { kind: '증표', desc: '사냥꾼이 머무는 곳이 적힌 한 장. 제2장에서 길잡이가 될 것이다' }
   },
 
   // 적. atk: 명중 보너스, ac: 방어, dmg: 피해 주사위, row: 처음 서는 열 (기본 앞열)
@@ -361,9 +433,9 @@ window.SCENARIO = {
     spider: { art: 'spider', name: '검은 소나무 거미', lv: 2, hp: 14, ac: 12, atk: 4, dmg: '1d6+1', xp: 8, gold: [2, 7], row: 'back', vuln: ['fire'],
       poison: { p: 0.35, turns: 2, dmg: '1d4' },
       skills: [{ name: '거미줄 뿜기', p: 0.4, ranged: true, dmg: '1d2', onHit: { restrain: 2 } }],
-      drops: [{ item: '푸른 물약', p: 0.1 }], desc: '송아지만 한 검은 거미. 뒤에서 거미줄을 뿜고, 송곳니에서 독이 떨어진다. 불에 약하다.' },
+      drops: [{ item: '푸른 물약', p: 0.1 }, { item: '거미 비단 장갑', p: 0.08 }], desc: '송아지만 한 검은 거미. 뒤에서 거미줄을 뿜고, 송곳니에서 독이 떨어진다. 불에 약하다.' },
     bear: { art: 'bear', name: '이끼 곰', lv: 3, hp: 28, ac: 12, atk: 5, dmg: '1d10+3', xp: 14, gold: [5, 12], big: true,
-      skills: [{ name: '짓누르기', p: 0.25, dmg: '2d8+3', hit: -1, onHit: { prone: 1 } }], drops: [{ item: '은빛 물약', p: 0.25 }, { item: '야영 물자', p: 0.5 }],
+      skills: [{ name: '짓누르기', p: 0.25, dmg: '2d8+3', hit: -1, onHit: { prone: 1 } }], drops: [{ item: '은빛 물약', p: 0.25 }, { item: '야영 물자', p: 0.5 }, { item: '곰 송곳니 목걸이', p: 0.15 }],
       desc: '등에 이끼가 자란 거대한 곰. 숲의 주인이다.' },
     scout: { art: 'scout', name: '잿빛 사냥개 정찰병', lv: 2, hp: 14, ac: 13, atk: 4, dmg: '1d6+2', xp: 9, gold: [2, 6], pack: true, init: 3,
       drops: [{ item: '회색 낙인 조각', p: 0.5 }], desc: '목덜미에 회색 표식이 깜박이는 사냥개.' },
@@ -378,8 +450,19 @@ window.SCENARIO = {
       desc: '천 년 동안 수로 바닥에 잠들어 있던 기사. 녹슨 투구 속에서 푸른 불꽃이 탄다. 냉기와 독에 강하고, 별빛에 약하다.' },
     acolyte: { art: 'acolyte', name: '회색 사냥꾼의 추종자', lv: 4, hp: 26, ac: 14, atk: 6, dmg: '1d8+3', xp: 20, gold: [10, 20], row: 'back', ranged: true,
       skills: [{ name: '사냥개 부르기', p: 0.3, summon: 'hound', once: true }],
-      drops: [{ item: '회색 낙인 조각', p: 0.6 }, { item: '푸른 물약', p: 0.3 }],
+      drops: [{ item: '회색 낙인 조각', p: 0.6 }, { item: '푸른 물약', p: 0.3 }, { item: '회색 두건', p: 0.12 }],
       desc: '회색 두건을 쓴 사람. 뒷열에서 회색 화살을 쏜다. 손등에 사냥개와 같은 낙인이 있다.' },
+    oldbear: { art: 'bear', name: '늙은 이끼 곰', lv: 5, hp: 60, ac: 13, atk: 6, dmg: '2d6+3', xp: 40, gold: [3, 10], elite: true, big: true, multi: 2,
+      skills: [{ name: '짓누르기', p: 0.3, dmg: '2d8+4', hit: -1, onHit: { prone: 1 } }],
+      drops: [{ item: '이끼 왕관', p: 1, once: 'got_moss_crown' }],
+      desc: '등에 숲이 자란 늙은 곰. 달빛 별꽃을 품고 잠든다. 한 번에 두 번 할퀸다.' },
+    chief: { art: 'acolyte', name: '추종자 우두머리', lv: 5, hp: 40, ac: 14, atk: 6, dmg: '1d8+3', xp: 35, gold: [25, 40], elite: true, row: 'back', ranged: true, init: 2,
+      skills: [
+        { name: '사냥개 부르기', p: 0.35, summon: 'hound', once: true },
+        { name: '낙인의 속삭임', p: 0.3, ranged: true, dmg: '2d6', dtype: 'psychic', onHit: { weak: 2 } }
+      ],
+      drops: [{ item: '사냥꾼의 휘장', p: 1, once: 'got_insignia' }],
+      desc: '이마 전체에 낙인이 새겨진 늙은 사내. 회색 장부를 허리에 찼다. 그 속삭임은 마음을 꺾는다.' },
     alpha: { art: 'alpha', name: '잿빛 송곳니', lv: 6, hp: 90, ac: 15, atk: 7, dmg: '2d6+4', xp: 80, gold: [40, 60], boss: true, big: true, init: 3, multi: 2,
       skills: [
         { name: '포효', p: 0.2, debuff: { atk: -2, turns: 2 }, text: '잿빛 송곳니가 포효한다. 다리가 굳는다! (2턴 동안 모두 명중 -2)' },
@@ -402,11 +485,12 @@ window.SCENARIO = {
         { if: { flag: 'done_n10' }, t: '천 년 만에 비가 그친 지붕 위로 햇살이 내려앉았다.' }
       ],
       rest: '노파의 오두막에서 쉰다', restFree: true,
-      shop: { name: '빗속의 행상인', items: ['은빛 물약', '푸른 물약', '야영 물자', '기름 병', '불꽃 병', '{fine}', '가죽 갑옷', '사슬 갑옷'] },
+      shop: { name: '빗속의 행상인', items: ['은빛 물약', '푸른 물약', '야영 물자', '기름 병', '불꽃 병', '{fine}', '가죽 갑옷', '사슬 갑옷', '여행자의 행운 부적'] },
       actions: [
         { label: '등불이 켜진 오두막의 문을 두드린다', event: 'n1', if: { not: 'done_n1' }, star: true },
         { label: '노파의 부탁을 듣는다', event: 'q_wolves_start', if: { flag: 'done_n1', not: 'q_wolves' } },
-        { label: '노파에게 늑대 사냥을 알린다', event: 'q_wolves_end', if: { flag: 'q_wolves', not: 'q_wolves_done', min: { kill_wolf: 5 } } },
+        { label: '노파에게 늑대 일을 알린다', event: 'q_wolves_end', if: { flag: 'q_wolves', not: 'q_wolves_done', or: [{ min: { kill_wolf: 5 } }, { flag: 'wolves_solved' }] } },
+        { label: '노파의 눈에 달빛 별꽃의 이슬을 떨어뜨린다', event: 'crone_cure', if: { item: '달빛 별꽃' }, star: true },
         { label: '회색 낙인 조각을 맞춰 본다', event: 'study_mark', if: { not: 'mark_seen', count: { '회색 낙인 조각': 3 } } }
       ],
       links: [{ to: 'slope' }, { to: 'forest' }]
@@ -421,6 +505,9 @@ window.SCENARIO = {
       encounters: [{ w: 4, e: ['wolf'] }, { w: 2, e: ['wolf', 'wolf'] }, { w: 3, e: ['bats'] }, { w: 1, e: ['boar'] }],
       ambush: 0.2, field: { high: 'both', cover: true },
       explore: ['ex_glint', 'ex_herb'],
+      actions: [
+        { label: '늑대들의 굴을 찾아간다', event: 'wolves_den', if: { flag: 'q_wolves', not: ['q_wolves_done', 'wolves_solved'] } }
+      ],
       links: [{ to: 'village' }, { to: 'forest' }, { to: 'stairs' }, { to: 'aqueduct' }]
     },
     forest: {
@@ -434,7 +521,8 @@ window.SCENARIO = {
       ambush: 0.3, field: { cover: true },
       explore: ['ex_trap', 'ex_web', 'ex_herb'],
       actions: [
-        { label: '거미줄 너머에서 들려오는 비명을 따라간다', event: 'c_sena', if: { not: 'done_c_sena' }, star: true }
+        { label: '거미줄 너머에서 들려오는 비명을 따라간다', event: 'c_sena', if: { not: 'done_c_sena' }, star: true },
+        { label: '이끼 곰의 둥지에서 달빛 별꽃을 찾는다 (권장 레벨 4)', event: 'moss_nest', if: { flag: 'q_moonflower', not: 'moonflower_got' }, star: true }
       ],
       links: [{ to: 'village' }, { to: 'slope' }]
     },
@@ -512,7 +600,8 @@ window.SCENARIO = {
       ambush: 0.3, field: { high: 'foe', cover: true },
       explore: ['ex_corpse', 'ex_rune'],
       actions: [
-        { label: '회랑 깊은 곳으로 잿빛 송곳니를 쫓는다 (권장 레벨 5)', event: 'n7', if: { not: 'done_n7' }, star: true }
+        { label: '회랑 깊은 곳으로 잿빛 송곳니를 쫓는다 (권장 레벨 5)', event: 'n7', if: { not: 'done_n7' }, star: true },
+        { label: '추종자 우두머리의 은신처를 찾는다 (권장 레벨 5)', event: 'cult_den', if: { flag: 'q_ledger', not: 'ledger_got' }, star: true }
       ],
       links: [{ to: 'tomb' }]
     }
@@ -527,14 +616,22 @@ window.SCENARIO = {
   ],
 
   quests: [
-    { name: '노파의 부탁', if: { flag: 'q_wolves', not: 'q_wolves_done' }, t: '안개 비탈의 굶주린 늑대 {#kill_wolf}/5 처치 → 마을의 노파에게' },
-    { name: '가라앉은 맹세', if: { flag: 'found_bones', not: 'q_ring_done' }, t: '옛 수로 깊은 곳의 물에 잠긴 기사에게서 반지를 찾아 관문의 오르덴에게 (권장 레벨 5)' },
+    { name: '노파의 부탁', if: { flag: 'q_wolves', not: ['q_wolves_done', 'wolves_solved'] }, t: '안개 비탈의 굶주린 늑대 {#kill_wolf}/5 처치, 또는 비탈의 늑대 굴을 찾아 무리를 떠나보낸다 → 마을의 노파에게' },
+    { name: '노파의 부탁', if: { flag: ['q_wolves', 'wolves_solved'], not: 'q_wolves_done' }, t: '늑대들은 비탈을 떠났다 → 마을의 노파에게 알린다' },
+    { name: '달빛 별꽃', if: { flag: 'q_moonflower', not: 'crone_cured' }, t: '검은 소나무 숲 가장 깊은 곳, 이끼 곰의 둥지에서 달빛 별꽃을 얻어 노파에게 (세나의 부탁)' },
+    { name: '회색 장부', if: { flag: 'q_ledger', not: 'ledger_got' }, t: '무너지는 회랑에 숨은 추종자 우두머리에게서 회색 장부를 빼앗는다 (브란의 부탁)' },
+    { name: '회색 장부', if: { item: '회색 장부', not: ['ledger_burned', 'ledger_kept'] }, t: '장부를 손에 넣었다. 브란과 함께 쉼터에서 긴 휴식을 하면 어떻게 할지 정한다' },
+    { name: '가라앉은 맹세', if: { flag: 'found_bones', not: ['q_ring_done', 'got_ring'] }, t: '옛 수로 깊은 곳의 물에 잠긴 기사에게서 반지를 찾는다. 싸우거나, 엘레우스 맹세의 구절로 잠재운다 (권장 레벨 5)' },
+    { name: '가라앉은 맹세', if: { item: '기사의 반지' }, t: '기사의 반지를 관문의 오르덴에게 가져간다' },
     { name: '숲의 비명', if: { flag: 'done_n1', not: 'done_c_sena' }, t: '노파의 손녀 세나가 검은 소나무 숲에서 돌아오지 않았다' },
     { name: '초소의 울음', if: { flag: 'done_n2', not: 'done_c_bran' }, t: '천 개의 계단 옆 무너진 초소에서 사냥개들이 누군가를 몰아붙이고 있다' },
-    { name: '회색 낙인', if: { not: 'mark_seen' }, t: '회색 낙인 조각 {@회색 낙인 조각}/3을 모아 마을이나 관문에서 맞춰 보면 낙인의 비밀을 알 수 있다' }
+    { name: '회색 낙인', if: { not: 'mark_seen' }, t: '회색 낙인 조각 {@회색 낙인 조각}/3을 모아 마을이나 관문에서 맞춰 보면 낙인의 비밀을 알 수 있다. 낙인을 잘 아는 누군가에게 물어도 된다' }
   ],
 
-  counterNames: { bond: '오르덴과의 유대' },
+  counterNames: { bond: '오르덴과의 유대', ap_sena: '세나의 호감', ap_bran: '브란의 호감' },
+
+  // 야영지 대화: 쉼터에서 긴 휴식을 하면, 조건이 맞는 첫 이야기가 모닥불 곁에서 시작된다 (한 번씩)
+  camp: ['camp_sena2', 'camp_bran2', 'camp_orden2', 'camp_sena1', 'camp_bran1', 'camp_orden1', 'camp_argue'],
 
   downText: '시야가 붉게 물들고 무릎이 꺾였다. 차가운 돌바닥이 뺨에 닿는 순간 — 품속에서 희미한 별빛이 번져 나와 그대를 감쌌다. 아직은 아니다. 별은 그대를 놓아주지 않았다.',
 
@@ -584,7 +681,7 @@ window.SCENARIO = {
         { if: { party: 'sena' }, t: '“할머니!” 세나가 노파에게 달려가 안겼다. 노파의 먼 눈이 처음으로 웃었다.' }
       ],
       choices: [
-        { id: 1, skill: '설득', insp: 'song', label: '노파 곁에 앉아 관문의 옛이야기를 청한다', stat: '매력', dc: 10,
+        { id: 1, skill: '설득', insp: 'song', label: '노파 곁에 앉아 관문의 옛이야기를 청한다', stat: '매력', dc: 10, approve: { sena: 1 },
           note: '성공하면 옛 전승과 선물을 얻는다',
           success: {
             text: [
@@ -600,7 +697,7 @@ window.SCENARIO = {
             ],
             log: '노파는 입을 닫았다.', next: 'map' } },
 
-        { id: 2, skill: '역사', insp: 'lore', label: '벽에 걸린 낡은 지도를 해독한다', stat: '지혜', dc: 12,
+        { id: 2, skill: '역사', insp: 'lore', label: '벽에 걸린 낡은 지도를 해독한다', stat: '지혜', dc: 12, approve: { bran: 1 },
           note: '성공하면 숨겨진 길을 찾는다',
           success: {
             text: [
@@ -617,7 +714,7 @@ window.SCENARIO = {
             fx: { set: ['alerted'] },
             log: '지도 해독에 매달리다 밤이 깊었다. 사냥개들이 울기 시작했다.', next: 'map' } },
 
-        { id: 3, skill: '운동', insp: 'mercy', label: '무너져 가는 오두막을 손봐 준다', stat: '힘', dc: 11,
+        { id: 3, skill: '운동', insp: 'mercy', label: '무너져 가는 오두막을 손봐 준다', stat: '힘', dc: 11, approve: { sena: 2 },
           note: '성공하면 노파의 마음을 얻는다',
           success: {
             text: [
@@ -645,10 +742,10 @@ window.SCENARIO = {
         '“안개 비탈의 늑대 다섯만 쫓아 주면… 이 늙은이가 가진 것을 내주마.”'
       ],
       choices: [
-        { id: 1, insp: 'mercy', label: '부탁을 들어준다', roll: false,
+        { id: 1, insp: 'mercy', label: '부탁을 들어준다', roll: false, approve: { sena: 1 },
           then: { text: ['노파가 고개를 끄덕였다. “조심하거라. 그놈들은 무리로 다닌다.”'], fx: { set: ['q_wolves'] },
             log: '노파의 부탁을 받았다: 안개 비탈의 굶주린 늑대 5마리.', next: 'map' } },
-        { id: 2, label: '지금은 어렵다고 말한다', roll: false,
+        { id: 2, label: '지금은 어렵다고 말한다', roll: false, approve: { sena: -1 },
           then: { text: ['“그래, 그래. 별의 아이에게는 더 큰 일이 있겠지.” 노파는 다시 불 쪽으로 몸을 돌렸다.'], next: 'map' } }
       ]
     },
@@ -658,7 +755,9 @@ window.SCENARIO = {
       title: '노파의 부탁',
       clock: '마지막 마을',
       text: [
-        '늑대 다섯 마리를 쫓았다는 말에, 노파는 한참을 말없이 그대의 손을 쓰다듬었다.',
+        { if: { nor: [{ flag: 'wolves_solved' }] }, t: '늑대 다섯 마리를 쫓았다는 말에, 노파는 한참을 말없이 그대의 손을 쓰다듬었다.' },
+        { if: { flag: 'wolves_fed' }, t: '먹을 것을 나눠 주고 늑대들을 떠나보냈다는 말에, 노파는 한참을 웃었다. “별의 아이는 마음도 별 같구나.”' },
+        { if: { flag: 'wolves_solved', not: 'wolves_fed' }, t: '늑대 무리가 비탈을 떠났다는 말에, 노파는 한참을 말없이 그대의 손을 쓰다듬었다.' },
         '“고맙구나.” 노파는 마루 밑에서 오래된 가죽 주머니를 꺼냈다.',
         { if: { party: 'sena' }, t: '세나가 할머니의 손을 꼭 잡았다. “이제 우물가에 늑대는 안 올 거예요.”' }
       ],
@@ -670,6 +769,7 @@ window.SCENARIO = {
               '“그리고 이건 덤이다. 엘레우스의 기사들은 ‘맹세를 기억하는 자’에게만 문을 연다고 했지. 기억해 두거라.”'
             ],
             fx: { set: ['q_wolves_done', 'lore'], gold: 30, items: ['은빛 물약', '은빛 물약'], xp: 15 },
+            fxIf: [{ if: { flag: 'wolves_fed' }, fx: { xp: 5 } }],
             log: '노파의 부탁을 마쳤다. 금화 30과 은빛 물약 둘, 엘레우스의 전승을 얻었다.', next: 'map' } }
       ]
     },
@@ -681,7 +781,7 @@ window.SCENARIO = {
         '세 조각을 맞추자 하나의 문양이 되었다. 왕관을 쓴 사냥개 — 그리고 그 아래, 낯선 룬으로 새겨진 이름 하나.'
       ],
       choices: [
-        { id: 1, skill: '비전', insp: 'lore', label: '낙인의 룬을 읽어 낸다', stat: '지혜', dc: 12,
+        { id: 1, skill: '비전', insp: 'lore', label: '낙인의 룬을 읽어 낸다', stat: '지혜', dc: 12, approve: { bran: 1 },
           adv: [{ if: { flag: 'lore' }, why: '노파의 전승' }, { if: { party: 'bran' }, why: '브란의 지식' }],
           note: '성공하면 낙인의 비밀을 안다',
           success: {
@@ -710,7 +810,7 @@ window.SCENARIO = {
         { if: { flag: 'alerted' }, t: '사냥개의 정찰병이다. 놈은 이미 귀를 곤두세우고 있다.' }
       ],
       choices: [
-        { id: 1, stat: 'class', dc: 13,
+        { id: 1, stat: 'class', dc: 13, approve: { bran: -1 },
           label: {
             mage: '마력 탄을 날려 정찰병을 단숨에 쓰러뜨린다',
             warrior: '안개를 뚫고 달려들어 정찰병을 단칼에 베어 넘긴다',
@@ -740,7 +840,7 @@ window.SCENARIO = {
             fx: { hp: -3, set: ['alerted'] },
             log: '정찰병을 놓쳤다. 놈의 울음이 무리를 깨웠다 (HP -3).', next: 'map' } },
 
-        { id: 2, skill: '은신', insp: 'sly', label: '바위 뒤에 숨어 놈이 지나가기를 기다린다', stat: '민첩', dc: 12,
+        { id: 2, skill: '은신', insp: 'sly', label: '바위 뒤에 숨어 놈이 지나가기를 기다린다', stat: '민첩', dc: 12, approve: { bran: 1 },
           dis: [{ if: { flag: 'alerted' }, why: '놈이 경계 중' }],
           note: '성공하면 놈의 정체를 살핀다',
           success: {
@@ -770,7 +870,7 @@ window.SCENARIO = {
                 fx: { set: ['alerted'] }, log: '정찰병에게 쓰러졌다. 놈의 울음이 무리를 깨웠다.', next: 'map' } },
             next: 'map' } },
 
-        { id: 4, label: '바람을 등지고 냄새를 숨긴 채 지나간다', stat: '지혜', skill: '생존', dc: 11, insp: 'wild',
+        { id: 4, label: '바람을 등지고 냄새를 숨긴 채 지나간다', stat: '지혜', skill: '생존', dc: 11, insp: 'wild', approve: { sena: 1 },
           note: '성공하면 놈의 정체를 살핀다',
           success: {
             text: [
@@ -818,7 +918,7 @@ window.SCENARIO = {
             fx: { hp: -3, set: ['wary'] },
             log: '룬 해독에 실패해 반발을 맞았다 (HP -3). 석상 기사가 경계하며 깨어났다.', next: 'n4' } },
 
-        { id: 2, skill: '공연', insp: 'song', label: '꿈속에서 들은 별의 노래를 소리 내어 부른다', stat: '매력', dc: 13,
+        { id: 2, skill: '공연', insp: 'song', label: '꿈속에서 들은 별의 노래를 소리 내어 부른다', stat: '매력', dc: 13, approve: { sena: 1 },
           note: '어렵다. 성공하면 기사의 마음을 크게 움직인다',
           success: {
             text: [
@@ -958,7 +1058,7 @@ window.SCENARIO = {
             fx: { hp: -5, add: { bond: 1 }, unset: ['wary'] },
             log: '오르덴과 힘을 겨루다 내던져졌다 (HP -5). 그래도 기사는 그대를 인정했다.', next: 'map' } },
 
-        { id: 5, label: '엘레우스 왕가의 마지막 사자라고 둘러댄다', stat: '매력', skill: '기만', dc: 15, insp: 'sly',
+        { id: 5, label: '엘레우스 왕가의 마지막 사자라고 둘러댄다', stat: '매력', skill: '기만', dc: 15, insp: 'sly', approve: { sena: -1, bran: 1 },
           note: '어렵다. 들키면 기사가 그대를 의심한다',
           success: {
             text: [
@@ -1092,7 +1192,7 @@ window.SCENARIO = {
         { if: { flag: 'oath' }, t: '오르덴이 그대 앞으로 나서며 장창을 겨누었다. “내 등 뒤에 서라.”' }
       ],
       choices: [
-        { id: 1, skill: '비전', insp: 'lore', label: '문턱의 룬을 덫으로 바꿔 무리를 한꺼번에 노린다', stat: '지혜', dc: 13,
+        { id: 1, skill: '비전', insp: 'lore', label: '문턱의 룬을 덫으로 바꿔 무리를 한꺼번에 노린다', stat: '지혜', dc: 13, approve: { bran: 1 },
           dis: [{ if: { flag: 'alerted' }, why: '놈들이 경계 중' }],
           note: '성공하면 남는 놈이 적다',
           success: {
@@ -1184,7 +1284,7 @@ window.SCENARIO = {
         '짐승이 도약했다. 그대는 달렸다. 등 뒤로 뜨거운 숨결이 닿을 듯 가까웠고, 오래된 회랑의 천장이 진동에 흔들리며 돌가루를 흩뿌렸다.'
       ],
       choices: [
-        { id: 1, stat: 'class', dc: 14,
+        { id: 1, stat: 'class', dc: 14, approve: { sena: -1 },
           label: {
             mage: '천장의 이음매에 마력을 꽂아 석재를 무너뜨린다',
             warrior: '기울어진 기둥을 들이받아 석재를 무너뜨린다',
@@ -1228,7 +1328,7 @@ window.SCENARIO = {
             fx: { hp: -6 },
             log: '유인하다 발톱에 긁혔다 (HP -6). 그래도 놈은 따라 들어왔다.', next: 'n8' } },
 
-        { id: 3, skill: '비전', insp: 'lore', label: '우두머리 이마의 회색 낙인을 노려 별빛을 쏜다', stat: '지혜', dc: 13,
+        { id: 3, skill: '비전', insp: 'lore', label: '우두머리 이마의 회색 낙인을 노려 별빛을 쏜다', stat: '지혜', dc: 13, approve: { bran: 2 },
           requires: { flag: 'mark_seen' }, reqText: '회색 낙인의 비밀',
           note: '성공하면 결전에서 낙인을 부수기 쉬워진다',
           success: {
@@ -1301,7 +1401,7 @@ window.SCENARIO = {
             fx: { hp: -6, add: { bond: 1 } }, battle: BOSS,
             log: '투창이 빗나갔다. 오르덴을 감싸다 물렸다 (HP -6).', next: 'n9' } },
 
-        { id: 3, skill: '곡예', insp: 'mercy', label: '몸을 굴려 피하며 새끼를 어미에게서 떼어 놓는다', stat: '민첩', dc: 12,
+        { id: 3, skill: '곡예', insp: 'mercy', label: '몸을 굴려 피하며 새끼를 어미에게서 떼어 놓는다', stat: '민첩', dc: 12, approve: { sena: 2, bran: 1 },
           note: '성공하면 결전에서 우두머리가 이따금 머뭇거리고, 낙인을 부수기 쉬워진다',
           success: {
             text: [
@@ -1371,7 +1471,7 @@ window.SCENARIO = {
             ],
             log: '별자리를 읽지 못했다. 그래도 {relic:이} 동쪽을 가리켰다.', next: 'n10' } },
 
-        { id: 2, skill: '공연', insp: 'mercy', label: '오르덴과 함께 돌이 된 기사들의 넋을 기린다', stat: '매력', dc: 10,
+        { id: 2, skill: '공연', insp: 'mercy', label: '오르덴과 함께 돌이 된 기사들의 넋을 기린다', stat: '매력', dc: 10, approve: { sena: 1 },
           note: '성공하면 오르덴과의 유대가 깊어진다. 어느 쪽이든 쉬어 간다',
           success: {
             text: [
@@ -1433,7 +1533,7 @@ window.SCENARIO = {
           note: '성공하면 거미가 내려오기 전에 그녀가 활을 쥔다 (적이 기습당한다)',
           success: {
             text: ['끈적한 줄이 손바닥에 들러붙었지만, 그대는 이를 악물고 거미줄을 통째로 뜯어냈다. 여자가 흙바닥에 굴러떨어지며 등의 활을 잡아챘다.', '“고마워요. 이제 내 차례예요!” 내려오던 거미들이 허공에서 멈칫했다.'],
-            fx: { set: ['sena_met'], xp: 3 }, battle: SENA_FIGHT(true), log: '거미줄을 찢어 약초꾼을 구해 냈다.', next: 'map' },
+            fx: { set: ['sena_met'], add: { ap_sena: 1 }, xp: 3 }, battle: SENA_FIGHT(true), log: '거미줄을 찢어 약초꾼을 구해 냈다.', next: 'map' },
           fail: {
             text: ['줄은 생각보다 질겼다. 그대의 팔까지 거미줄에 감기는 사이, 거미들이 바닥에 내려앉았다.', '여자가 버둥거리며 한 손을 빼내 활을 쥐었다. “같이 싸워요. 둘이 엉켜 죽을 순 없잖아요!”'],
             fx: { set: ['sena_met'], hp: -2 }, battle: SENA_FIGHT(false), log: '거미줄에 같이 엉켰다 (HP -2).', next: 'map' } },
@@ -1471,15 +1571,15 @@ window.SCENARIO = {
         { id: 1, insp: 'brave', label: '그의 곁으로 뛰어들어 함께 싸운다', roll: false, note: '전투',
           then: {
             text: ['그대는 사내와 등을 맞대고 섰다. “좋소. 불씨가 젖기 전에 끝냅시다.”'],
-            fx: { set: ['bran_met'] }, battle: BRAN_FIGHT(false), log: '회색 두건의 사내 곁에서 싸웠다.', next: 'map' } },
+            fx: { set: ['bran_met'], add: { ap_bran: 1 } }, battle: BRAN_FIGHT(false), log: '회색 두건의 사내 곁에서 싸웠다.', next: 'map' } },
         { id: 2, skill: '통찰', insp: 'mercy', label: '손등의 화상을 살펴, 정말 낙인을 끊은 자인지 가늠한다', stat: '지혜', dc: 12,
           note: '성공하면 그를 믿고 함께 싸운다',
           success: {
             text: ['스스로 지진 화상이었다. 그것도 여러 번. 낙인이 다시 살아날 때마다 불로 지졌으리라.', '“믿겠소.” 그대의 말에 사내의 눈빛이 달라졌다. 지팡이 끝에 다시 불씨가 피어올랐다.'],
-            fx: { set: ['bran_met', 'bran_trust'], xp: 3 }, battle: BRAN_FIGHT(false), log: '사내의 화상이 스스로 지진 것임을 알아보았다.', next: 'map' },
+            fx: { set: ['bran_met', 'bran_trust'], add: { ap_bran: 2 }, xp: 3 }, battle: BRAN_FIGHT(false), log: '사내의 화상이 스스로 지진 것임을 알아보았다.', next: 'map' },
           fail: {
             text: ['그대가 망설이는 사이, 사냥개 한 마리가 사내의 다리를 물고 늘어졌다.', '“의심은 나중에 하시오!” 사내가 피를 흘리며 외쳤다.'],
-            fx: { set: ['bran_met'] }, battle: BRAN_FIGHT(false), log: '망설이는 사이 사내가 다쳤다.', next: 'map' } },
+            fx: { set: ['bran_met'], add: { ap_bran: -1 } }, battle: BRAN_FIGHT(false), log: '망설이는 사이 사내가 다쳤다.', next: 'map' } },
         { id: 3, skill: '은신', insp: 'sly', label: '초소 지붕으로 돌아 올라가 사냥개들을 위에서 덮친다', stat: '민첩', dc: 13,
           note: '성공하면 적이 기습당한다',
           success: {
@@ -1488,6 +1588,396 @@ window.SCENARIO = {
           fail: {
             text: ['젖은 기와가 미끄러졌다. 그대는 사냥개들 한가운데로 떨어졌다.'],
             fx: { set: ['bran_met'], hp: -3 }, battle: BRAN_FIGHT(false), log: '지붕에서 떨어졌다 (HP -3).', next: 'map' } }
+      ]
+    },
+
+    // ───────────────────────── 노파의 부탁: 여러 가지 해결
+    wolves_den: {
+      art: { sky: 'rain', bg: 'slope', actors: [{ k: 'hero', x: 0.24 }, { k: 'wolf', x: 0.6, face: -1 }, { k: 'pup', x: 0.7, face: -1 }, { k: 'wolf', x: 0.8, face: -1 }], fx: ['fog', 'rain'] },
+      title: '늑대 굴',
+      clock: '노파의 부탁',
+      text: [
+        '비탈 아래 바위틈에서 늑대들의 굴을 찾았다. 갈비뼈가 드러난 어미 늑대들이 새끼들 앞을 막아서며 이를 드러냈다.',
+        '놈들도 굶주렸을 뿐이다. 잿빛 사냥개들이 숲의 사냥감을 모조리 휩쓸어 간 뒤로, 늑대들에게는 마을의 닭장 말고는 먹을 것이 없었다.',
+        { if: { party: 'sena' }, t: '“사냥개들이 숲을 비워 버린 거예요.” 세나가 활을 내렸다. “얘들 잘못만은 아니에요.”' },
+        { if: { party: 'bran' }, t: '브란이 지팡이 끝에 불씨를 피웠다. “짐승은 불을 무서워하지. 굴 입구만 태우면 다른 골짜기로 옮겨 갈 거요.”' }
+      ],
+      choices: [
+        { id: 1, insp: 'brave', label: '무리를 쓸어 낸다', roll: false, note: '전투', approve: { sena: -1 },
+          then: {
+            text: ['그대는 무기를 뽑았다. 어미들이 한꺼번에 달려든다!'],
+            battle: {
+              enemies: ['wolf', 'wolf', 'wolf'], art: { sky: 'rain', bg: 'slope', fx: ['fog', 'rain'] },
+              win: { text: ['마지막 늑대가 쓰러지자, 굴 안의 새끼들이 흩어져 달아났다. 이제 마을로 내려올 늑대는 없다.'], fx: { set: ['wolves_solved'] }, log: '늑대 굴의 무리를 쓸어 냈다.', next: 'map' },
+              lose: { text: ['늑대들의 이빨에 쓰러졌다. 정신을 차렸을 때 굴은 비어 있었다. 피 냄새에 놀란 무리가 더 깊은 골짜기로 옮겨 간 것이다.'], fx: { set: ['wolves_solved'] }, log: '늑대들에게 쓰러졌지만, 무리는 비탈을 떠났다.', next: 'map' } },
+            next: 'map' } },
+        { id: 2, label: '굴 입구에 불을 놓아 다른 골짜기로 몰아낸다', roll: false, approve: { bran: 1 },
+          requires: { or: [{ item: '불꽃 병' }, { item: '기름 병' }, { party: 'bran' }] }, reqText: '불꽃 병이나 기름 병, 또는 브란',
+          note: '싸우지 않고 끝낸다',
+          then: {
+            text: [
+              { if: { party: 'bran' }, t: '브란의 불씨가 마른 덤불에 옮겨붙었다. 비에 젖은 연기가 굴 안으로 낮게 깔려 들어갔다.' },
+              { if: { nor: [{ party: 'bran' }] }, t: '그대가 던진 병이 굴 입구에서 깨지며 불길이 솟았다. 비에 젖은 연기가 굴 안으로 낮게 깔려 들어갔다.' },
+              '어미들은 새끼의 목덜미를 물고 하나둘 굴을 빠져나왔다. 그리고 불길을 피해, 사냥개의 냄새가 닿지 않는 동쪽 골짜기로 사라졌다.'
+            ],
+            fx: { set: ['wolves_solved'], xp: 6 },
+            fxIf: [
+              { if: { nor: [{ party: 'bran' }], item: '불꽃 병' }, fx: { drop: ['불꽃 병'] } },
+              { if: { nor: [{ party: 'bran' }, { item: '불꽃 병' }] }, fx: { drop: ['기름 병'] } }
+            ],
+            log: '불을 놓아 늑대 무리를 동쪽 골짜기로 몰아냈다.', next: 'map' } },
+        { id: 3, insp: 'mercy', label: '야영 물자를 굴 앞에 풀어 놓고 물러난다', roll: false, approve: { sena: 2 },
+          requires: { count: { '야영 물자': 2 } }, reqText: '야영 물자 2',
+          note: '싸우지 않고 끝낸다',
+          then: {
+            text: [
+              '그대는 말린 고기와 곡식을 굴 앞에 쏟아 놓고 천천히 물러났다.',
+              '어미 하나가 먼저 다가와 냄새를 맡았다. 그리고 새끼들을 불렀다. 굶주림이 가시자, 늑대들은 그대를 한 번 돌아보고는 새끼를 물고 동쪽 골짜기로 떠났다.'
+            ],
+            fx: { drop: ['야영 물자', '야영 물자'], set: ['wolves_solved', 'wolves_fed'], xp: 8 },
+            log: '먹을 것을 나눠 주고 늑대 무리를 떠나보냈다.', next: 'map' } },
+        { id: 4, skill: '생존', insp: 'wild', label: '사냥감이 남은 골짜기로 늑대들의 길을 열어 준다', stat: '지혜', dc: 13, approve: { sena: 1 },
+          note: '성공하면 싸우지 않고 끝낸다',
+          success: {
+            text: [
+              '그대는 바람과 발자국을 읽었다. 동쪽 골짜기에는 아직 사슴이 남아 있다.',
+              '그쪽으로 가는 길에 늑대의 냄새를 남겨 두자, 어미들은 코를 킁킁거리다가 새끼들을 몰고 떠났다. 마지막 늑대가 고개를 돌려 그대를 오래 바라보았다.'
+            ],
+            fx: { set: ['wolves_solved'], xp: 8 },
+            log: '늑대들에게 사냥감이 남은 골짜기로 가는 길을 열어 주었다.', next: 'map' },
+          fail: {
+            text: ['늑대들은 그대가 남긴 냄새를 무시했다. 오히려 낯선 냄새에 성난 어미 둘이 달려든다!'],
+            battle: {
+              enemies: ['wolf', 'wolf'], art: { sky: 'rain', bg: 'slope', fx: ['fog', 'rain'] },
+              win: { text: ['두 어미가 쓰러지자, 남은 무리는 새끼를 물고 비탈을 떠났다.'], fx: { set: ['wolves_solved'] }, log: '성난 어미들을 쓰러뜨렸다. 무리는 비탈을 떠났다.', next: 'map' },
+              lose: { text: ['정신을 차렸을 때 굴은 비어 있었다. 무리는 더 깊은 골짜기로 옮겨 간 뒤였다.'], fx: { set: ['wolves_solved'] }, log: '늑대에게 쓰러졌지만, 무리는 비탈을 떠났다.', next: 'map' } },
+            log: '늑대들의 길을 읽지 못했다.', next: 'map' } }
+      ]
+    },
+
+    // ───────────────────────── 세나의 부탁: 달빛 별꽃
+    moss_nest: {
+      art: { sky: 'night', bg: 'forest', actors: [{ k: 'hero', x: 0.22 }, { k: 'bear', x: 0.7, face: -1 }], fx: ['fog', 'motes'] },
+      title: '이끼 곰의 둥지',
+      clock: '세나의 부탁',
+      text: [
+        '검은 소나무 숲 가장 깊은 곳, 쓰러진 거목들이 둥지처럼 둘러싼 빈터가 있었다. 그 한가운데에서 달빛도 없는데 은빛으로 빛나는 꽃 한 송이가 피어 있었다.',
+        '그리고 그 꽃을 감싸듯 몸을 웅크린 것 — 등에 이끼가 숲처럼 자란, 다른 곰들보다 두 배는 큰 늙은 이끼 곰이었다. 놈의 숨소리에 맞추어 꽃잎이 흔들렸다.',
+        { if: { flag: 'dew_known' }, t: '“이슬만 받으면 돼요.” 세나의 말이 떠올랐다. 꽃을 꺾지 않으면, 저 곰도 화낼 이유가 없다.' },
+        { if: { party: 'sena' }, t: '세나가 그대의 소매를 잡았다. “저 곰… 사냥개들이 숲을 비운 뒤에도 꽃을 떠나지 않았어요. 지키고 있는 거예요.”' }
+      ],
+      choices: [
+        { id: 1, insp: 'brave', label: '늙은 곰과 싸워 꽃을 얻는다', roll: false, note: '전투 (강하다)',
+          then: { text: ['그대가 빈터로 걸어 나가자, 늙은 곰이 천천히 눈을 떴다.'], battle: NEST_FIGHT(false), next: 'map' } },
+        { id: 2, skill: '은신', insp: 'sly', label: '곰이 잠든 틈에 숨죽여 꽃에 다가간다', stat: '민첩', dc: 14,
+          dcMod: [{ if: { flag: 'dew_known' }, v: -2, why: '이슬만 받으면 된다' }],
+          note: '실패하면 곰이 깨어난다',
+          success: {
+            text: [
+              '그대는 숨을 멈추고 거목 사이를 미끄러지듯 지나갔다. 곰의 콧김이 뺨에 닿을 만큼 가까웠다.',
+              { if: { flag: 'dew_known' }, t: '은빛 꽃잎 끝에 맺힌 이슬을 작은 병에 받았다. 꽃은 그대로 두었다.' },
+              { if: { not: 'dew_known' }, t: '그대는 꽃을 줄기째 꺾어 품에 넣었다. 곰이 잠결에 낮게 으르렁거렸지만, 깨지는 않았다.' }
+            ],
+            fx: { items: ['달빛 별꽃'], set: ['moonflower_got'], xp: 10 },
+            fxIf: [{ if: { flag: 'dew_known' }, fx: { set: ['flower_spared'] } }],
+            log: '잠든 곰 곁에서 달빛 별꽃을 얻었다.', next: 'map' },
+          fail: {
+            text: ['마른 가지가 발밑에서 부러졌다. 늙은 곰의 눈이 번쩍 뜨였다!'],
+            battle: NEST_FIGHT(false), log: '곰이 깨어났다.', next: 'map' } },
+        { id: 3, skill: '생존', insp: 'wild', label: '곰의 숨결에 맞춰 천천히 다가가 짐승을 달랜다', stat: '지혜', dc: 15,
+          note: '어렵다. 성공하면 곰이 스스로 길을 비킨다',
+          success: {
+            text: [
+              '그대는 곰의 숨소리에 자신의 숨을 맞췄다. 들이쉬고, 내쉬고. 한 걸음, 또 한 걸음.',
+              '늙은 곰이 눈을 떴다. 그러나 이빨을 드러내지 않았다. 놈은 그대를 오래 바라보다가, 천천히 몸을 비켜 꽃을 내보였다. 마치 오래 기다렸다는 듯이.',
+              '그대가 이슬을 받는 동안 곰은 다시 눈을 감았다. 빈터를 떠날 때, 곰이 누웠던 자리에서 이끼가 왕관처럼 엉긴 무언가가 반짝였다.'
+            ],
+            fx: { items: ['달빛 별꽃', '이끼 왕관'], set: ['moonflower_got', 'flower_spared', 'got_moss_crown'], xp: 14 }, approve: { sena: 2 },
+            log: '늙은 이끼 곰을 달래 달빛 별꽃의 이슬을 받았다. 곰이 이끼 왕관을 남겼다.', next: 'map' },
+          fail: {
+            text: ['숨이 엇나갔다. 곰의 콧잔등에 주름이 잡히더니, 낮은 포효가 빈터를 흔들었다.'],
+            battle: NEST_FIGHT(false), log: '곰을 달래지 못했다.', next: 'map' } },
+        { id: 4, insp: 'mercy', label: '야영 물자를 빈터 끝에 풀어 곰을 꽃에서 떼어 놓는다', roll: false, approve: { sena: 1 },
+          requires: { count: { '야영 물자': 2 } }, reqText: '야영 물자 2',
+          note: '싸우지 않고 끝낸다',
+          then: {
+            text: [
+              '그대는 말린 고기와 꿀을 빈터 끝에 풀어 놓고 물러섰다. 단내를 맡은 늙은 곰이 느릿느릿 몸을 일으켰다.',
+              '곰이 먹이에 정신이 팔린 사이, 그대는 꽃 곁으로 다가가 꽃잎 끝의 이슬을 받았다.'
+            ],
+            fx: { drop: ['야영 물자', '야영 물자'], items: ['달빛 별꽃'], set: ['moonflower_got', 'flower_spared'], xp: 10 },
+            log: '먹이로 곰을 떼어 놓고 달빛 별꽃의 이슬을 받았다.', next: 'map' } }
+      ]
+    },
+
+    crone_cure: {
+      art: { sky: 'cave', bg: 'hut', actors: [{ k: 'hero', x: 0.34 }, { k: 'crone', x: 0.62, face: -1 }] },
+      title: '등불지기의 눈',
+      clock: '세나의 부탁',
+      text: [
+        '노파는 달빛 별꽃의 이슬을 눈꺼풀에 떨어뜨리고, 오랫동안 눈을 감고 있었다.',
+        '이윽고 눈을 떴을 때 — 그 탁하던 눈동자에 화로의 불빛이 비쳤다.',
+        { if: { party: 'sena' }, t: '“…세나야. 너 머리를 잘랐구나.” 세나가 울음을 터뜨리며 할머니에게 안겼다. 노파의 마른 손이 손녀의 짧은 머리를 오래도록 쓸어내렸다.' },
+        { if: { nor: [{ party: 'sena' }] }, t: '노파는 그대의 얼굴을 한참 들여다보았다. “네가 별의 아이로구나. 생각보다 어리구나.”' }
+      ],
+      choices: [
+        { id: 1, insp: 'mercy', label: '노파의 손을 잡는다', roll: false,
+          then: {
+            text: [
+              '노파가 벽장 깊은 곳에서 작은 등불 하나를 꺼냈다. 유리 안에서 꺼지지 않는 불씨가 깜박였다.',
+              '“등불지기는 대대로 이걸 지켜 왔단다. 잿빛 안개 속에서도 길을 비춰 주지.” 노파가 등불을 그대의 손에 쥐여 주었다. “이제 네가 가져가거라. 나는 다시 볼 수 있으니.”'
+            ],
+            fx: { drop: ['달빛 별꽃'], items: ['등불지기의 등불'], set: ['crone_cured'], xp: 20 }, approve: { sena: 2 },
+            log: '달빛 별꽃의 이슬로 노파가 눈을 되찾았다. 등불지기의 등불을 받았다.', next: 'map' } }
+      ]
+    },
+
+    // ───────────────────────── 브란의 부탁: 회색 장부
+    cult_den: {
+      art: { sky: 'cave', bg: 'hall', actors: [{ k: 'hero', x: 0.22 }, { k: 'acolyte', x: 0.58, face: -1 }, { k: 'acolyte', x: 0.7, face: -1 }, { k: 'acolyte', x: 0.84, face: -1 }], fx: ['dust'] },
+      title: '회색 두건의 은신처',
+      clock: '브란의 부탁',
+      text: [
+        '회랑 옆 무너진 예배실. 회색 두건을 쓴 자들이 무릎을 꿇고 앉아, 낮은 목소리로 같은 구절을 되풀이하고 있었다. ‘돌아오라. 사냥꾼의 품은 따뜻하다.’',
+        '제단 위에서 한 사람이 일어섰다. 두건 아래로 이마 전체에 낙인이 새겨진 늙은 사내 — 추종자들의 우두머리였다. 그의 허리춤에 두꺼운 회색 장부가 매달려 있다.',
+        { if: { party: 'bran' }, t: '브란의 손이 떨렸다. “저자요. 내 손등에 낙인을 찍은 자.”' }
+      ],
+      choices: [
+        { id: 1, insp: 'brave', label: '정면으로 쳐들어간다', roll: false, note: '전투 (우두머리와 추종자 둘)',
+          then: { text: ['그대가 예배실 문을 박차고 들어서자, 구절이 뚝 끊겼다.'], battle: CULT_FIGHT(false), next: 'map' } },
+        { id: 2, skill: '은신', insp: 'sly', label: '그림자를 따라 제단 뒤로 돌아 기습한다', stat: '민첩', dc: 14,
+          note: '성공하면 적이 기습당한다',
+          success: { text: ['그대는 기둥의 그림자를 하나씩 건너 제단 뒤에 섰다. 우두머리의 등이 바로 앞에 있었다.'], battle: CULT_FIGHT(true), log: '추종자들의 등 뒤를 잡았다.', next: 'map' },
+          fail: { text: ['무너진 돌 하나가 굴러떨어졌다. 수십 개의 두건이 일제히 그대를 향했다.'], fx: { hp: -3 }, battle: CULT_FIGHT(false), log: '숨어들다 들켰다 (HP -3).', next: 'map' } },
+        { id: 3, skill: '기만', insp: 'sly', label: '회색 두건을 쓰고 추종자인 척 장부에 다가간다', stat: '매력', dc: 15,
+          adv: [{ if: { party: 'bran' }, why: '브란이 구절을 알려 준다' }],
+          note: '성공하면 싸우지 않고 장부를 빼낸다',
+          success: {
+            text: [
+              '그대는 낮게 구절을 읊조리며 무릎 꿇은 이들 사이를 지나갔다. 아무도 고개를 들지 않았다.',
+              '우두머리가 장부를 제단에 내려놓고 기도를 올리는 순간, 그대는 장부를 품에 넣고 그림자 속으로 물러났다. 등 뒤에서 구절은 끝없이 이어졌다.'
+            ],
+            fx: { items: ['회색 장부'], set: ['ledger_got'], xp: 25 }, approve: { bran: 1 },
+            log: '추종자인 척 숨어들어 회색 장부를 빼냈다.', next: 'map' },
+          fail: {
+            text: ['구절 하나를 틀렸다. 우두머리의 눈이 가늘어졌다. “사냥꾼의 품에 그런 말은 없다.”'],
+            battle: CULT_FIGHT(false), log: '정체가 들통났다.', next: 'map' } },
+        { id: 4, label: '예배실 입구에 기름을 붓고 불을 놓는다', roll: false, approve: { bran: 2, sena: -1 },
+          requires: { or: [{ item: '기름 병' }, { item: '불꽃 병' }, { party: 'bran' }] }, reqText: '기름 병이나 불꽃 병, 또는 브란',
+          note: '추종자들은 흩어지고, 우두머리만 불길 속에서 맞선다',
+          then: {
+            text: ['불길이 예배실 입구를 삼켰다. 비명과 함께 두건들이 흩어졌다. 우두머리만이 불길을 뚫고 그대에게 다가왔다. 장부를 품에 꼭 안은 채.'],
+            fxIf: [
+              { if: { nor: [{ party: 'bran' }], item: '기름 병' }, fx: { drop: ['기름 병'] } },
+              { if: { nor: [{ party: 'bran' }, { item: '기름 병' }] }, fx: { drop: ['불꽃 병'] } }
+            ],
+            battle: CULT_FIGHT(false, true), next: 'map' } }
+      ]
+    },
+
+    // ───────────────────────── 야영지 대화 (쉼터에서 긴 휴식을 하면)
+    camp_sena1: {
+      camp: true, art: 'camp', if: { party: 'sena' },
+      title: '모닥불 곁에서 · 세나',
+      clock: '야영',
+      text: [
+        '불이 낮게 타올랐다. 세나는 화살촉을 갈다 말고, 한참 동안 불꽃만 바라보고 있었다.',
+        '“할머니 눈 말이에요.” 그녀가 입을 열었다. “원래부터 안 보였던 게 아니에요. 사냥개들이 처음 울던 밤, 할머니는 등불을 들고 밖에 나갔다가 회색 빛을 정면으로 봤대요. 그 뒤로 세상이 잿빛 안개처럼 보인대요.”',
+        '“진짜 약은 따로 있어요. 달빛 별꽃 — 숲 가장 깊은 곳, 늙은 이끼 곰의 둥지에서만 피는 꽃이요.” 그녀가 쓴웃음을 지었다. “혼자서는 엄두도 못 냈죠.”'
+      ],
+      choices: [
+        { id: 1, insp: 'mercy', label: '함께 둥지로 가자고 약속한다', roll: false, approve: { sena: 2 },
+          then: {
+            text: ['세나의 눈이 커졌다. “정말요?” 그녀가 서둘러 고개를 숙였다. 불빛 때문인지 귀끝이 붉었다. “…고마워요. 진짜로.”'],
+            fx: { set: ['q_moonflower'] }, log: '세나와 이끼 곰의 둥지에서 달빛 별꽃을 찾기로 약속했다.', next: 'map' } },
+        { id: 2, skill: '의학', insp: 'lore', label: '할머니의 증상을 자세히 묻는다', stat: '지혜', dc: 12, approve: { sena: 1 },
+          note: '성공하면 꽃을 꺾지 않아도 되는 방법을 안다',
+          success: {
+            text: [
+              '그대는 증상을 하나하나 물었다. 회색 빛, 잿빛 안개, 밤마다 심해지는 통증. 낙인의 빛이 남긴 상처라면, 꽃잎이 아니라 꽃잎에 맺힌 이슬로 씻어 낼 수 있다.',
+              '“이슬이요?” 세나가 눈을 깜빡였다. “그럼… 꽃을 꺾지 않아도 되겠네요. 곰이 지키는 꽃을.”'
+            ],
+            fx: { set: ['q_moonflower', 'dew_known'], xp: 4 }, log: '달빛 별꽃은 꺾지 않고 이슬만 받아도 된다는 것을 알아냈다.', next: 'map' },
+          fail: {
+            text: ['그대의 질문은 끝내 답에 닿지 못했다. 세나가 피곤한 듯 웃었다. “직접 가 보는 수밖에 없어요.”'],
+            fx: { set: ['q_moonflower'] }, log: '달빛 별꽃 이야기를 들었다.', next: 'map' } },
+        { id: 3, label: '관문의 일이 먼저라고 말한다', roll: false, approve: { sena: -2 },
+          then: {
+            text: ['“…그렇죠. 별의 아이한테는 더 큰 일이 있으니까.” 세나는 다시 화살촉을 갈기 시작했다. 사각거리는 소리가 오래 이어졌다.', '그래도 잠들기 전, 그녀는 숲 쪽을 한 번 더 돌아보았다.'],
+            fx: { set: ['q_moonflower'] }, log: '달빛 별꽃 이야기를 들었지만, 관문이 먼저라고 했다.', next: 'map' } }
+      ]
+    },
+
+    camp_sena2: {
+      camp: true, art: 'camp', if: { party: 'sena', flag: 'crone_cured', min: { ap_sena: 4 } },
+      title: '모닥불 곁에서 · 세나',
+      clock: '야영',
+      text: [
+        '세나가 목에 걸린 가죽끈을 만지작거렸다. 끝에 낡은 화살촉 하나가 매달려 있었다.',
+        '“엄마 거예요. 사냥개들이 마을에 처음 내려왔던 밤에, 엄마는 이걸로 세 마리를 쐈대요. 네 번째는 못 쐈고요.”',
+        '“할머니 눈을 고쳐 줘서 고마워요. 그래서… 이거, 당신이 가져요.” 그녀가 목걸이를 풀어 그대의 손에 쥐여 주었다. “엄마가 그랬대요. 지켜야 할 사람이 생기면 넘겨주라고.”'
+      ],
+      choices: [
+        { id: 1, label: '목걸이를 받는다', roll: false, approve: { sena: 1 },
+          then: {
+            text: ['세나가 웃었다. 불빛 속에서, 그 웃음은 노파를 닮아 있었다. “이제 당신도 등불지기 집안 사람이에요. 도망 못 가요.”'],
+            fx: { items: ['세나 어머니의 화살촉'], set: ['sena_sworn'] }, log: '세나에게서 어머니의 화살촉을 받았다.', next: 'map' } },
+        { id: 2, insp: 'mercy', label: '“그건 네가 지녀야 한다”며 다시 목에 걸어 준다', roll: false, approve: { sena: 2 },
+          then: {
+            text: ['세나는 잠시 멍하니 그대를 보다가, 목걸이를 꼭 쥐었다. “…그럼 이걸로 당신을 지킬게요. 엄마처럼. 네 번째 화살까지.”', '그날 이후 세나의 화살은 한 번도 망설이지 않았다.'],
+            fx: { set: ['sena_sworn', 'sena_kept_arrow'] }, log: '세나에게 어머니의 화살촉을 돌려주었다. 세나가 끝까지 지키겠다고 맹세했다. (세나 명중 +1)', next: 'map' } }
+      ]
+    },
+
+    camp_bran1: {
+      camp: true, art: 'camp', if: { party: 'bran' },
+      title: '모닥불 곁에서 · 브란',
+      clock: '야영',
+      text: [
+        '브란은 모닥불에서 가장 먼 자리에 앉아, 지져진 손등을 불빛에 비춰 보고 있었다.',
+        '“밤이 되면 들린다오.” 그가 그대의 시선을 느끼고 말했다. “지져 냈는데도. 낙인이 있던 자리에서 누군가 속삭이지. 돌아오라고. 사냥꾼의 품은 따뜻하다고.”',
+        '“회랑 어딘가에 추종자들의 우두머리가 숨어 있소. 그자가 회색 장부를 가지고 있지. 낙인이 찍힌 모든 이름이 적힌 장부요. 그 장부가 남아 있는 한, 사냥꾼은 우리를 언제든 다시 부를 수 있소.”'
+      ],
+      choices: [
+        { id: 1, label: '장부를 찾아 함께 불태우자고 한다', roll: false, approve: { bran: 2 },
+          then: {
+            text: ['브란이 그대를 오래 바라보았다. 그리고 처음으로, 비웃음이 섞이지 않은 웃음을 지었다. “…그대는 이상한 사람이군.”'],
+            fx: { set: ['q_ledger'] }, log: '브란과 회색 장부를 찾아 불태우기로 했다.', next: 'map' } },
+        { id: 2, insp: 'lore', label: '낙인이 어떻게 짐승의 뜻을 빼앗는지 묻는다', roll: false, approve: { bran: 1 },
+          note: '회색 낙인의 비밀을 듣는다',
+          then: {
+            text: [
+              '“낙인은 사슬이오. 사냥꾼의 뜻을 짐승의 뜻 위에 덮어씌우지. 하지만 사슬이란 건 — 고리 하나만 끊어도 끝이오.”',
+              '브란이 손가락으로 허공에 룬 하나를 그렸다. ‘묶는 자, 회색 사냥꾼.’ 그대는 그 이름을 마음에 새겼다.',
+              '“장부 이야기는… 마음이 내키면 들어 주시오.”'
+            ],
+            fx: { set: ['mark_seen', 'q_ledger'], xp: 6 }, log: '브란에게서 회색 낙인의 비밀을 들었다. 낙인은 끊을 수 있는 사슬이다.', next: 'map' } },
+        { id: 3, skill: '통찰', insp: 'mercy', label: '속삭임에 아직 끌리고 있는지 그의 눈을 살핀다', stat: '지혜', dc: 13,
+          success: {
+            text: ['그의 눈은 흔들리지 않았다. 속삭임은 들리지만, 그는 대답하지 않는 것이다. 매일 밤, 혼자서.', '“…들켰군.” 브란이 어깨를 으쓱했다. “그래도 누가 봐 주니 조금 낫소.”'],
+            fx: { set: ['q_ledger'], xp: 4 }, approve: { bran: 2 }, log: '브란이 매일 밤 홀로 속삭임을 견디고 있음을 알았다.', next: 'map' },
+          fail: {
+            text: ['그대가 너무 오래 쳐다보았다. 브란이 차갑게 웃었다. “아직 사냥꾼의 개인지 확인하는 거요? 마음대로 하시오.”'],
+            fx: { set: ['q_ledger'] }, approve: { bran: -1 }, log: '브란을 의심하는 눈빛을 들켰다.', next: 'map' } },
+        { id: 4, label: '“아직도 사냥꾼의 냄새가 난다”고 쏘아붙인다', roll: false, approve: { bran: -2, sena: 1 },
+          then: {
+            text: ['브란의 얼굴이 굳었다. 그는 아무 말 없이 일어나 어둠 속으로 걸어갔다.', { if: { party: 'sena' }, t: '세나는 아무 말도 하지 않았지만, 그대 쪽으로 조금 더 다가앉았다.' }, '새벽녘에야 돌아온 그가 짧게 말했다. “회랑의 장부. 그래도 그건 불태워야 하오.”'],
+            fx: { set: ['q_ledger'] }, log: '브란에게 모진 말을 했다.', next: 'map' } }
+      ]
+    },
+
+    camp_bran2: {
+      camp: true, art: 'camp', if: { party: 'bran', item: '회색 장부' },
+      title: '모닥불 곁에서 · 브란',
+      clock: '야영',
+      text: [
+        '브란이 회색 장부를 무릎 위에 펼쳤다. 빽빽한 이름들. 사람, 짐승, 그리고 이름 대신 낙인 문양만 그려진 칸들.',
+        '한 장을 넘기던 그의 손가락이 멈췄다. 거기에 브란의 이름이 있었다. 그 아래에, 아직 지워지지 않은 수백 개의 이름이.',
+        '“이걸 태우면, 여기 적힌 자들은 사냥꾼의 부름에서 풀려나오. 하지만…” 그가 장부를 덮었다. “사냥꾼이 어디서 무엇을 묶었는지도 함께 사라지지. 그대가 정하시오.”'
+      ],
+      choices: [
+        { id: 1, insp: 'mercy', label: '함께 불태운다', roll: false, approve: { bran: 3, sena: 1 },
+          then: {
+            text: [
+              '장부가 불길 속에서 오그라들었다. 이름 하나가 탈 때마다, 아주 먼 곳 어딘가에서 무언가가 툭 끊어지는 소리가 들리는 것 같았다.',
+              '브란이 지져진 손등을 내려다보았다. “…조용하군.” 그의 목소리가 떨렸다. “천 날 만에 처음으로, 조용하오.”',
+              '그는 손가락에서 무쇠 반지 하나를 빼어 장부를 태운 불씨에 한 번 담갔다가, 그대에게 내밀었다. “받으시오. 이 불씨가 그대를 지킬 거요.”'
+            ],
+            fx: { drop: ['회색 장부'], items: ['브란의 불씨 반지'], set: ['ledger_burned'], xp: 20 },
+            log: '브란과 함께 회색 장부를 불태웠다. 브란이 속삭임에서 풀려났다. (브란 명중 +1)', next: 'map' } },
+        { id: 2, skill: '설득', insp: 'song', label: '사냥꾼을 쫓으려면 그가 머무는 곳이 적힌 장만은 남기자고 한다', stat: '매력', dc: 15,
+          success: {
+            text: ['브란은 오래 망설였다. “…한 장만 남기시오. 사냥꾼이 머무는 곳이 적힌 장.” 나머지는 불길 속으로 들어갔다.', '그는 반지 하나를 불씨에 담갔다가 그대에게 내밀었다. “그 한 장이 그대를 삼키지 않도록.”'],
+            fx: { drop: ['회색 장부'], items: ['회색 장부의 마지막 장', '브란의 불씨 반지'], set: ['ledger_burned', 'ledger_page'], xp: 20 }, approve: { bran: 1 },
+            log: '회색 장부를 불태우되, 사냥꾼이 머무는 곳이 적힌 마지막 장은 남겼다.', next: 'map' },
+          fail: {
+            text: ['“그 말, 사냥꾼도 똑같이 했소.” 브란이 장부를 빼앗아 불 속에 던졌다. 그는 그날 밤 내내 그대 쪽을 보지 않았다.'],
+            fx: { drop: ['회색 장부'], set: ['ledger_burned'], xp: 10 }, approve: { bran: -2 },
+            log: '장부를 남기자고 했다가 브란의 화를 샀다. 브란이 장부를 불태웠다.', next: 'map' } },
+        { id: 3, label: '장부를 지니고 다니며 사냥꾼의 비밀을 읽겠다고 한다', roll: false, approve: { bran: -3 },
+          then: {
+            text: ['브란이 아무 말 없이 그대를 바라보았다. 그리고 장부를 그대에게 건네고 등을 돌렸다. “…그대 뜻대로.”'],
+            fx: { set: ['ledger_kept'] }, log: '회색 장부를 지니기로 했다. 브란이 등을 돌렸다.', next: 'map' } }
+      ]
+    },
+
+    camp_orden1: {
+      camp: true, art: 'camp', if: { party: 'orden', flag: 'done_n5' },
+      title: '모닥불 곁에서 · 오르덴',
+      clock: '야영',
+      text: [
+        '오르덴은 모닥불 곁에서도 투구를 벗지 않았다. 천 년 동안 그래 왔듯이.',
+        '“돌이 되어 있던 동안, 나는 꿈을 꾸지 않았다.” 그가 불쑥 말했다. “다만 빗소리를 들었지. 천 년 동안 하루도 빠짐없이. 그러다 어느 날, 그 빗소리 사이로 그대의 발소리가 들렸다.”',
+        '“하나만 묻겠다. 별께서 그대에게 나처럼 돌이 되어 문을 지키라 하신다면 — 그대는 따르겠는가?”'
+      ],
+      choices: [
+        { id: 1, insp: 'brave', label: '따르겠다. 맹세란 그런 것이다', roll: false, approve: { orden: 1 },
+          then: {
+            text: ['오르덴이 고개를 끄덕였다. “그 대답을 천 년 전에 들었다면… 아니, 됐다.” 그는 불을 오래 바라보았다.'],
+            fx: { set: ['oath_follow'] }, log: '오르덴에게 별의 뜻이라면 따르겠다고 답했다.', next: 'map' } },
+        { id: 2, label: '따르지 않겠다. 별이라도 사람에게 그런 것을 요구해서는 안 된다', roll: false, approve: { orden: 1, bran: 1 },
+          then: {
+            text: ['오르덴은 한참 말이 없었다. “…천 년 전 왕께 그렇게 말한 기사가 한 명 있었다. 카이론. 내 동생이었지.”', '그가 처음으로 투구를 벗었다. 불빛에 드러난 얼굴은 생각보다 훨씬 젊었다. “그 아이가 옳았는지도 모르겠군.”'],
+            fx: { set: ['oath_question'] }, log: '오르덴에게 별의 뜻이라도 따르지 않겠다고 답했다. 오르덴이 투구를 벗었다.', next: 'map' } },
+        { id: 3, skill: '공연', insp: 'song', label: '대답 대신, 돌이 된 기사들의 노래를 나지막이 부른다', stat: '매력', dc: 12,
+          success: {
+            text: ['그대의 노래가 불 위로 낮게 퍼졌다. 두 번째 소절에서, 갈라진 목소리 하나가 그 뒤를 따랐다.', '오르덴이 부르고 있었다. 천 년 만에. 노래가 끝났을 때, 기사는 아무 말도 하지 않았다. 할 필요가 없었다.'],
+            approve: { orden: 2 }, fx: { xp: 4 }, log: '오르덴과 함께 돌이 된 기사들의 노래를 불렀다.', next: 'map' },
+          fail: {
+            text: ['노래가 자꾸 엇나갔다. 오르덴이 낮게 웃었다. “그 노래는 천 년 전에도 다들 틀렸다. 괜찮다.”'],
+            log: '노래가 엇나갔지만 오르덴이 웃었다.', next: 'map' } }
+      ]
+    },
+
+    camp_orden2: {
+      camp: true, art: 'camp', if: { party: 'orden', flag: 'q_ring_done', min: { bond: 4 } },
+      title: '모닥불 곁에서 · 오르덴',
+      clock: '야영',
+      text: [
+        '오르덴이 새끼손가락에서 은반지를 빼어 손바닥 위에 올려놓았다. 카이론의 반지였다.',
+        '“형제의 맹세는 형제가 잇는 법이다.” 그가 반지를 그대에게 내밀었다. “카이론은 문 안에 갇혀 있는 것보다 길 위에 있기를 바랐을 것이다. 그대가 지녀라.”'
+      ],
+      choices: [
+        { id: 1, label: '반지를 받는다', roll: false, approve: { orden: 1 },
+          then: {
+            text: ['반지는 그대의 손가락에 꼭 맞았다. 오르덴이 짧게 웃었다. “역시. 그 녀석도 손가락이 가늘었지.”'],
+            fx: { items: ['카이론의 반지'], set: ['kairon_given'] }, log: '오르덴에게서 카이론의 반지를 받았다.', next: 'map' } },
+        { id: 2, insp: 'mercy', label: '“그 반지는 그대가 끼고 있어야 한다”며 돌려준다', roll: false, approve: { orden: 2 },
+          then: {
+            text: ['오르덴은 반지를 다시 끼며 오래 고개를 숙였다. “…그렇다면 이 반지에 걸고, 그대 앞에 서는 모든 것을 막겠다.”'],
+            fx: { set: ['kairon_kept'] }, log: '카이론의 반지를 오르덴에게 돌려주었다. (오르덴 방어 +1)', next: 'map' } }
+      ]
+    },
+
+    camp_argue: {
+      camp: true, art: 'camp', if: { party: ['sena', 'bran'], flag: ['done_camp_sena1', 'done_camp_bran1'] },
+      title: '모닥불 곁의 다툼',
+      clock: '야영',
+      text: [
+        '그날 밤, 모닥불 너머에서 언성이 높아졌다.',
+        '“그 낙인을 찍은 게 당신네들이잖아요!” 세나가 벌떡 일어났다. “우리 엄마 아빠를 물어 죽인 개들한테도 그 낙인이 있었어요!”',
+        '브란은 일어서지 않았다. “맞소. 내 손으로 찍은 개도 있었겠지.” 그가 지져진 손등을 불빛에 내보였다. “그래서 이걸 지졌소. 그걸로 다 갚아지진 않겠지만.”',
+        '두 사람의 시선이 그대에게 향했다.'
+      ],
+      choices: [
+        { id: 1, label: '세나 편을 든다 — 손등을 지진다고 지워지지 않는 죄도 있다', roll: false, approve: { sena: 2, bran: -2 },
+          then: { text: ['세나가 이를 악물고 고개를 끄덕였다. 브란은 아무 말 없이 불씨만 뒤적였다. 그날 밤, 모닥불은 유난히 빨리 사그라들었다.'], log: '모닥불 곁의 다툼에서 세나 편을 들었다.', next: 'map' } },
+        { id: 2, label: '브란 편을 든다 — 사슬을 끊고 돌아선 사람을 탓할 수는 없다', roll: false, approve: { bran: 2, sena: -2 },
+          then: { text: ['브란이 놀란 듯 그대를 보았다. 세나는 입술을 깨물고 등을 돌려 누웠다. 그날 밤 그녀는 한 번도 돌아눕지 않았다.'], log: '모닥불 곁의 다툼에서 브란 편을 들었다.', next: 'map' } },
+        { id: 3, skill: '설득', insp: 'song', label: '두 사람 모두의 원수는 회색 사냥꾼이라고 말한다', stat: '매력', dc: 13,
+          success: {
+            text: ['“세나의 부모를 죽인 것도, 브란의 손에 낙인을 찍은 것도 같은 자다.” 그대의 말에 모닥불이 조용해졌다.', '한참 뒤, 세나가 다시 앉았다. “…그 장부, 태울 때 나도 불러요.” 브란이 고개를 끄덕였다. “그러지.”'],
+            approve: { sena: 1, bran: 1 }, fx: { xp: 5 }, log: '세나와 브란을 화해시켰다.', next: 'map' },
+          fail: {
+            text: ['그대의 말은 두 사람 모두에게 변명처럼 들렸다. 세나는 자리를 옮겼고, 브란은 어둠 속으로 걸어갔다.'],
+            approve: { sena: -1, bran: -1 }, log: '세나와 브란의 다툼을 말리지 못했다.', next: 'map' } },
+        { id: 4, skill: '통찰', insp: 'mercy', label: '말없이 둘 사이에 앉아, 각자의 이야기를 끝까지 듣는다', stat: '지혜', dc: 12,
+          success: {
+            text: ['그대는 아무 편도 들지 않았다. 다만 들었다. 세나의 부모 이야기를, 브란이 처음 낙인을 받던 날의 이야기를.', '새벽이 올 무렵, 두 사람은 같은 불을 쬐고 있었다. 말은 없었지만, 더는 서로를 노려보지 않았다.'],
+            approve: { sena: 1, bran: 1 }, fx: { xp: 5 }, log: '세나와 브란의 이야기를 끝까지 들었다.', next: 'map' },
+          fail: {
+            text: ['침묵이 너무 길었다. 두 사람은 각자 다른 쪽으로 돌아누웠다.'],
+            log: '모닥불 곁의 다툼은 침묵으로 끝났다.', next: 'map' } }
       ]
     },
 
@@ -1565,7 +2055,7 @@ window.SCENARIO = {
         '녹슨 장갑을 낀 손에 은빛 병 두 개가 아직 온전히 쥐어져 있었다. 그런데 — 다른 손가락에는 반지 자국만 남아 있다. 수로 깊은 곳에서 녹슨 갑주가 부딪히는 소리가 들려온다.'
       ],
       choices: [
-        { id: 1, insp: 'mercy', label: '짧게 묵념하고 병을 거둔다', roll: false,
+        { id: 1, insp: 'mercy', label: '짧게 묵념하고 병을 거둔다', roll: false, approve: { sena: 1, orden: 1 },
           then: { text: ['그대는 기사의 유골 앞에 잠시 고개를 숙였다. 반지는 어디로 간 것일까.'], fx: { set: ['found_bones'], items: ['은빛 물약', '은빛 물약'] },
             log: '옛 수로에서 쓰러진 기사의 유골을 찾았다. 반지가 사라져 있었다.', next: 'map' } }
       ]
@@ -1591,18 +2081,37 @@ window.SCENARIO = {
         { id: 1, insp: 'brave', label: '물에 잠긴 기사와 싸운다 (권장 레벨 5)', roll: false, note: '전투',
           then: {
             text: ['기사가 녹슨 대검을 물 밖으로 끌어 올렸다. 천 년의 침묵을 깨는 소리였다.'],
-            battle: { enemies: ['drowned'],
+            battle: { enemies: ['drowned'], perPC: { hp: 12 },
               win: { text: ['기사의 갑주가 무너져 내렸다. 푸른 불꽃이 꺼지기 직전, 그것은 그대를 향해 고개를 숙였다. 마치 — 고맙다는 듯이.'], log: '물에 잠긴 기사를 쉬게 했다.', next: 'map' },
               lose: { text: ['녹슨 대검이 그대를 물속으로 처박았다. 정신을 차렸을 때, 기사는 다시 깊은 곳으로 가라앉은 뒤였다.'], log: '물에 잠긴 기사에게 쓰러졌다.', next: 'map' } },
             next: 'map' } },
-        { id: 2, label: '지금은 물러난다', roll: false, then: { text: ['그대는 조용히 물러났다. 기사는 그대를 쫓지 않았다.'], next: 'map' } }
+        { id: 2, skill: '역사', insp: 'lore', label: '엘레우스 맹세의 구절을 읊어 기사를 잠재운다', stat: '지혜', dc: 14, approve: { orden: 1 },
+          requires: { or: [{ flag: 'lore' }, { party: 'orden' }] }, reqText: '엘레우스의 전승 또는 오르덴',
+          adv: [{ if: { party: 'orden' }, why: '오르덴이 함께 읊는다' }],
+          note: '성공하면 싸우지 않고 반지를 얻는다',
+          success: {
+            text: [
+              '‘별이 떨어진 밤에도 우리는 무릎 꿇지 않으리. 마지막 빛이 꺼질 때까지 이 문을 지키리.’',
+              { if: { party: 'orden' }, t: '오르덴의 낮은 목소리가 그대의 목소리에 겹쳤다. 두 목소리가 물 위로 퍼져 나가자, 투구 속 푸른 불꽃이 흔들렸다.' },
+              '물에 잠긴 기사가 녹슨 대검을 내렸다. 그는 천천히 무릎을 꿇고, 손가락의 은반지를 빼어 그대의 손바닥 위에 올려놓았다. 그리고 흉갑의 버클을 풀어 그대 앞에 내려놓았다. 더는 지킬 것이 없다는 듯이.',
+              '푸른 불꽃이 꺼지고, 기사는 조용히 물속으로 가라앉았다. 천 년 만의 잠이었다.'
+            ],
+            fx: { set: ['got_ring', 'got_cuirass', 'knight_rest'], items: ['기사의 반지', '엘레우스 기사의 흉갑'], xp: 30 },
+            log: '맹세의 구절로 물에 잠긴 기사를 잠재우고 반지를 받았다.', next: 'map' },
+          fail: {
+            text: ['구절 하나가 물소리에 묻혔다. 투구 속 불꽃이 사납게 타올랐다. 기사가 녹슨 대검을 치켜든다!'],
+            battle: { enemies: ['drowned'], perPC: { hp: 12 },
+              win: { text: ['기사의 갑주가 무너져 내렸다. 푸른 불꽃이 꺼지기 직전, 그것은 그대를 향해 고개를 숙였다. 마치 고맙다는 듯이.'], log: '물에 잠긴 기사를 쉬게 했다.', next: 'map' },
+              lose: { text: ['녹슨 대검이 그대를 물속으로 처박았다. 정신을 차렸을 때, 기사는 다시 깊은 곳으로 가라앉은 뒤였다.'], log: '물에 잠긴 기사에게 쓰러졌다.', next: 'map' } },
+            log: '맹세의 구절이 엇나갔다.', next: 'map' } },
+        { id: 3, label: '지금은 물러난다', roll: false, then: { text: ['그대는 조용히 물러났다. 기사는 그대를 쫓지 않았다.'], next: 'map' } }
       ]
     },
     ex_corpse: {
       title: '추종자의 시신', clock: '탐색',
       text: ['무너진 기둥 아래 회색 두건을 쓴 시신이 깔려 있다. 손등에 사냥개와 같은 낙인이 있다.'],
       choices: [
-        { id: 1, skill: '지각', label: '시신의 소지품을 살핀다', stat: '지혜', dc: 12,
+        { id: 1, skill: '지각', label: '시신의 소지품을 살핀다', stat: '지혜', dc: 12, approve: { sena: -1, bran: 1 },
           success: { text: ['두건 속주머니에서 낙인 조각과 금화 몇 닢이 나왔다.'], fx: { items: ['회색 낙인 조각'], gold: [8, 16], xp: 3 }, log: '추종자의 시신에서 낙인 조각을 찾았다.', next: 'map' },
           fail: { text: ['시신에 손을 대는 순간, 낙인이 회색 빛을 뿜으며 손끝을 태웠다.'], fx: { hp: -3 }, log: '낙인이 손끝을 태웠다 (HP -3).', next: 'map' } },
         { id: 2, label: '그냥 지나친다', roll: false, then: { text: ['그대는 시신을 지나쳤다.'], next: 'map' } }
@@ -1618,9 +2127,13 @@ window.SCENARIO = {
         { if: { min: { bond: 1 } }, t: '그대를 믿지만, 관문을 지키기 위해 남았다' }
       ], else: '관문을 지키는 문지기로 남았다' },
     { label: '세나', cases: [
+        { if: { flag: 'sena_left' }, t: '그대에게 실망해 마을로 돌아갔다' },
+        { if: { flag: 'sena_sworn' }, t: '할머니의 눈을 되찾아 준 그대를 끝까지 지키기로 했다' },
         { if: { flag: 'sena_met' }, t: '등불지기의 손녀. 그대와 함께 관문까지 왔다' }
       ], else: '검은 소나무 숲에서 만나지 못했다' },
     { label: '브란', cases: [
+        { if: { flag: 'bran_left' }, t: '그대 곁을 떠나 안개 속으로 사라졌다' },
+        { if: { flag: 'ledger_burned' }, t: '회색 장부를 불태우고 사냥꾼의 속삭임에서 풀려났다' },
         { if: { flag: 'bran_met' }, t: '낙인을 지져 낸 옛 추종자. 그대와 함께 사냥꾼에 맞선다' }
       ], else: '천 개의 계단 초소에서 만나지 못했다' },
     { label: '잿빛 송곳니', cases: [
@@ -1639,6 +2152,14 @@ window.SCENARIO = {
     { label: '회색 사냥꾼', cases: [
         { if: { any: ['alpha_fled', 'hunter_saw'] }, t: '그대의 존재를 알아챘다' }
       ], else: '아직 그대의 정체를 모른다' },
+    { label: '등불지기', cases: [
+        { if: { flag: 'crone_cured' }, t: '달빛 별꽃의 이슬로 눈을 되찾았다' }
+      ], else: '잿빛 안개 속에 산다' },
+    { label: '회색 장부', cases: [
+        { if: { flag: 'ledger_page' }, t: '불태웠지만, 사냥꾼이 머무는 곳이 적힌 마지막 장은 남겼다' },
+        { if: { flag: 'ledger_burned' }, t: '브란과 함께 불태웠다. 수백 개의 이름이 사냥꾼의 부름에서 풀려났다' },
+        { if: { flag: 'ledger_kept' }, t: '그대가 지니고 있다' }
+      ], else: '추종자 우두머리의 손에 있다' },
     { label: '가라앉은 맹세', cases: [
         { if: { flag: 'q_ring_done' }, t: '오르덴의 동생 카이론의 반지를 돌려주었다' }
       ], else: '수로 깊은 곳의 기사는 아직 잠들어 있다' },
