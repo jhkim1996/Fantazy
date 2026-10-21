@@ -112,6 +112,27 @@ input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--
 .acts button{padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:2px}
 .acts button small{font-size:11px;color:var(--sub);text-align:center}
 .acts .wide{grid-column:1/-1}
+.foe.pc{cursor:default}
+.foe.pc.on{border-color:var(--acc-line)}
+.foe.down{opacity:.7;border-style:dashed}
+.initbar{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.ini{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--card)}
+.ini.s-foe{color:var(--foe)}
+.ini.cur{border-color:var(--acc-line);background:var(--acc-bg);color:var(--acc-text);font-weight:500}
+.ini.s-foe.cur{border-color:var(--foe);background:var(--bad-bg);color:var(--bad)}
+.ini.down{opacity:.5;text-decoration:line-through}
+.zone{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:8px 0 4px}
+.zone b{font-weight:500}
+.surf{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line)}
+.surf.oil{background:#2a2216;color:#e8dcc0;border-color:#2a2216}
+.surf.water{background:#2d5f8a;color:#e6f1fb;border-color:#2d5f8a}
+.surf.fire{background:#c4561e;color:#fff3e0;border-color:#c4561e}
+.surf.ice{background:#cfeaff;color:#18405e;border-color:#9cc8e6}
+.surf.high{border-style:dashed}
+.pips{display:flex;gap:10px;margin:10px 0 8px;font-size:12px;color:var(--sub)}
+.pips span.on{color:var(--text);font-weight:500}
+.acts .go{background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text)}
+.acts .go small{color:var(--acc-text)}
 .clog{list-style:none;padding:0;margin:0;display:grid;gap:3px;font-size:13px}
 .clog li{padding-left:10px;border-left:3px solid var(--line)}
 .clog li.me{border-color:var(--acc-line)}
@@ -120,7 +141,11 @@ input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--
 .clog li.old{opacity:.55}
 .art{display:block;width:100%;height:auto;aspect-ratio:640/280;border-radius:12px;margin-bottom:10px;background:#1b1f27}
 body.combat .art{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35)}
-body.combat #hud .stats{display:none}
+body.combat #hud{display:none}
+.foes.two{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.foes.two .foe{padding:7px 9px}
+.foes.two .hudtop{flex-direction:column;align-items:flex-start;gap:0}
+.foes.two .foe .bar{margin:4px 0 2px}
 .seg{display:flex;gap:6px}
 .seg button{flex:1;padding:8px}
 .buy{display:grid;gap:6px}

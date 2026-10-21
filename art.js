@@ -175,6 +175,8 @@ window.Art=(function(){
     else if(w==='lute'){ell(hx-f*h*.02,hy+h*.02,h*.09,h*.06,f*.6);g.lineWidth=h*.025;seg(hx,hy,hx+f*h*.22,hy-h*.18);if(o.relic)glow(hx,hy,h*.16,'#9fc8ff',.55)}
     else if(w==='spear'){g.lineWidth=h*.025;seg(hx,hy+h*.3,hx+f*h*.08,hy-h*.62);poly([[hx+f*h*.08,hy-h*.72],[hx+f*h*.05,hy-h*.6],[hx+f*h*.11,hy-h*.6]])}
     else if(w==='bigsword'){g.lineWidth=h*.045;seg(hx,hy,hx+f*h*.38,hy-h*.1)}
+    else if(w==='bow'){g.lineWidth=h*.022;const cx=hx-f*h*.1,cy=hy-h*.06,rr=h*.27,a0=f>0?-Math.PI/3:Math.PI*2/3,a1=f>0?Math.PI/3:Math.PI*4/3;g.beginPath();g.arc(cx,cy,rr,a0,a1);g.stroke();g.lineWidth=1;g.strokeStyle='rgba(225,225,215,.55)';seg(cx+Math.cos(a0)*rr,cy+Math.sin(a0)*rr,cx+Math.cos(a1)*rr,cy+Math.sin(a1)*rr);g.strokeStyle=c}
+    else if(w==='torch'){g.lineWidth=h*.026;seg(hx,hy+h*.26,hx+f*h*.05,hy-h*.4);const tx=hx+f*h*.05,ty=hy-h*.44;glow(tx,ty,h*.2,'#ff8a3c',.75);g.fillStyle='#ffb35c';poly([[tx-h*.03,ty+h*.03],[tx,ty-h*.09],[tx+h*.03,ty+h*.03]]);g.fillStyle=c}
     else if(w==='lantern'){g.lineWidth=h*.02;seg(hx,hy,hx+f*h*.03,hy+h*.12);g.fillStyle='#f6c26a';circ(hx+f*h*.03,hy+h*.16,h*.035);glow(hx+f*h*.03,hy+h*.16,h*.5,'#f3a64a',.45)}
   }
   const HERO={mage:{robe:true,pointy:true,weapon:'staff'},warrior:{cape:true,helm:true,weapon:'sword'},rogue:{hood:true,cape:true,weapon:'dagger'},bard:{hat:true,cape:true,weapon:'lute'}};
@@ -227,13 +229,20 @@ window.Art=(function(){
   // 그리기 가능한 것들
   function actor(a,info,t,off){
     const k=a.k,f=a.face||(a.x<W/2?1:-1),x=a.x+(off?off.dx:0),gy=(a.gy||GY)+(off?off.dy:0),s=a.s||1;
-    const bob=motion?Math.sin(t*2.2+(a.x%7))*1.2:0;
-    if(!a.dead){g.save();g.translate(x,gy);g.scale(1,.22);glow(0,0,62*s,P.rim,.32);g.restore()}
+    const bob=motion&&!a.down&&!a.prone?Math.sin(t*2.2+(a.x%7))*1.2:0;
+    if(a.cur){g.save();g.strokeStyle='rgba(255,255,255,.85)';g.lineWidth=2;g.beginPath();g.ellipse(x,gy+3,30*s,7*s,0,0,Math.PI*2);g.stroke();g.restore()}
+    if(!a.dead&&!a.down){g.save();g.translate(x,gy);g.scale(1,.22);glow(0,0,62*s,P.rim,.32);g.restore()}
     g.save();
     if(a.dead){g.globalAlpha=.25;g.translate(0,8)}
     else{g.shadowColor=P.rim;g.shadowBlur=9*scale}
+    // 쓰러진 아군은 옆으로 눕고, 넘어진 자는 기울고, 숨은 자는 흐릿하다
+    if(a.down){g.globalAlpha=.6;g.translate(x,gy);g.rotate(-f*1.4);g.translate(-x,-gy)}
+    else if(a.prone){g.translate(x,gy);g.rotate(-f*.55);g.translate(-x,-gy)}
+    if(a.hid)g.globalAlpha=.35;
     if(k==='hero'){const cl=a.cls||info.cls||'warrior';figure(x,gy,96*s,f,Object.assign({relic:info.relic},HERO[cl]||HERO.warrior,{}))}
     else if(k==='orden')knight(x,gy,118*s,f,{});
+    else if(k==='sena')figure(x,gy,90*s,f,{hood:true,cape:true,weapon:'bow'});
+    else if(k==='bran'){figure(x,gy,96*s,f,{robe:true,hood:true,weapon:'torch'});glow(x-f*96*s*.11,gy-96*s*.48,10*s,'#ff5a3c',.7)}
     else if(k==='statue')knight(x,gy,118*s,f,{stone:true});
     else if(k==='drowned')knight(x,gy,112*s,f,{drowned:true});
     else if(k==='acolyte')figure(x,gy,98*s,f,{robe:true,hood:true,weapon:'dagger',eyes:'#c9d1dc'});
@@ -264,7 +273,7 @@ window.Art=(function(){
   };
 
   // ── 전투 효과
-  const DUR={hit:900,miss:800,heal:900,cast:420,lunge:420,text:1000};
+  const DUR={hit:900,miss:800,heal:900,cast:420,lunge:420,text:1000,boom:800};
   function fxOff(id,now){
     let dx=0,dy=0,flash=0;
     fxq.forEach(e=>{
@@ -279,6 +288,7 @@ window.Art=(function(){
     fxq.forEach(e=>{
       const p=(now-e.t)/DUR[e.type];if(p<0||p>1)return;
       if(e.type==='cast'){const a=pos[e.from],b=pos[e.to];if(!a||!b)return;const x=a.x+(b.x-a.x)*p,y=a.y-50+(b.y-a.y)*p;glow(x,y,22,e.color||'#9fc8ff',.9);g.fillStyle='#fff';circ(x,y,3);return}
+      if(e.type==='boom'){const Z=ZX[e.zone];if(!Z)return;const x=W*Z.c,k=Math.sin(p*Math.PI);glow(x,GY-30,60+120*p,'#ff8a3c',.9*k);glow(x,GY-40,30+60*p,'#ffe0a0',.8*k);return}
       const tp=pos[e.target];if(!tp)return;
       const y=tp.y-tp.h-6-p*30;g.globalAlpha=1-Math.max(0,p-.6)/.4;
       if(e.type==='hit'){g.font=(e.crit?'700 26px ':'700 20px ')+'system-ui,sans-serif';g.lineWidth=4;g.strokeStyle='rgba(0,0,0,.7)';const s=(e.crit?'치명! ':'')+'-'+e.val;g.strokeText(s,tp.x,y);g.fillStyle=e.crit?'#ffd166':e.target==='hero'?'#ff7a6b':'#ffffff';g.fillText(s,tp.x,y)}
@@ -290,16 +300,40 @@ window.Art=(function(){
     fxq=fxq.filter(e=>now-e.t<=DUR[e.type]);
   }
 
-  // ── 전투 배치
-  const XS={1:[.72],2:[.62,.85],3:[.55,.71,.88],4:[.5,.63,.76,.89]};
-  const HT={wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,acolyte:98,hero:96,orden:118};
+  // ── 전투 배치: 열마다 자리를 나눈다 (왼쪽이 아군, 오른쪽이 적)
+  const ZX={'pc-front':{c:.34,w:.08,rx:.12},'pc-back':{c:.135,w:.07,rx:.11},'foe-front':{c:.665,w:.09,rx:.17},'foe-back':{c:.885,w:.07,rx:.1}};
+  const HT={wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,acolyte:98,hero:96,orden:118,sena:90,bran:96};
   function battleLayout(info){
-    const B=info.battle,list=[];
-    list.push({id:'hero',k:'hero',x:W*.24,face:1,dead:info.heroHp<=0});
-    if(B.ally)list.push({id:'ally',k:'orden',x:W*.1,face:1});
-    const n=B.enemies.length,xs=XS[n]||B.enemies.map((e,i)=>.48+i*(.44/(n-1)));
-    B.enemies.forEach((e,i)=>list.push({id:'e'+i,k:e.art||'wolf',x:W*xs[i],face:-1,dead:e.hp<=0,target:i===B.target&&!B.over&&e.hp>0,s:n>2&&e.art==='alpha'?.8:1}));
+    const B=info.battle,list=[];if(!B)return list;
+    const groups={};B.units.forEach(u=>{const z=u.side+'-'+u.row;(groups[z]=groups[z]||[]).push(u)});
+    const total=B.units.filter(u=>!(u.side==='foe'&&u.down)).length;
+    ['pc-back','foe-back','pc-front','foe-front'].forEach(z=>{
+      const gr=groups[z];if(!gr)return;const Z=ZX[z],n=gr.length;
+      gr.forEach((u,i)=>{
+        let px=Z.c+(i-(n-1)/2)*Z.w;if(z[0]==='p')px=Z.c+((n-1)/2-i)*Z.w;   // 아군은 첫 자리가 가운데 쪽
+        const s=(n>=3||total>=7?.8:1)*(u.k==='alpha'&&total>3?.85:1);
+        list.push({id:u.id,k:u.k,x:W*px,face:u.side==='pc'?1:-1,gy:GY-(u.high?30:0),high:u.high,dead:u.side==='foe'&&u.down,down:u.side==='pc'&&u.down,prone:u.prone,hid:u.hid,cur:u.cur&&!B.over,target:u.target&&!B.over&&!u.down,s});
+      });
+    });
     return list;
+  }
+  // 열 바닥의 표면과 고지대
+  function drawField(info,t){
+    const B=info.battle;if(!B)return;
+    const hi=B.field&&B.field.high;
+    ['pc','foe'].forEach(side=>{if(hi!=='both'&&hi!==side)return;const Z=ZX[side+'-back'],x=W*Z.c,w=W*.11;
+      g.fillStyle=mix(P.ink,P.hz,.3);poly([[x-w,GY+2],[x-w*.8,GY-30],[x-w*.2,GY-36],[x+w*.6,GY-31],[x+w,GY+2]]);
+      g.fillStyle=mix(P.ink,P.hz,.5);g.fillRect(x-w*.8,GY-32,w*1.4,2)});
+    for(const z in (B.surf||{})){
+      const sf=B.surf[z],Z=ZX[z];if(!Z)continue;const x=W*Z.c,rx=W*Z.rx,y=GY+3;
+      g.save();
+      if(sf.t==='water'){g.fillStyle='rgba(70,130,190,.42)';ell(x,y,rx,11);g.strokeStyle='rgba(170,210,240,.45)';g.lineWidth=1;for(let i=0;i<3;i++){const ph=motion?(t*.8+i/3)%1:i/3;g.beginPath();g.ellipse(x+(i-1)*rx*.5,y,rx*.18*(.4+ph),4*(.4+ph),0,0,Math.PI*2);g.stroke()}}
+      else if(sf.t==='oil'){g.fillStyle='rgba(20,14,8,.8)';ell(x,y,rx,11);const gr=g.createLinearGradient(x-rx,y,x+rx,y);gr.addColorStop(0,'rgba(120,90,200,0)');gr.addColorStop(.5,'rgba(170,140,255,.22)');gr.addColorStop(1,'rgba(90,200,160,0)');g.fillStyle=gr;ell(x,y-2,rx*.8,5)}
+      else if(sf.t==='ice'){g.fillStyle='rgba(205,235,255,.6)';ell(x,y,rx,11);g.strokeStyle='rgba(255,255,255,.75)';g.lineWidth=1;seg(x-rx*.6,y-3,x-rx*.1,y+4);seg(x-rx*.1,y+4,x+rx*.4,y-2);seg(x+rx*.1,y-6,x+rx*.5,y+5)}
+      else if(sf.t==='fire'){glow(x,y-10,rx*1.1,'#ff7a2c',.5);g.fillStyle='rgba(255,120,40,.35)';ell(x,y,rx,11);
+        for(let i=0;i<7;i++){const fx=x-rx*.8+i*rx*.27,fl=motion?Math.sin(t*9+i*1.7)*5:0,hh=16+((i*37)%11)+fl;g.fillStyle=i%2?'#ffb35c':'#ff7a2c';poly([[fx-6,y],[fx,y-hh],[fx+6,y]])}}
+      g.restore();
+    }
   }
 
   // ── 그리기 루프
@@ -315,11 +349,14 @@ window.Art=(function(){
     (BG[spec.bg]||BG.mountains)(r,t);
     arr(spec.props).filter(p=>PROPS[p]&&!/^stars|fallingstar/.test(p)).forEach(p=>PROPS[p](r,t));
     const pos={};
-    let actors=spec.battle&&info.battle?battleLayout(info):arr(spec.actors).map(a=>Object.assign({},a,{x:a.x*W}));
+    const bat=spec.battle&&info.battle;
+    if(bat)drawField(info,t);
+    let actors=bat?battleLayout(info):arr(spec.actors).map(a=>Object.assign({},a,{x:a.x*W}));
     actors.forEach(a=>{const off=a.id?fxOff(a.id,now):null;if(off&&off.flash)a.flash=off.flash;
       actor(a,info,t,off);
-      if(a.id)pos[a.id]={x:a.x,y:GY,h:HT[a.k]||70};
-      if(a.target){const hy=GY-(HT[a.k]||70)-18+(motion?Math.sin(t*4)*2:0);g.fillStyle='#ffd166';poly([[a.x-7,hy-10],[a.x+7,hy-10],[a.x,hy]])}
+      const gy=a.gy||GY,ht=(HT[a.k]||70)*(a.s||1);
+      if(a.id)pos[a.id]={x:a.x,y:gy,h:ht};
+      if(a.target){const hy=gy-ht-18+(motion?Math.sin(t*4)*2:0);g.fillStyle='#ffd166';poly([[a.x-7,hy-10],[a.x+7,hy-10],[a.x,hy]])}
     });
     arr(spec.fx).filter(f=>f!=='stars'&&FX[f]).forEach(f=>FX[f](r,t));
     if(spec.battle)drawFx(pos,now);
@@ -345,8 +382,8 @@ window.Art=(function(){
         if(!spec||!spec.battle||!onPick)return;
         const rc=cv.getBoundingClientRect(),x=(ev.clientX-rc.left)/rc.width*W;
         const info=getInfo();if(!info.battle)return;
-        let best=-1,bd=60;battleLayout(info).forEach(a=>{if(a.id&&a.id[0]==='e'&&!a.dead){const dd=Math.abs(a.x-x);if(dd<bd){bd=dd;best=+a.id.slice(1)}}});
-        if(best>=0)onPick(best);
+        let best=null,bd=50;battleLayout(info).forEach(a=>{if(!a.dead&&!a.down){const dd=Math.abs(a.x-x);if(dd<bd){bd=dd;best=a.id}}});
+        if(best)onPick(best);
       });
       resize();
     },

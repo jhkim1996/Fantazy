@@ -1,5 +1,5 @@
 // 떨어진 별의 노래 — 게임 엔진
-// 모드: create(모험가 만들기) → world(지도) ⇄ event(이야기·탐색 사건) ⇄ combat(턴제 전투) → end(장 끝)
+// 모드: create(모험가 만들기) → world(지도) ⇄ event(이야기·탐색 사건) ⇄ combat(전술 전투) → end(장 끝)
 const $=i=>document.getElementById(i);
 const SC=window.SCENARIO;
 const KEY='fantazy:'+SC.id;
@@ -82,7 +82,8 @@ function fxOf(v){
   return f;
 }
 
-// ── 조건: {flag, not, any, min, max, item, count, skill, cls, or, nor} — 적힌 조건을 모두 만족해야 참
+// ── 조건: {flag, not, any, min, max, item, count, skill, cls, party, or, nor} — 적힌 조건을 모두 만족해야 참
+// party: 그 동료가 지금 함께 있다
 function ok(c){
   if(!c)return true;
   if(arr(c.flag).some(f=>!S.flags[f]))return false;
@@ -94,6 +95,7 @@ function ok(c){
   if(c.count)for(const k in c.count)if(countItem(k)<c.count[k])return false;
   if(arr(c.skill).some(i=>!hasSkill(i)))return false;
   if(c.cls&&!arr(c.cls).includes(S.cls))return false;
+  if(c.party&&arr(c.party).some(id=>!compHere(id)))return false;
   if(c.or&&!c.or.some(x=>ok(x)))return false;
   if(c.nor&&c.nor.some(x=>ok(x)))return false;
   return true;
@@ -106,7 +108,7 @@ function freshMake(){
 }
 function fresh(){
   return {mode:'create',mk:freshMake(),cls:null,race:null,bg:null,hero:null,stats:[],amp:null,skills:[],items:[],equip:{},gold:0,
-    insp:0,opt:{karmic:true},failStreak:0,reroll:null,
+    insp:0,opt:{karmic:true,autoComp:false},failStreak:0,reroll:null,comp:{},rows:{},ch:{},rest:{short:2},
     flags:{},counters:{},log:[],loc:SC.startLoc,ev:null,pending:null,sel:null,lvl:0,battle:null,notice:null,done:false};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -114,7 +116,13 @@ function restore(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY));if(!s||!s.mode)return null;
     if(s.mode==='create'&&s.mk&&s.mk.buy)return s;
-    if(s.hero&&SC.locations[s.loc]&&(s.mode!=='event'||SC.events[s.ev])&&(s.mode!=='combat'||s.battle)){if(!s.opt)s.opt={karmic:true};return s}
+    if(s.hero&&SC.locations[s.loc]&&(s.mode!=='event'||SC.events[s.ev])){
+      // 예전 저장: 전술 전투 이전의 전투는 지도로 돌린다
+      if(s.mode==='combat'&&!(s.battle&&s.battle.units)){s.mode='world';s.battle=null}
+      s.opt=Object.assign({karmic:true,autoComp:false},s.opt);
+      if(!s.rest)s.rest={short:2};if(!s.comp)s.comp={};if(!s.rows)s.rows={};if(!s.ch)s.ch={};
+      return s;
+    }
   }catch(e){}
   return null;
 }
@@ -136,7 +144,6 @@ function profCount(sk){
 function skillMod(sk){return statVal(SC.skillList[sk])+profCount(sk)*profBonus()}
 function wpn(){return SC.items[S.equip.weapon]||{dice:'1d4',bonus:0}}
 function arm(){return SC.items[S.equip.armor]||{ac:0}}
-function bsum(k){const B=S.battle;return B?B.pb.reduce((a,b)=>a+(b[k]||0),0):0}
 function prof(){return Math.floor(S.hero.level/2)}
 function heroAC(){return 10+statVal('민첩')+(arm().ac||0)+bsum('ac')}
 function atkStat(){return cls().key}
@@ -183,10 +190,12 @@ function settle(out){
     const c=cls(),r=race();
     h.xp-=h.xpMax;h.level++;h.xpMax=xpNeed(h.level);
     h.hpMax+=c.hpGain+((r&&r.hpPerLevel)||0);h.mpMax+=c.mpGain;h.hp=h.hpMax;h.mp=h.mpMax;S.lvl++;
-    out.push('레벨 업! 레벨 '+h.level+' (HP·마력 모두 회복)');
+    syncComps(true);
+    out.push('레벨 업! 레벨 '+h.level+' (HP·마력 모두 회복'+(Object.keys(S.comp||{}).length?', 동료도 함께 성장':'')+')');
     logp('레벨 '+h.level+'이 되었다.');
     if(h.level===5)out.push('숙련 보너스 +3');
     clsSkills().filter(k=>SC.combatSkills[k].lv===h.level).forEach(k=>{out.push('새 기술: '+SC.combatSkills[k].name);logp('새 기술 「'+SC.combatSkills[k].name+'」을 익혔다.')});
+    Object.keys(S.comp||{}).forEach(id=>(COMP(id).skills||[]).filter(k=>SC.combatSkills[k].lv===h.level).forEach(k=>{out.push(COMP(id).name+' 새 기술: '+SC.combatSkills[k].name);logp(josa(COMP(id).name,'이')+' 새 기술 「'+SC.combatSkills[k].name+'」을 익혔다.')}));
   }
   return down;
 }
@@ -399,8 +408,8 @@ function startAdventure(){
     return {n,v:m+k,note:'점수 '+sc+' ('+sign(m)+')'+(k?', '+SC.skillDefs[c.passive].name+' +2':'')};
   });
   S.amp={die:4,cost:2,source:c.item,name:c.amp};
-  S.skills=['amp',c.passive];S.items=[c.item,c.armor,'은빛 물약'].concat(arr(b.items));S.gold=(SC.startGold||0)+(b.gold||0);
-  S.insp=1;S.opt={karmic:true};S.failStreak=0;
+  S.skills=['amp',c.passive];S.items=[c.item,c.armor,'은빛 물약','야영 물자','야영 물자'].concat(arr(b.items));S.gold=(SC.startGold||0)+(b.gold||0);
+  S.insp=1;S.opt={karmic:true,autoComp:false};S.failStreak=0;S.comp={};S.rows={};S.ch={};S.rest={short:2};
   autoEquip();
   S.loc=SC.startLoc;S.log=[];
   logp(name+' ('+r.name+' '+c.name+', '+b.name+') · '+S.stats.map(s=>s.n+' '+sign(s.v)).join(' '));
@@ -433,10 +442,29 @@ function explore(){
   if(pool.length){startEvent(pool[rint(0,pool.length-1)]);return}
   notice('주변을 샅샅이 살폈지만 아무것도 찾지 못했다.');
 }
-function rest(){
-  const h=S.hero;h.hp=h.hpMax;h.mp=h.mpMax;
-  logp(L().name+'에서 쉬었다.');
-  notice(tpl(L().rest)+' — 밤이 지나고, HP와 마력이 모두 회복되었다.');
+// 긴 휴식: 쉼터에서. 마을은 공짜, 그 밖의 쉼터는 야영 물자 하나 (없으면 절반만 회복)
+function longRest(){
+  const l=L(),h=S.hero,free=!!l.restFree,has=countItem('야영 물자')>0,full=free||has;
+  if(!free&&has)S.items.splice(S.items.indexOf('야영 물자'),1);
+  syncComps();
+  const fill=(v,mx)=>full?mx:Math.max(v,Math.ceil(mx/2));
+  h.hp=fill(h.hp,h.hpMax);h.mp=fill(h.mp,h.mpMax);
+  for(const id in S.comp)S.comp[id].hp=fill(S.comp[id].hp,S.comp[id].hpMax);
+  S.rest={short:2};recharge('long');
+  logp(l.name+'에서 '+(full?'':'빈속으로 ')+'긴 휴식을 했다.');
+  notice(tpl(l.rest)+' — '+(full?'밤이 지나고, 모두 HP와 마력을 되찾았다.':'먹을 것이 없어 잠을 설쳤다. 절반만 회복했다.')+(!free&&has?' (야영 물자 -1)':'')+' 짧은 휴식과 기술이 모두 충전되었다.');
+}
+// 짧은 휴식: 어디서나, 긴 휴식 사이에 두 번. HP 절반 회복, 짧은 휴식 기술 충전
+function shortRest(){
+  if(!S.rest||S.rest.short<=0)return;
+  S.rest.short--;syncComps();
+  const h=S.hero,song=S.cls==='bard'?d(6):0,add=(v,mx)=>Math.min(mx,v+Math.ceil(mx/2)+song);
+  h.hp=add(h.hp,h.hpMax);
+  for(const id in S.comp)S.comp[id].hp=add(S.comp[id].hp,S.comp[id].hpMax);
+  let mp=0;if(S.cls==='mage'){const was=h.mp;h.mp=Math.min(h.mpMax,h.mp+Math.ceil(h.mpMax/2));mp=h.mp-was}
+  recharge('short');
+  logp('짧은 휴식을 했다.');
+  notice('잠시 숨을 골랐다. HP를 절반만큼 회복하고, 짧은 휴식마다 쓰는 기술이 충전되었다.'+(song?' (휴식의 노래 +'+song+')':'')+(mp?' 비전 회복으로 마력 +'+mp+'.':'')+' 남은 짧은 휴식: '+S.rest.short+'번');
 }
 function buy(name){
   const it=SC.items[name];if(!it||!it.price||S.gold<it.price)return;
@@ -444,11 +472,12 @@ function buy(name){
   logp(josa(name,'을')+' 샀다 (금화 -'+it.price+').');
   save();render();
 }
-function useItem(name){
+// 지도에서 물약을 쓴다. who: 동료 id (없으면 그대)
+function useItem(name,who){
   const it=SC.items[name];if(!it||!it.use||rolling)return;
   const k=S.items.indexOf(name);if(k<0)return;S.items.splice(k,1);
-  const out=[],before=S.hero.hp;applyFx(it.use,out);
-  if(S.mode==='combat'){logB(name+' 사용 — '+out.join(', '),'me');if(S.hero.hp>before)afx({type:'heal',target:'hero',val:S.hero.hp-before});else afx({type:'text',target:'hero',text:name,color:'#8fb6ff'});return}
+  if(who&&S.comp[who]){const c=S.comp[who],was=c.hp;c.hp=Math.min(c.hpMax,c.hp+(it.use.hp||0));logp(COMP(who).name+'에게 '+name+' (HP +'+(c.hp-was)+')');save();render();return}
+  const out=[];applyFx(it.use,out);
   logp(name+' 사용 ('+out.join(', ')+')');save();render();
 }
 
@@ -481,6 +510,7 @@ function applyOutcome(oc,meta){
   if(meta.roll&&meta.roll.rerolled)out.push('영감 사용');
   applyFx(fxOf(oc.fx),out);
   arr(oc.fxIf).forEach(e=>{if(ok(e.if))applyFx(fxOf(e.fx),out)});
+  syncComps().forEach(id=>{out.push('동료 합류: '+COMP(id).name);logp(josa(COMP(id).name,'이')+' 동료가 되었다.')});
   if(meta.key==='crit'&&!meta.ownCrit){S.hero.xp+=2;out.push('대성공 보너스 경험치 +2')}
   if(meta.extra)out.unshift.apply(out,meta.extra);
   if(meta.insp)out.push(meta.insp);
@@ -515,259 +545,714 @@ function goNext(next){
   startEvent(next);
 }
 
-// ── 전투
-function afx(o){if(window.Art)Art.fx(Object.assign({delay:fxDelay},o))}
-function mkEnemy(id){const E=SC.enemies[id];return {id,art:E.art||'wolf',name:E.name,lv:E.lv,hp:E.hp,hpMax:E.hp,ac:E.ac,atk:E.atk,dmg:E.dmg,st:{},used:{}}}
-function logB(t,k){const B=S.battle;B.log.push({t,k:k||'',r:B.round});if(B.log.length>60)B.log.splice(0,B.log.length-60)}
-function alive(){return S.battle.enemies.filter(e=>e.hp>0)}
-function eid(e){return 'e'+S.battle.enemies.indexOf(e)}
-function target(){
-  const B=S.battle;let e=B.enemies[B.target];
-  if(!e||e.hp<=0){B.target=B.enemies.findIndex(x=>x.hp>0);e=B.enemies[B.target]}
-  return e;
+// ── 동료
+function COMP(id){return SC.companions[id]}
+function compKnown(id){return !!S.hero&&ok(COMP(id).joinIf)}
+// 지금 이 장소에서 함께 다니는가 (오르덴은 관문 근처에서만)
+function compHere(id){const c=COMP(id);return compKnown(id)&&(!c.locs||c.locs.includes(S.loc)||ok(c.anywhereIf))}
+function party(){return Object.keys(SC.companions||{}).filter(compHere)}
+function compMaxHp(id){const c=COMP(id);return c.hp+c.hpGain*(S.hero.level-1)}
+// 동료 기록을 레벨에 맞춘다. full이면 모두 회복. 새로 합류한 동료 id를 돌려준다
+function syncComps(full){
+  S.comp=S.comp||{};const fresh=[];
+  Object.keys(SC.companions||{}).forEach(id=>{
+    if(!compKnown(id))return;
+    const mx=compMaxHp(id);let r=S.comp[id];
+    if(!r){r=S.comp[id]={hp:mx,hpMax:mx,ch:{}};fresh.push(id)}
+    if(r.hpMax!==mx){r.hp=Math.max(1,r.hp+mx-r.hpMax);r.hpMax=mx}
+    if(full)r.hp=mx;
+  });
+  return fresh;
 }
+function rowPref(id){S.rows=S.rows||{};return S.rows[id]||(id==='hero'?cls().row:COMP(id).row)||'front'}
+// 기술 사용 횟수 (uses가 있는 기술만). 짧은 휴식은 per:'short'를, 긴 휴식은 모두를 채운다
+function chOf(u){return u.kind==='hero'?(S.ch=S.ch||{}):S.comp[u.id].ch}
+function usesLeft(u,k){const ab=SC.combatSkills[k];if(!ab.uses)return Infinity;const c=chOf(u);return c[k]==null?ab.uses:c[k]}
+function recharge(per){const f=c=>{for(const k in c){const ab=SC.combatSkills[k];if(!ab||per==='long'||ab.per==='short')delete c[k]}};f(S.ch=S.ch||{});for(const id in (S.comp||{}))f(S.comp[id].ch)}
+function abCost(ab){return (ab.cost==='bonus'?'보조 행동':'행동')+(ab.mp?' · 마력 '+ab.mp:ab.mp===0?' · 마력 없음':'')+(ab.uses?' · '+(ab.per==='long'?'긴':'짧은')+' 휴식마다 '+ab.uses+'번':'')}
+
+// ── 전투
+// 주도권 순서대로 한 명씩 움직인다. 한 턴 = 행동 1 + 보조 행동 1 + 이동 1. 반응(기회 공격·수호)은 라운드마다 한 번.
+// 위치는 열로 단순화한다: 양쪽 모두 앞열·뒷열. 근접 공격은 앞열에서 하고, 대상 쪽 앞열에 서 있는 자가 있으면 앞열만 노릴 수 있다.
+// 열마다 바닥 표면(기름·물·불·얼음)이 깔린다. 불이 기름에 닿으면 폭발하고, 젖은 몸에 냉기가 닿으면 얼어붙는다.
+const ROWN={front:'앞열',back:'뒷열'};
+const SURF={oil:{n:'기름',r:5},water:{n:'물',r:4},fire:{n:'불',r:3},ice:{n:'얼음',r:3}};
+const ZONES=['pc-front','pc-back','foe-front','foe-back'];
+const ST_N={stun:'얼어붙음',poison:'중독',weak:'명중 -2',blind:'연막',burn:'불붙음',prone:'넘어짐',restrain:'속박',wet:'젖음',taunt:'도발당함',insp:'격려'};
+
+function afx(o){if(window.Art)Art.fx(Object.assign({delay:fxDelay},o))}
+function logB(t,k){const B=S.battle;B.log.push({t,k:k||'',r:B.round});if(B.log.length>80)B.log.splice(0,B.log.length-80)}
+function U(uid){return S.battle.units.find(u=>u.uid===uid)}
+function R(u){return u.kind==='hero'?S.hero:u.kind==='comp'?S.comp[u.id]:u}
+function up(u){return R(u).hp>0}
+function pcs(){return S.battle.units.filter(u=>u.side==='pc')}
+function foes(){return S.battle.units.filter(u=>u.side==='foe')}
+function alive(){return foes().filter(up)}
+function upPCs(){return pcs().filter(up)}
+function other(side){return side==='pc'?'foe':'pc'}
+function zk(u){return u.side+'-'+u.row}
+function surfOf(u){const s=S.battle.surf[zk(u)];return s?s.t:null}
+function standing(side,row){return S.battle.units.filter(u=>u.side===side&&up(u)&&(!row||u.row===row))}
+function frontWall(side){return standing(side,'front').length>0}
+function curU(){const B=S.battle;return B&&B.turn>=0&&B.turn<B.order.length?U(B.order[B.turn]):null}
+function myTurn(){const B=S.battle,u=curU();return !!(B&&!B.over&&u&&u.side==='pc'&&up(u))}
+function E_(u){return SC.enemies[u.id]}
+function big(u){return u.side==='foe'&&!!E_(u).big}
+function nm(u){return u.name}
+function lk(u){return u.side==='pc'?'me':'foe'}   // 기록 색: 아군이 한 일 / 적이 한 일
+function hk(u){return u.side==='pc'?'foe':'me'}   // 그 대상이 당한 일
+
+// ── 수치
+function bsumU(u,k){return ((u&&u.buffs)||[]).reduce((a,b)=>a+(b[k]||0),0)}
+function bsum(k){const B=S.battle;return B&&B.units?bsumU(U('hero'),k):0}
+function lvB(){return Math.floor((S.hero.level-1)/2)}
+function acOf(u){return u.kind==='hero'?heroAC():(u.kind==='comp'?COMP(u.id).ac:u.ac)+bsumU(u,'ac')}
+function saveMod(u,stat){
+  if(u.kind==='hero')return statVal(stat);
+  if(u.kind==='comp'){const c=COMP(u.id);return ({힘:c.str,민첩:c.dex,지혜:c.wis})[stat]||0}
+  const E=E_(u);return Math.floor(u.lv/2)+((E.saves&&E.saves[stat])||0)+(E.big&&stat==='힘'?2:0);
+}
+function iniMod(u){return u.kind==='hero'?statVal('민첩'):u.kind==='comp'?COMP(u.id).init:(E_(u).init!=null?E_(u).init:Math.floor(u.lv/2))}
+function spellHit(sk){return statVal(sk.stat||atkStat())+prof()+(sk.hit||0)+bsum('atk')}
+function spellDC(u,ab){return 8+profBonus()+(u.kind==='hero'?statVal(ab.stat||atkStat()):(COMP(u.id).dc||2))}
+function d20(u,mode){if(u.kind==='hero')return rollD20(mode);const a=d(20);if(mode==='normal')return {r:a,dice:[a],notes:[]};const b=d(20);return {r:mode==='adv'?Math.max(a,b):Math.min(a,b),dice:[a,b],notes:[]}}
+// 공격 정보: 이름·명중·원거리·치명 범위·피해 종류·피해 굴림
+function profile(u,ab){
+  if(u.kind==='hero'){
+    if(ab&&ab.attack==='spell'){const st=ab.stat||atkStat(),add=ab.addStat?statVal(st):0;
+      return {name:ab.name,hit:spellHit(ab),ranged:true,crit:ab.crit||20,dtype:ab.dtype||'arcane',spell:true,dice:ab.dmg+sign(add+bsum('dmg')),dmg:c=>rollDice(ab.dmg,c).total+add+bsum('dmg')}}
+    const w=wpn(),thrown=S.cls==='rogue'&&u.row==='back';   // 도적은 뒷열에서 단검을 던진다
+    return {name:ab?ab.name:thrown?'단검 던지기':'공격',hit:weaponHit(ab&&ab.hit),ranged:thrown,crit:Math.min(w.crit||20,(ab&&ab.crit)||20),dtype:'phys',weapon:true,
+      dice:w.dice+sign(weaponDmgBonus())+(ab&&ab.extra?'+'+ab.extra:''),dmg:c=>rollDice(w.dice,c).total+weaponDmgBonus()+(ab&&ab.extra?rollDice(ab.extra,c).total:0)};
+  }
+  const A=COMP(u.id).attack,b=A.dmgB+lvB()+bsumU(u,'dmg');
+  return {name:ab?ab.name:A.name,hit:A.hit+lvB()+((ab&&ab.hit)||0)+bsumU(u,'atk'),ranged:!!A.ranged,reach:!!A.reach,crit:(ab&&ab.crit)||20,dtype:A.dtype||'phys',burn:!!A.burn,weapon:true,
+    dice:A.dice+sign(b)+(ab&&ab.extra?'+'+ab.extra:''),dmg:c=>rollDice(A.dice,c).total+b+(ab&&ab.extra?rollDice(ab.extra,c).total:0)};
+}
+function foeProfile(e,sk){
+  const E=E_(e),pack=!!E.pack&&alive().some(o=>o!==e&&E_(o).pack);
+  return {name:sk?sk.name:'공격',hit:e.atk+((sk&&sk.hit)||0)-(e.st.weak?2:0)+bsumU(e,'atk')+(pack?2:0),ranged:!!(sk?sk.ranged:E.ranged),reach:!!(sk&&sk.reach),crit:20,dtype:(sk&&sk.dtype)||E.dtype||'phys',
+    dmg:c=>rollDice((sk&&sk.dmg)||e.dmg,c).total};
+}
+// 근접으로 닿는가: 공격자는 앞열에 서야 하고(창은 뒷열에서도 적 앞열까지), 대상 쪽 앞열에 서 있는 자가 있으면 앞열만 노린다
+function canMelee(a,t,reach){
+  if(!up(t)||t.hid||t.side===a.side)return false;
+  if(a.fly||(a.side==='foe'&&reach))return true;   // 날짐승과 돌진은 어느 열이든 닿는다
+  if(a.row!=='front'&&!reach)return false;
+  if(t.row==='front'||t.fly)return true;
+  return a.row==='front'&&!frontWall(t.side);
+}
+function canHit(a,t,P){return P.ranged?(up(t)&&!t.hid&&t.side!==a.side):canMelee(a,t,P.reach)}
+function atkMode(a,t,P,extra){
+  const adv=[],dis=[];
+  if(a.hid)adv.push('숨어서 기습');
+  if(t.st.stun)adv.push('얼어붙은 대상');
+  if(t.st.restrain)adv.push('속박된 대상');
+  if(t.st.blind)adv.push('연막 속의 대상');
+  if(t.st.prone){if(P.ranged)dis.push('넘어진 대상(원거리)');else adv.push('넘어진 대상')}
+  if(a.st.poison)dis.push('중독');
+  if(a.st.blind)dis.push('연막');
+  if(a.st.prone)dis.push('넘어진 채');
+  if(a.st.restrain)dis.push('속박');
+  if(t.dodge)dis.push('회피 중인 대상');
+  if(P.ranged&&!a.fly&&a.row==='front'&&frontWall(other(a.side)))dis.push('적과 맞붙은 채 원거리');
+  arr(extra).forEach(x=>dis.push(x));
+  return {mode:modeOf(adv,dis),adv,dis};
+}
+function heightMod(a,t,P){return !P.ranged?0:a.high&&!t.high?2:!a.high&&t.high?-2:0}
+function hitP(a,t,P){return chance(P.hit+heightMod(a,t,P),acOf(t),atkMode(a,t,P).mode,0,{critOn:P.crit,lucky:a.kind==='hero'&&!!(race()&&race().lucky)})}
+function failP(t,stat,dc){return Math.max(0,Math.min(1,(dc-1-saveMod(t,stat))/20))}
+
+// ── 피해·회복·상태
+function mult(t,dt){
+  let m=1;const why=[];
+  if(t.side==='foe'){const E=E_(t);if(arr(E.vuln).includes(dt)){m*=2;why.push('약점')}if(arr(E.resist).includes(dt)){m/=2;why.push('저항')}}
+  if(dt==='fire'&&t.st.wet){m/=2;why.push('젖음')}
+  if(dt==='poison'&&t.kind==='hero'&&race()&&race().poisonResist){m/=2;why.push('드워프')}
+  return {m,why};
+}
+// 피해를 준다. 쓰러진 아군을 때리면 죽음 내성 실패가 쌓인다. 실제로 준 피해를 돌려준다
+function hurt(t,raw,dt,o){
+  o=o||{};dt=dt||'phys';const r=R(t);
+  if(t.side==='pc'&&r.hp<=0){
+    if(t.out)return 0;
+    t.saves.f+=o.crit?2:1;logB(josa(nm(t),'이')+' 쓰러진 채 공격받았다 — 죽음 내성 실패 '+Math.min(3,t.saves.f)+'/3','foe');checkOut(t);return 0;
+  }
+  if(t.kind==='hero'&&S.flags.shield){delete S.flags.shield;logB('별빛 방벽이 피해를 막아 냈다!','sys');afx({type:'text',target:t.uid,text:'방벽!',color:'#9fc8ff',delay:fxDelay+260});return 0}
+  const {m,why}=mult(t,dt),dm=Math.max(1,Math.floor(raw*m));
+  r.hp=Math.max(0,r.hp-dm);t.lastWhy=why;
+  afx({type:'hit',target:t.uid,val:dm,crit:o.crit,delay:fxDelay+(o.d==null?260:o.d)});
+  if(r.hp===0)drop(t);
+  else if(dt==='cold'&&t.st.wet&&!big(t)&&!t.st.stun){t.st.stun=1;logB(josa(nm(t),'이')+' 젖은 몸이 얼어붙었다!','sys');afx({type:'text',target:t.uid,text:'얼어붙음',color:'#9fd3ff',delay:fxDelay+460})}
+  return dm;
+}
+function wtxt(dm,t){return dm+(t.lastWhy&&t.lastWhy.length?'('+t.lastWhy.join('·')+')':'')}
+function drop(t){
+  if(t.side==='foe'){if(!t.dead){t.dead=true;delete t.hid;S.counters['kill_'+t.id]=(S.counters['kill_'+t.id]||0)+1}return}
+  t.saves={s:0,f:0};t.stable=false;delete t.hid;t.st={};t.buffs=[];t.high=false;
+  logB(josa(nm(t),'이')+' 쓰러졌다! 차례마다 죽음 내성을 굴린다','foe');
+}
+function checkOut(t){if(t.saves.f>=3&&!t.out){t.out=true;logB(josa(nm(t),'은')+' 의식을 잃었다. 이 전투에서는 일어나지 못한다','foe')}}
+function heal(t,v){
+  const r=R(t);if(t.out)return 0;
+  const was=r.hp;r.hp=Math.min(r.hpMax,r.hp+Math.max(0,v));
+  if(was<=0&&r.hp>0){t.saves={s:0,f:0};t.stable=false;t.st={prone:1};logB(josa(nm(t),'이')+' 다시 일어났다! (넘어진 채)','me')}
+  if(r.hp>was)afx({type:'heal',target:t.uid,val:r.hp-was,delay:fxDelay+200});
+  return r.hp-was;
+}
+function applyOn(t,o){
+  if(!o||!up(t))return;
+  const say=(k,txt,col)=>{logB(josa(nm(t),'이')+' '+txt,hk(t));afx({type:'text',target:t.uid,text:ST_N[k],color:col,delay:fxDelay+460})};
+  const tooBig=()=>{logB(josa(nm(t),'은')+' 너무 거대해 꿈쩍도 하지 않는다','sys');return true};
+  if(o.stun){t.st.stun=Math.max(t.st.stun||0,o.stun);say('stun','얼어붙었다!','#9fd3ff')}
+  if(o.poison){t.st.poison={t:o.poison,dmg:o.pdmg||'1d6'};say('poison','중독되었다!','#9be37a')}
+  if(o.weak){t.st.weak=Math.max(t.st.weak||0,o.weak);say('weak','기가 꺾였다 (명중 -2)','#f0c75e')}
+  if(o.restrain){t.st.restrain=Math.max(t.st.restrain||0,o.restrain);say('restrain','속박되었다!','#e8e2d2')}
+  if(o.burn&&!t.st.wet){t.st.burn=Math.max(t.st.burn||0,o.burn);say('burn','불붙었다!','#ffa95e')}
+  if(o.push){if(big(t))tooBig();else{if(t.row==='front'){t.row='back';t.high=false;logB(josa(nm(t),'이')+' 뒷열로 밀려났다',hk(t));surfHit(t)}if(up(t)){t.st.prone=1;say('prone','넘어졌다!','#e8e2d2')}}}
+  else if(o.prone){if(big(t))tooBig();else{t.st.prone=1;say('prone','넘어졌다!','#e8e2d2')}}
+}
+
+// ── 바닥 표면
+function zoneUnits(z){const [s,r]=z.split('-');return S.battle.units.filter(u=>u.side===s&&u.row===r&&up(u))}
+function zoneName(z){const [s,r]=z.split('-');return (s==='pc'?'아군 ':'적 ')+ROWN[r]}
+function fireLife(){return S.battle.field.rain?1:3}
+function setSurf(z,t){
+  const B=S.battle,cur=B.surf[z]&&B.surf[z].t,zn=zoneName(z),deep=B.surf[z]&&B.surf[z].r>=90;
+  if(t==='fire'){
+    if(cur==='water'){if(!deep)delete B.surf[z];logB(zn+' — 물이 끓어 증기가 피어올랐다'+(deep?'':' (물이 사라졌다)'),'sys');return}
+    if(cur==='ice'){B.surf[z]={t:'water',r:3};logB(zn+' — 얼음이 녹아 물웅덩이가 되었다','sys');return}
+    if(cur==='oil')explode(z);else logB(zn+'에 불이 붙었다'+(B.field.rain?' (비 때문에 오래가지 않는다)':''),'sys');
+    B.surf[z]={t:'fire',r:fireLife()};return;
+  }
+  if(t==='ice'){
+    if(cur==='fire'){B.surf[z]={t:'water',r:3};logB(zn+' — 불이 꺼지고 물웅덩이가 남았다','sys');return}
+    B.surf[z]={t:'ice',r:3};logB(zn+' 바닥이 얼어붙었다','sys');return;
+  }
+  if(t==='oil'){
+    if(cur==='fire'){explode(z);B.surf[z]={t:'fire',r:fireLife()};return}
+    B.surf[z]={t:'oil',r:SURF.oil.r};logB(zn+' 바닥이 기름으로 덮였다','sys');return;
+  }
+  B.surf[z]={t,r:SURF[t].r};
+}
+function explode(z){
+  logB(zoneName(z)+' — 기름에 불이 붙어 폭발했다!','sys');
+  afx({type:'boom',zone:z,delay:fxDelay+200});
+  zoneUnits(z).forEach(u=>{const dm=hurt(u,rollDice('2d6').total,'fire',{d:340});if(dm)logB(nm(u)+' — 폭발에 휘말려 불 피해 '+wtxt(dm,u),hk(u))});
+}
+// 불이 스친 열에 기름이 있으면 불이 붙는다
+function fireTouch(z){const s=S.battle.surf[z];if(s&&s.t==='oil')setSurf(z,'fire')}
+// 표면 위에서 차례를 시작하거나 그 열로 들어설 때
+function surfHit(u){
+  const s=surfOf(u);if(!s||u.fly||!up(u))return;
+  if(s==='water'){u.st.wet=2;if(u.st.burn){delete u.st.burn;logB(nm(u)+' — 물에 불이 꺼졌다','sys')}return}
+  if(s==='fire'){const dm=hurt(u,rollDice('1d6').total,'fire');if(dm)logB(nm(u)+' — 불길 속에서 '+wtxt(dm,u)+' 피해',hk(u));return}
+  if((s==='oil'||s==='ice')&&!big(u)&&!u.st.prone){
+    const dc=s==='oil'?10:12,r=d(20)+saveMod(u,'민첩');
+    if(r<dc){u.st.prone=1;logB(josa(nm(u),'이')+' '+(s==='oil'?'기름':'얼음')+'에 미끄러져 넘어졌다 (민첩 '+r+' vs '+dc+')',hk(u));afx({type:'text',target:u.uid,text:'미끄러짐',color:'#e8e2d2'})}
+  }
+}
+
+// ── 전투 시작
+function mkFoe(id,i){const E=SC.enemies[id];return {uid:'e'+i,side:'foe',kind:'foe',id,art:E.art||'wolf',name:E.name,lv:E.lv,hp:E.hp,hpMax:E.hp,ac:E.ac,atk:E.atk,dmg:E.dmg,row:E.row||'front',fly:!!E.fly,st:{},buffs:[],used:{},react:true}}
 function nameList(ids){
   const c={};ids.forEach(i=>{const n=SC.enemies[i].name;c[n]=(c[n]||0)+1});
   return Object.keys(c).map(n=>n+(c[n]>1?' '+c[n]+'마리':'')).join(', ');
 }
 function startBattle(def,kind,ambush){
-  def=copy(def);
-  const en=def.enemies.map(mkEnemy);
+  def=copy(def);syncComps();
+  const la=pickArt(L().art)||{},ba=pickArt(def.art);
+  const field=Object.assign({high:null,cover:false,water:false},L().field,def.field);
+  field.rain=arr((ba||la).fx).includes('rain');
+  const pids=party(),ids=def.enemies.slice();
+  if(def.scale){const n=Math.max(0,pids.length-(def.scaleFree||0));for(let i=0;i<n&&ids.length<5;i++)ids.push(def.scale[i%def.scale.length])}
+  const units=[{uid:'hero',side:'pc',kind:'hero',id:'hero',name:S.hero.name,art:'hero',row:rowPref('hero')}];
+  pids.forEach(id=>units.push({uid:id,side:'pc',kind:'comp',id,name:COMP(id).name,art:COMP(id).art,row:rowPref(id)}));
+  const en=ids.map(mkFoe);
   const cnt={},seen={};en.forEach(e=>cnt[e.name]=(cnt[e.name]||0)+1);
   en.forEach(e=>{if(cnt[e.name]>1){seen[e.name]=(seen[e.name]||0)+1;e.name+=' '+'ABCDE'[seen[e.name]-1]}});
+  // 동료가 많을수록 우두머리·정예도 단단해진다
+  if(def.perPC&&pids.length)en.forEach(e=>{const E=SC.enemies[e.id];if(E.boss||E.elite){e.hp+=def.perPC.hp*pids.length;e.hpMax=e.hp}});
   const mods=[];
   arr(def.mods).forEach(m=>{if(ok(m.if)){en.forEach(e=>{if(m.hp)e.hp=Math.max(1,e.hp+m.hp);if(m.ac)e.ac+=m.ac;if(m.atk)e.atk+=m.atk});mods.push(m.why)}});
-  const ally=def.ally&&ok(def.ally.if)?{name:def.ally.name,atk:def.ally.atk,dmg:def.ally.dmg}:null;
-  S.battle={def,kind,enemies:en,round:1,log:[],target:0,pb:[],ps:{},ally,over:null,res:null,last:null};
+  units.push(...en);
+  units.forEach(u=>{if(u.side==='pc'){u.st={};u.buffs=[];u.saves={s:0,f:0};u.high=false;u.react=true}u.ini=d(20)+iniMod(u)});
+  const ord=units.map(u=>({uid:u.uid,ini:u.ini,pc:u.side==='pc'?1:0}));
+  if(def.extraTurn&&pids.length>=def.extraTurn)en.filter(e=>SC.enemies[e.id].boss).forEach(e=>ord.push({uid:e.uid,ini:e.ini-10,pc:0}));
+  ord.sort((a,b)=>b.ini-a.ini||b.pc-a.pc);
+  const B=S.battle={def,kind,units,order:ord.map(o=>o.uid),turn:-1,round:1,log:[],target:en[0].uid,surf:{},field,nE:en.length,
+    surprise:ambush?'pc':def.surprise||null,over:null,res:null,last:null,tr:null};
+  if(field.water)ZONES.forEach(z=>B.surf[z]={t:'water',r:99});
   S.mode='combat';S.notice=null;cmenu=null;fxDelay=0;
-  logB(def.intro?tpl(def.intro):(ambush?'매복이다! ':'')+josa(nameList(def.enemies),'이')+' 나타났다!','sys');
+  logB(def.intro?tpl(def.intro):(ambush?'매복이다! ':'')+josa(nameList(ids),'이')+' 나타났다!','sys');
+  if(pids.length)logB('함께 싸운다: '+pids.map(id=>COMP(id).name).join(', '),'sys');
   mods.forEach(m=>logB('▸ '+m,'sys'));
-  if(ally)logB(josa(ally.name,'이')+' 그대 곁에서 함께 싸운다.','sys');
   if(S.flags.shield)logB('별빛 방벽이 그대를 감싸고 있다. (첫 피해를 막는다)','sys');
+  if(B.surprise==='foe')logB('적이 기습당했다! 첫 라운드에 적은 움직이지 못한다','sys');
+  if(B.surprise==='pc')logB('기습당했다! 첫 라운드에 아군은 움직이지 못한다','foe');
+  if(field.water)logB('무릎까지 물이 차 있다. 모두 젖는다 (불 피해 절반, 냉기에 얼어붙음)','sys');
+  logB('주도권: '+B.order.map(id=>nm(U(id))).join(' → '),'sys');
+  runTurns();
   save();render();toTop();
-  if(ambush){logB('적이 먼저 움직인다!','sys');fxDelay=300;enemyTurn();if(S.hero.hp<=0)loseBattle();else endRound();save();render()}
 }
 function startRandomBattle(ambush){
   const pool=L().encounters.filter(x=>!x.if||ok(x.if));
   let r=Math.random()*pool.reduce((a,b)=>a+b.w,0),g=pool[0];
   for(const x of pool){r-=x.w;if(r<0){g=x;break}}
-  startBattle({enemies:g.e},'random',ambush);
-}
-function hurt(e,dmg){
-  e.hp=Math.max(0,e.hp-dmg);
-  if(e.hp===0&&!e.dead){e.dead=true;S.counters['kill_'+e.id]=(S.counters['kill_'+e.id]||0)+1}
-}
-function heal(v){const h=S.hero;const before=h.hp;h.hp=Math.min(h.hpMax,h.hp+v);return h.hp-before}
-function onHit(e,sk){
-  const o=sk&&sk.onHit;if(!o||e.hp<=0)return;
-  if(o.stun){e.st.stun=o.stun;logB(josa(e.name,'이')+' 얼어붙었다! (그대의 공격이 유리)','me');afx({type:'text',target:eid(e),text:'얼어붙음',color:'#9fd3ff',delay:fxDelay+380})}
-  if(o.poison){e.st.poison={t:o.poison,dmg:'1d6'};logB(josa(e.name,'이')+' 독에 중독되었다!','me');afx({type:'text',target:eid(e),text:'중독',color:'#9be37a',delay:fxDelay+380})}
-  if(o.weak){e.st.weak=o.weak;logB(e.name+'의 명중이 떨어졌다! (-2)','me');afx({type:'text',target:eid(e),text:'명중 -2',color:'#f0c75e',delay:fxDelay+380})}
-}
-// 그대의 공격이 유리/불리해지는 상황: 얼어붙거나 연막 속인 적은 유리, 중독되면 불리
-function atkMode(e){
-  const adv=[],dis=[];
-  if(e&&e.st.stun)adv.push('얼어붙은 적');if(e&&e.st.blind)adv.push('연막 속의 적');
-  if(S.battle.ps.poison)dis.push('중독');
-  return {mode:modeOf(adv,dis),adv,dis};
-}
-function hitChance(e,hb,critOn){return chance(hb,e.ac,atkMode(e).mode,0,{critOn,lucky:race()&&race().lucky})}
-// 명중 판정: d20 + 보너스 ≥ 방어. 1은 언제나 빗나가고, 치명 범위는 언제나 맞는다(피해 주사위 두 배).
-function attackRoll(e,hb,critOn,name,dmgFn,vis){
-  const B=S.battle,id=eid(e),m=atkMode(e),rr=rollD20(m.mode),r=rr.r,tot=r+hb,crit=r>=critOn,hit=r!==1&&(crit||tot>=e.ac);
-  if(vis&&vis.spell)afx({type:'cast',from:'hero',to:id,color:vis.color});else afx({type:'lunge',who:'hero',dir:1});
-  const dtxt=rr.dice.length>1?'d20['+rr.dice.join(', ')+'] '+(m.mode==='adv'?'유리':'불리')+'→'+r:'d20('+r+')';
-  const base=dtxt+(rr.notes.length?' ('+rr.notes.join(', ')+')':'')+' '+sign(hb)+' = '+tot+' vs 방어 '+e.ac;
-  if(!hit){B.last={r,dice:rr.dice,txt:base+' → 빗나감'};logB(name+' — '+e.name+'에게 빗나갔다','me');afx({type:'miss',target:id,delay:fxDelay+260});return}
-  const dm=Math.max(1,dmgFn(crit));
-  hurt(e,dm);
-  B.last={r,dice:rr.dice,txt:base+' → '+(crit?'치명타! ':'명중! ')+'피해 '+dm};
-  logB(name+' — '+e.name+'에게 '+(crit?'치명타! ':'')+dm+' 피해'+(e.hp<=0?' · 쓰러뜨렸다!':''),'me');
-  afx({type:'hit',target:id,val:dm,crit,delay:fxDelay+260});
-  return true;
-}
-function weaponAttack(e,sk){
-  const w=wpn(),name=sk?sk.name:'공격';
-  const critOn=Math.min(w.crit||20,(sk&&sk.crit)||20);
-  const hit=attackRoll(e,weaponHit(sk&&sk.hit),critOn,name,crit=>{
-    let v=rollDice(w.dice,crit).total+weaponDmgBonus();
-    if(sk&&sk.extra)v+=rollDice(sk.extra,crit).total;
-    return v;
-  });
-  if(hit)onHit(e,sk);
-}
-const SPELL_COLOR={지혜:'#9fc8ff',매력:'#f0a8ff'};
-function spellHit(sk){return statVal(sk.stat||atkStat())+prof()+(sk.hit||0)+bsum('atk')}
-function spellAttack(e,sk){
-  const st=sk.stat||atkStat(),add=sk.addStat?statVal(st):0,id=eid(e);
-  if(sk.auto){
-    const r=rollDice(sk.dmg);const dm=Math.max(1,r.total+add+bsum('dmg'));hurt(e,dm);
-    S.battle.last={r:null,txt:sk.name+' '+r.txt+'('+r.dice.join('+')+')'+sign(add)+' = '+dm};
-    logB(sk.name+' — '+e.name+'에게 '+dm+' 피해'+(e.hp<=0?' · 쓰러뜨렸다!':''),'me');
-    afx({type:'cast',from:'hero',to:id,color:SPELL_COLOR[st]});afx({type:'hit',target:id,val:dm,delay:fxDelay+260});
-    onHit(e,sk);return;
-  }
-  if(attackRoll(e,spellHit(sk),sk.crit||20,sk.name,crit=>rollDice(sk.dmg,crit).total+add+bsum('dmg'),{spell:true,color:SPELL_COLOR[st]}))onHit(e,sk);
+  // 동료와 함께 다니면 적도 더 몰려온다
+  const ids=g.e.slice(),n=party().length,extra=n?n+(n>=2&&Math.random()<0.25?1:0):0;
+  const singles=pool.filter(x=>x.e.length===1&&!SC.enemies[x.e[0]].elite).map(x=>x.e[0]);
+  for(let i=0;i<extra&&ids.length<5&&singles.length;i++)ids.push(singles[rint(0,singles.length-1)]);
+  startBattle({enemies:ids,perPC:{hp:12}},'random',ambush);
 }
 
-function canAct(kind,arg){
-  const B=S.battle;if(!B||B.over||rolling)return false;
-  if(kind==='skill'){const sk=SC.combatSkills[arg];return !!sk&&S.hero.mp>=sk.mp}
-  if(kind==='item')return S.items.includes(arg);
-  if(kind==='flee')return !B.def.noFlee;
-  if(kind==='special'){const sp=specialOf(arg);return !!sp&&specialReady(sp)}
+// ── 차례 진행
+function startTurn(u){
+  const B=S.battle;
+  B.tr={act:1,bonus:1,move:1,sneak:false,dis:false};
+  u.react=true;u.dodge=false;
+  if(B.round===1&&B.surprise===u.side){logB(josa(nm(u),'은')+' 기습당해 움직이지 못한다','sys');afx({type:'text',target:u.uid,text:'기습당함',color:'#c8ccd4'});return false}
+  if(u.st.prone&&!u.st.stun){delete u.st.prone;B.tr.move=0;logB(josa(nm(u),'이')+' 몸을 일으켰다 (이동을 썼다)','sys')}
+  surfHit(u);
+  if(up(u)&&u.st.burn){const dm=hurt(u,rollDice('1d4').total,'fire');if(dm)logB(nm(u)+' — 불붙은 몸에서 불 피해 '+wtxt(dm,u),hk(u));if(--u.st.burn<=0)delete u.st.burn}
+  if(up(u)&&u.st.poison){const p=u.st.poison,dm=hurt(u,rollDice(p.dmg).total,'poison');if(dm)logB(nm(u)+' — 독 피해 '+wtxt(dm,u),hk(u));if(--p.t<=0)delete u.st.poison}
+  if(!up(u))return false;
+  if(u.st.stun){if(--u.st.stun<=0)delete u.st.stun;logB(josa(nm(u),'은')+' 얼어붙어 움직이지 못한다','sys');afx({type:'text',target:u.uid,text:'얼어붙음',color:'#9fd3ff'});return false}
+  if(u.st.restrain){B.tr.move=0;if(--u.st.restrain<=0)delete u.st.restrain}
+  if(u.st.prone)B.tr.move=0;
   return true;
 }
-function specialOf(id){return arr(S.battle.def.special).find(x=>x.id===id)}
-function specialReady(sp){const b=S.battle.enemies[0];return ok(sp.if)&&b.hp>0&&b.hp<=b.hpMax*(sp.below||1)&&S.hero.mp>=(sp.mp||0)}
-function specialDC(sp){let dc=sp.dc;const why=[];arr(sp.dcMod).forEach(m=>{if(ok(m.if)){dc+=m.v;why.push(m.why+' '+sign(m.v))}});return {dc,why}}
-
-function act(kind,arg){
-  if(!canAct(kind,arg))return;
-  const rollsDie=kind==='attack'||kind==='flee'||kind==='special'||(kind==='skill'&&/attack|aoe/.test(SC.combatSkills[arg].act)&&!SC.combatSkills[arg].auto);
-  cmenu=null;
-  const go=()=>{
-    rolling=false;fxDelay=0;
-    const B=S.battle;B.last=null;
-    playerAct(kind,arg);
-    if(!B.over&&!alive().length)winBattle();
-    fxDelay=420;
-    if(!B.over&&B.ally)allyAct();
-    if(!B.over&&!alive().length)winBattle();
-    fxDelay=B.ally?860:520;
-    if(!B.over)enemyTurn();
-    if(!B.over&&S.hero.hp<=0)loseBattle();
-    if(!B.over)endRound();
-    save();render();
-  };
-  if(!rollsDie){go();return}
-  rolling=true;renderCombat();
-  animateDie('cshape','cnum',go);
+function deathSave(u){
+  if(u.out||u.stable)return;
+  const r=d(20);
+  if(r===20){R(u).hp=1;u.saves={s:0,f:0};u.st={prone:1};logB(nm(u)+' — 죽음 내성 20! 스스로 일어났다 (HP 1)','me');afx({type:'heal',target:u.uid,val:1,delay:fxDelay});return}
+  if(r===1)u.saves.f+=2;else if(r>=10)u.saves.s++;else u.saves.f++;
+  logB(nm(u)+' — 죽음 내성 d20('+r+') '+(r>=10?'성공':'실패')+' · 성공 '+Math.min(3,u.saves.s)+'/3 · 실패 '+Math.min(3,u.saves.f)+'/3',r>=10?'sys':'foe');
+  if(u.saves.s>=3){u.stable=true;logB(josa(nm(u),'은')+' 숨이 고르게 돌아왔다 (안정). 누군가 일으켜 주어야 한다','sys')}
+  checkOut(u);
 }
-function playerAct(kind,arg){
-  const B=S.battle,h=S.hero;
-  if(kind==='attack'){weaponAttack(target(),null);return}
-  if(kind==='skill'){
-    const sk=SC.combatSkills[arg];h.mp-=sk.mp;
-    if(sk.act==='attack'){if(sk.weapon)weaponAttack(target(),sk);else spellAttack(target(),sk)}
-    else if(sk.act==='aoe'){alive().forEach(e=>{if(sk.weapon)weaponAttack(e,sk);else spellAttack(e,sk)});if(sk.heal){const v=heal(rollDice(sk.heal).total);logB(sk.name+' — HP '+v+' 회복','me');afx({type:'heal',target:'hero',val:v,delay:450})}}
-    else if(sk.act==='heal'){const r=rollDice(sk.dmg),add=sk.addStat?statVal(sk.stat):0,v=heal(r.total+add);B.last={r:null,txt:sk.name+' '+r.txt+'('+r.dice.join('+')+')'+sign(add)+' → HP +'+v};logB(sk.name+' — HP '+v+' 회복','me');afx({type:'heal',target:'hero',val:v})}
-    else if(sk.act==='buff'){B.pb.push(Object.assign({t:sk.turns,name:sk.name},sk.buff));B.last={r:null,txt:sk.name+' — '+sk.desc};logB(sk.name+'! '+sk.desc,'me');afx({type:'text',target:'hero',text:sk.name,color:'#f0c75e'})}
-    else if(sk.act==='debuffAll'){alive().forEach(e=>{Object.assign(e.st,sk.status);afx({type:'text',target:eid(e),text:sk.name,color:'#c8ccd4'})});B.last={r:null,txt:sk.name+' — '+sk.desc};logB(sk.name+'! '+sk.desc,'me')}
+function autoFor(u){return u.kind==='comp'&&!!(S.opt&&S.opt.autoComp)}
+// 다음 차례로 넘긴다. 적과 자동 동료의 차례는 바로 처리하고, 플레이어가 고를 아군 차례에서 멈춘다
+function runTurns(){
+  const B=S.battle;let guard=0;
+  while(!B.over&&guard++<300){
+    B.turn++;
+    if(B.turn>=B.order.length){endRound();B.turn=0}
+    const u=U(B.order[B.turn]);if(!u)continue;
+    if(u.side==='foe'){
+      if(!up(u))continue;
+      if(startTurn(u)&&!checkEnd())foeTurn(u);
+      fxDelay+=520;if(checkEnd())return;continue;
+    }
+    if(!up(u)){if(!u.out&&!u.stable){deathSave(u);fxDelay+=300}if(checkEnd())return;continue}
+    const can=startTurn(u);
+    if(checkEnd())return;
+    if(!can){fxDelay+=260;continue}
+    if(autoFor(u)){aiTurn(u);fxDelay+=420;if(checkEnd())return;continue}
+    autoTarget(u);cmenu=null;
     return;
   }
-  if(kind==='item'){useItem(arg);return}
-  if(kind==='guard'){B.ps.guard=true;h.mp=Math.min(h.mpMax,h.mp+1);B.last={r:null,txt:'방어 — 이번 턴 받는 피해 절반, 마력 +1'};logB('방어 자세를 취했다. (피해 절반, 마력 +1)','me');afx({type:'text',target:'hero',text:'방어',color:'#8fb6ff'});return}
+}
+function checkEnd(){const B=S.battle;if(B.over)return true;if(!alive().length){winBattle();return true}if(!upPCs().length){loseBattle();return true}return false}
+function endRound(){
+  const B=S.battle;
+  B.units.forEach(u=>{
+    ['weak','blind','taunt'].forEach(k=>{if(u.st[k]&&--u.st[k]<=0){delete u.st[k];if(k==='taunt')delete u.st.tauntBy}});
+    if(u.st.wet&&surfOf(u)!=='water'&&--u.st.wet<=0)delete u.st.wet;
+    u.buffs=(u.buffs||[]).filter(b=>--b.t>0);
+  });
+  for(const z in B.surf){const s=B.surf[z];if(s.r<90&&--s.r<=0){delete B.surf[z];if(B.field.water)B.surf[z]={t:'water',r:99};logB(zoneName(z)+' — '+SURF[s.t].n+(s.t==='fire'?'이 꺼졌다':'이 사라졌다'),'sys')}}
+  B.round++;
+}
+
+// ── 적의 차례
+function foeTurn(e){
+  const B=S.battle,E=E_(e),def=B.def;
+  if(E.boss&&def.hesitate&&ok(def.hesitate.if)&&Math.random()<def.hesitate.p){logB(def.hesitate.text,'sys');afx({type:'text',target:e.uid,text:'머뭇거림',color:'#f0c75e'});return}
+  let sk=null;
+  for(const s of arr(E.skills)){
+    if(s.once&&e.used[s.name])continue;
+    if(s.needFront&&standing('pc','front').length<s.needFront)continue;
+    if(Math.random()<s.p){sk=s;break}
+  }
+  if(sk&&sk.summon){
+    e.used[sk.name]=true;
+    const ne=mkFoe(sk.summon,B.nE++);ne.name+=' (불려 옴)';ne.ini=e.ini-1;B.units.push(ne);B.order.splice(B.turn+1,0,ne.uid);
+    logB(nm(e)+' — '+sk.name+'! '+josa(ne.name,'이')+' 나타났다.','foe');afx({type:'text',target:e.uid,text:sk.name,color:'#c8ccd4'});return;
+  }
+  if(sk&&sk.debuff){
+    upPCs().forEach(p=>{p.buffs.push({atk:sk.debuff.atk,t:sk.debuff.turns,name:sk.name,neg:true});afx({type:'text',target:p.uid,text:'명중 '+sk.debuff.atk,color:'#ff9a8a',delay:fxDelay+200})});
+    logB(sk.text||(nm(e)+' — '+sk.name+'!'),'foe');return;
+  }
+  const ranged=!!(sk?sk.ranged:E.ranged);
+  // 근접하는 적은 앞열로 나선다. 원거리 적은 고지대에 오른다
+  if(!ranged&&!e.fly&&!(sk&&sk.reach)&&e.row==='back'&&B.tr.move){e.row='front';B.tr.move=0;logB(josa(nm(e),'이')+' 앞열로 나섰다','foe');surfHit(e);if(!up(e))return}
+  if(ranged&&!e.high&&e.row==='back'&&B.tr.move&&canClimb('foe')&&highCount('foe')<2){e.high=true;B.tr.move=0;logB(josa(nm(e),'이')+' 높은 곳으로 올라갔다','foe')}
+  if(sk&&sk.sweep){
+    const ts=upPCs().filter(t=>canMelee(e,t,false));
+    if(ts.length){logB(nm(e)+' — '+sk.name+'!','foe');ts.forEach(t=>{foeAttack(e,t,sk);fxDelay+=200});return}
+    sk=null;
+  }
+  let P=foeProfile(e,sk),cands=upPCs().filter(t=>canHit(e,t,P));
+  if(!cands.length&&sk){sk=null;P=foeProfile(e,null);cands=upPCs().filter(t=>canHit(e,t,P))}
+  if(!cands.length){
+    const hidden=upPCs().filter(t=>t.hid);
+    if(hidden.length){
+      const t=hidden[rint(0,hidden.length-1)],r=d(20)+Math.floor(e.lv/2)+1;
+      if(r>=t.hid){delete t.hid;logB(nm(e)+' — 숨어 있던 '+josa(nm(t),'을')+' 찾아냈다! (지각 '+r+' vs 은신 '+t.hid+')','foe');afx({type:'text',target:t.uid,text:'들킴',color:'#ff9a8a'})}
+      else logB(nm(e)+' — 숨은 상대를 찾지 못했다 (지각 '+r+')','sys');
+      return;
+    }
+    logB(josa(nm(e),'은')+' 닿는 상대가 없어 으르렁거린다','sys');return;
+  }
+  const tb=e.st.taunt&&U(e.st.tauntBy);
+  if(tb&&cands.includes(tb))cands=[tb];
+  // 여러 번 무는 짐승은 기본 공격을 거듭한다
+  const times=sk?1:(E.multi||1);
+  for(let i=0;i<times;i++){
+    const live=cands.filter(up);if(!live.length||!up(e))break;
+    const t=Math.random()<0.6?live.slice().sort((a,b)=>R(a).hp/R(a).hpMax-R(b).hp/R(b).hpMax)[0]:live[rint(0,live.length-1)];
+    if(i)fxDelay+=360;
+    foeAttack(e,t,sk);
+  }
+}
+function foeAttack(e,t,sk){
+  const E=E_(e),P=foeProfile(e,sk),extra=[];
+  // 오르덴의 수호: 앞열에 선 오르덴이 다른 아군을 노린 근접 공격을 막아선다 (라운드마다 한 번)
+  const g=!P.ranged&&pcs().find(u=>u.kind==='comp'&&COMP(u.id).guard&&u!==t&&up(u)&&u.row==='front'&&u.react&&!u.st.stun&&!u.st.prone);
+  if(g){g.react=false;extra.push(nm(g)+'의 수호');afx({type:'text',target:g.uid,text:'수호',color:'#8fb6ff',delay:fxDelay+100})}
+  const r=attack(e,t,P,{extraDis:extra});
+  if(!r.hit)return;
+  if(E.drain&&r.dm){const v=Math.max(1,Math.floor(r.dm*E.drain));e.hp=Math.min(e.hpMax,e.hp+v);logB(josa(nm(e),'이')+' 피를 빨아 HP '+v+' 회복','foe')}
+  if(E.poison&&up(t)&&Math.random()<E.poison.p)applyOn(t,{poison:E.poison.turns,pdmg:E.poison.dmg});
+  if(sk&&sk.onHit)applyOn(t,sk.onHit);
+}
+// 공격 한 번: d20 + 명중 ≥ 방어. 1은 언제나 빗나가고, 치명 범위는 언제나 맞는다(피해 주사위 두 배)
+function attack(a,t,P,o){
+  o=o||{};const B=S.battle;
+  const m=atkMode(a,t,P,o.extraDis),hm=heightMod(a,t,P),rr=d20(a,m.mode),r=rr.r;
+  let bonus=P.hit+hm,ins=0;
+  if(a.st.insp){ins=d(6);bonus+=ins;delete a.st.insp}
+  const tot=r+bonus,ac=acOf(t),crit=r>=P.crit,hit=r!==1&&(crit||tot>=ac);
+  if(P.spell||P.ranged)afx({type:'cast',from:a.uid,to:t.uid,color:P.dtype==='fire'?'#ffa95e':P.dtype==='cold'?'#bfe6ff':P.spell?'#9fc8ff':'#e8e2d2'});
+  else afx({type:'lunge',who:a.uid,dir:a.side==='pc'?1:-1});
+  const dt=(rr.dice.length>1?'d20['+rr.dice.join(', ')+'] '+(m.mode==='adv'?'유리':'불리')+'→'+r:'d20('+r+')')+(rr.notes.length?' ('+rr.notes.join(', ')+')':'')+' '+sign(P.hit)+(hm?' 고지대 '+sign(hm):'')+(ins?' 격려 +'+ins:'')+' = '+tot+' vs 방어 '+ac;
+  const why=m.mode!=='normal'?' ['+(m.mode==='adv'?'유리: '+m.adv.join(', '):'불리: '+m.dis.join(', '))+']':'';
+  if(a.hid)delete a.hid;
+  if(a.side==='pc')B.last={r,dice:rr.dice,txt:P.name+' '+dt+(hit?(crit?' → 치명타!':' → 명중'):' → 빗나감')+why};
+  if(!hit){logB(nm(a)+'의 '+P.name+' — '+nm(t)+'에게 빗나갔다'+(a.side==='foe'?' ('+tot+' vs 방어 '+ac+')':''),lk(a));afx({type:'miss',target:t.uid,delay:fxDelay+260});return {hit:false}}
+  let v=P.dmg(crit),sn='';
+  if(o.sneak){const sv=rollDice(Math.ceil(S.hero.level/2)+'d6',crit).total;v+=sv;sn=' (기습 +'+sv+')'}
+  const dm=hurt(t,v,P.dtype,{crit});
+  if(a.side==='pc')B.last.txt+=' · 피해 '+dm+sn;
+  logB(nm(a)+'의 '+P.name+' — '+nm(t)+'에게 '+(crit?'치명타! ':'')+(dm?wtxt(dm,t)+' 피해'+sn:'피해 없음')+(t.side==='foe'&&!up(t)?' · 쓰러뜨렸다!':''),lk(a));
+  return {hit:true,dm,crit};
+}
+
+// ── 아군의 행동
+function abOf(k){return SC.combatSkills[k]}
+function costKey(ab){return ab.cost==='bonus'?'bonus':'act'}
+function unitSkills(u){
+  if(u.kind==='hero')return knownSkills();
+  return (COMP(u.id).skills||[]).filter(k=>abOf(k).lv<=S.hero.level);
+}
+// 쓸 수 없는 이유 (쓸 수 있으면 null)
+function resWhy(u,k){
+  const ab=abOf(k),B=S.battle;
+  if(!B.tr[costKey(ab)])return (ab.cost==='bonus'?'보조 행동':'행동')+'을 이미 썼다';
+  if(ab.mp&&S.hero.mp<ab.mp)return '마력 부족';
+  if(ab.uses&&usesLeft(u,k)<=0)return '다 썼다 (휴식으로 충전)';
+  return null;
+}
+function sneakOK(a,t,P){
+  if(a.kind!=='hero'||!cls().sneak||!P.weapon||S.battle.tr.sneak||!t)return false;
+  const m=atkMode(a,t,P).mode;if(m==='dis')return false;
+  return m==='adv'||(t.row==='front'&&pcs().some(p=>p!==a&&up(p)&&p.row==='front'));
+}
+function rogue(u){return u.kind==='hero'&&S.cls==='rogue'}
+function canClimb(side){const h=S.battle.field.high;return h==='both'||h===side}
+function highCount(side){return S.battle.units.filter(x=>x.side===side&&x.high&&up(x)).length}
+// 앞열에서 물러날 때 기회 공격을 할 수 있는 적 (물러서기를 했으면 없음)
+function oaFoes(u){
+  if(S.battle.tr.dis||u.row!=='front')return [];
+  return alive().filter(e=>e.row==='front'&&!E_(e).ranged&&e.react&&!e.st.stun&&!e.st.prone&&!e.st.restrain).slice(0,2);
+}
+function moveOpts(u){
+  const B=S.battle,o=[];if(!B.tr.move||u.st.restrain||u.st.prone)return o;
+  const oa=oaFoes(u).length;
+  if(u.row==='front')o.push({id:'back',label:'뒷열로 물러난다',small:oa?'기회 공격 '+oa+'번을 받는다':'안전하게 물러난다'});
+  else o.push({id:'front',label:'앞열로 나선다',small:'근접 공격을 할 수 있다'});
+  if(!u.high&&canClimb('pc')&&highCount('pc')<2)o.push({id:'up',label:'고지대에 오른다',small:'뒷열 · 원거리 명중 +2, 낮은 곳의 원거리 공격 -2'+(u.row==='front'&&oa?' · 기회 공격 '+oa+'번':'')});
+  if(u.high)o.push({id:'down',label:'고지대에서 내려온다',small:'뒷열에 그대로'});
+  return o;
+}
+function moveTo(u,dest){
+  const B=S.battle;
+  if(dest!=='front'&&u.row==='front')oaFoes(u).forEach(e=>{if(!up(u))return;e.react=false;logB(nm(e)+' — 물러서는 '+josa(nm(u),'을')+' 노린 기회 공격!','foe');foeAttack(e,u,null);fxDelay+=300});
+  if(!up(u))return;
+  if(dest==='up'){u.row='back';u.high=true;logB(josa(nm(u),'이')+' 고지대에 올랐다 (원거리 명중 +2)','me')}
+  else if(dest==='down'){u.high=false;logB(josa(nm(u),'이')+' 고지대에서 내려왔다','me');return}
+  else{u.row=dest;u.high=false;logB(josa(nm(u),'이')+' '+josa(ROWN[dest],'으로')+(dest==='front'?' 나섰다':' 물러났다'),'me')}
+  surfHit(u);
+}
+function hpPotions(){return [...new Set(S.items.filter(n=>SC.items[n]&&SC.items[n].use&&SC.items[n].use.hp))]}
+function shoveMod(u){return u.kind==='hero'?skillMod('운동'):COMP(u.id).str+2}
+function foeStr(t){const E=E_(t);return E.str!=null?E.str:Math.floor(t.lv/2)+1}
+function shoveP(u,t){const a=shoveMod(u),b=foeStr(t);let p=0;for(let x=1;x<=20;x++)for(let y=1;y<=20;y++)if(x+a>y+b)p++;return p/400}
+function hideMod(u){return u.kind==='hero'?skillMod('은신'):COMP(u.id).dex+2}
+function hideDC(){return 10+Math.max(0,...alive().map(e=>Math.floor(e.lv/2)+1))}
+function throwHit(u){return u.kind==='hero'?statVal('민첩')+prof():COMP(u.id).dex+2+lvB()}
+function rockP(u){const s=u.kind==='hero'?statVal('힘'):COMP(u.id).str;return {name:'돌 던지기',hit:(u.kind==='hero'?s+prof():s+2+lvB()),ranged:true,crit:20,dtype:'phys',dice:'1d4'+sign(Math.max(0,s)),dmg:c=>rollDice('1d4',c).total+Math.max(0,s)}}
+function fleeInfo(){return {bonus:statVal('민첩')+(S.cls==='rogue'?3:0),dc:10+Math.max(...alive().map(e=>e.lv))}}
+function bossU(){return foes().find(e=>E_(e).boss)||foes()[0]}
+function specialOf(id){return arr(S.battle.def.special).find(x=>x.id===id)}
+function specialReady(sp){const b=bossU();return ok(sp.if)&&up(b)&&b.hp<=b.hpMax*(sp.below||1)&&S.hero.mp>=(sp.mp||0)}
+function specialDC(sp){let dc=sp.dc;const why=[];arr(sp.dcMod).forEach(m=>{if(ok(m.if)){dc+=m.v;why.push(m.why+' '+sign(m.v))}});return {dc,why}}
+function tgtU(){const t=U(S.battle.target);return t&&t.side==='foe'?t:null}
+// 지금 고른 대상이 이 아군의 기본 공격에 닿지 않으면 닿는 대상으로 바꾼다
+function autoTarget(u){
+  const B=S.battle,P=profile(u,null),t=tgtU();
+  if(t&&canHit(u,t,P))return;
+  const c=alive().filter(x=>canHit(u,x,P));
+  const v=c.length?c.sort((a,b)=>a.hp-b.hp)[0]:alive().find(x=>!x.hid);
+  if(v)B.target=v.uid;
+}
+// 행동이 가능한지: {ok, roll(주사위를 굴리는지), why}
+function canDo(u,kind,arg,au){
+  const B=S.battle,t=tgtU(),no=why=>({ok:false,why});
+  if(!myTurn()||rolling||curU()!==u)return no('차례가 아니다');
+  const tok=x=>x&&up(x)&&!x.hid;
+  if(kind==='attack'){if(!B.tr.act)return no('행동을 이미 썼다');const P=profile(u,null);return t&&canHit(u,t,P)?{ok:true,roll:true}:no(P.ranged?'대상이 없다':'닿지 않음 · 앞열로 나서거나 앞열의 적을 고른다')}
+  if(kind==='skill'){
+    const ab=abOf(arg),w=resWhy(u,arg);if(w)return no(w);
+    if(ab.kind==='attack'||ab.kind==='pierce'){const P=profile(u,ab);return t&&canHit(u,t,P)?{ok:true,roll:true}:no('대상에 닿지 않는다')}
+    if(ab.kind==='sweep')return alive().some(x=>canMelee(u,x,false))?{ok:true,roll:true}:no('닿는 적이 없다');
+    if(ab.kind==='save'&&ab.area==='all')return {ok:true,roll:true};
+    if(ab.kind==='save'||ab.kind==='surface'||ab.kind==='darts')return tok(t)?{ok:true,roll:ab.kind==='save'}:no('대상을 고른다');
+    if(ab.kind==='heal'){if(!au)return pcs().some(p=>!p.out&&R(p).hp<R(p).hpMax)?{ok:true,pick:true}:no('다친 아군이 없다');const a=U(au);return a&&!a.out&&R(a).hp<R(a).hpMax?{ok:true}:no('회복할 수 없다')}
+    if(ab.kind==='self')return R(u).hp<R(u).hpMax?{ok:true}:no('HP가 가득하다');
+    return {ok:true};
+  }
+  if(kind==='shove'){if(!B.tr.act)return no('행동을 이미 썼다');if(!t||!canMelee(u,t,false))return no('앞열에서, 닿는 적에게만');if(big(t))return no('너무 거대하다');return {ok:true,roll:true}}
+  if(kind==='hide'){const c=rogue(u)?'bonus':'act';if(!B.tr[c])return no((c==='bonus'?'보조 행동':'행동')+'을 이미 썼다');if(u.hid)return no('이미 숨어 있다');if(u.row!=='back')return no('뒷열에서만 숨을 수 있다');return {ok:true,roll:true}}
+  if(kind==='help'){if(!B.tr.act)return no('행동을 이미 썼다');if(!au)return pcs().some(p=>!up(p)&&!p.out)?{ok:true,pick:true}:no('쓰러진 동료가 없다');const a=U(au);return a&&!up(a)&&!a.out?{ok:true}:no('일으킬 수 없다')}
+  if(kind==='dodge')return B.tr.act?{ok:true}:no('행동을 이미 썼다');
+  if(kind==='drink'){if(!B.tr.bonus)return no('보조 행동을 이미 썼다');if(!S.items.includes(arg))return no('없다');const it=SC.items[arg].use;if(it.mp&&u.kind!=='hero')return no('마력이 없다');if(!it.mp&&R(u).hp>=R(u).hpMax)return no('HP가 가득하다');return {ok:true}}
+  if(kind==='give'){if(!B.tr.act)return no('행동을 이미 썼다');if(!S.items.includes(arg))return no('없다');const can=a=>a&&a!==u&&!a.out&&R(a).hp<R(a).hpMax;if(!au)return pcs().some(can)?{ok:true,pick:true}:no('다친 동료가 없다');return can(U(au))?{ok:true}:no('줄 수 없다')}
+  if(kind==='throw'){if(!B.tr.act)return no('행동을 이미 썼다');if(arg!=='돌'&&!S.items.includes(arg))return no('없다');return tok(t)?{ok:true,roll:arg!=='기름 병'}:no('대상을 고른다')}
+  if(kind==='move')return moveOpts(u).some(o=>o.id===arg)?{ok:true}:no('움직일 수 없다');
+  if(kind==='dis')return rogue(u)&&B.tr.bonus&&!B.tr.dis?{ok:true}:no('쓸 수 없다');
+  if(kind==='flee'){if(u.kind!=='hero'||!B.tr.act)return no('그대의 행동으로만');return B.def.noFlee?no('도망칠 수 없다'):{ok:true,roll:true}}
+  if(kind==='special'){if(u.kind!=='hero'||!B.tr.act)return no('그대의 행동으로만');const sp=specialOf(arg);return sp&&specialReady(sp)?{ok:true,roll:true}:no('아직 때가 아니다')}
+  return no('?');
+}
+function pcAct(kind,arg,au){
+  const u=curU();if(!u)return;
+  const c=canDo(u,kind,arg,au);if(!c.ok)return;
+  if(c.pick){cmenu={pick:kind,arg};renderCombat();return}
+  cmenu=null;
+  const go=()=>{
+    rolling=false;fxDelay=0;S.battle.last=null;
+    doIt(u,kind,arg,au);
+    if(!checkEnd()&&(!up(u)||spent()))runTurns();
+    save();render();
+  };
+  if(c.roll){rolling=true;renderCombat();animateDie('cshape','cnum',go)}else go();
+}
+function spent(){const t=S.battle.tr;return !t.act&&!t.bonus&&!t.move}
+function endTurn(){if(!myTurn()||rolling)return;cmenu=null;fxDelay=0;runTurns();save();render()}
+function autoNow(){const u=curU();if(!myTurn()||rolling)return;cmenu=null;fxDelay=0;S.battle.last=null;aiTurn(u);if(!checkEnd())runTurns();save();render()}
+function doIt(u,kind,arg,au){
+  const B=S.battle,t=tgtU(),h=S.hero;
+  if(kind==='attack'){B.tr.act=0;const P=profile(u,null),sn=sneakOK(u,t,P),r=attack(u,t,P,{sneak:sn});if(r.hit){if(sn)B.tr.sneak=true;if(P.burn)applyOn(t,{burn:2})}if(P.dtype==='fire')fireTouch(zk(t));return}
+  if(kind==='skill'){useAb(u,arg,t,au);return}
+  if(kind==='shove'){
+    B.tr.act=0;const rr=d20(u,'normal'),a=rr.r+shoveMod(u),b=d(20)+foeStr(t);
+    afx({type:'lunge',who:u.uid,dir:1});
+    B.last={r:rr.r,dice:rr.dice,txt:'밀치기 d20('+rr.r+') '+sign(shoveMod(u))+' = '+a+' vs '+nm(t)+' '+b+(a>b?' → 성공':' → 실패')};
+    if(a>b){logB(nm(u)+' — '+josa(nm(t),'을')+' 밀쳐 냈다! ('+a+' vs '+b+')','me');applyOn(t,{push:1})}
+    else{logB(nm(u)+' — '+josa(nm(t),'을')+' 밀치지 못했다 ('+a+' vs '+b+')','me');afx({type:'miss',target:t.uid,delay:260})}
+    return;
+  }
+  if(kind==='hide'){
+    B.tr[rogue(u)?'bonus':'act']=0;const mode=B.field.cover?'adv':'normal',rr=d20(u,mode),tot=rr.r+hideMod(u),dc=hideDC();
+    B.last={r:rr.r,dice:rr.dice,txt:'숨기 '+(rr.dice.length>1?'d20['+rr.dice.join(', ')+'] 엄폐로 유리→'+rr.r:'d20('+rr.r+')')+' '+sign(hideMod(u))+' = '+tot+' vs '+dc+(tot>=dc?' → 숨었다':' → 들켰다')};
+    if(tot>=dc){u.hid=tot;logB(josa(nm(u),'이')+' 숨었다. 적이 노릴 수 없고, 다음 공격이 유리하다','me');afx({type:'text',target:u.uid,text:'숨음',color:'#c8ccd4'})}
+    else logB(nm(u)+' — 숨으려 했지만 들켰다','me');
+    return;
+  }
+  if(kind==='help'){B.tr.act=0;const a=U(au);R(a).hp=1;a.saves={s:0,f:0};a.stable=false;a.st={prone:1};logB(nm(u)+' — '+josa(nm(a),'을')+' 일으켜 세웠다 (HP 1)','me');afx({type:'heal',target:a.uid,val:1});return}
+  if(kind==='dodge'){B.tr.act=0;u.dodge=true;if(u.kind==='hero')h.mp=Math.min(h.mpMax,h.mp+1);logB(josa(nm(u),'이')+' 회피 자세를 취했다 (받는 공격 불리'+(u.kind==='hero'?', 마력 +1':'')+')','me');afx({type:'text',target:u.uid,text:'회피',color:'#8fb6ff'});return}
+  if(kind==='drink'||kind==='give'){
+    B.tr[kind==='drink'?'bonus':'act']=0;const a=kind==='drink'?u:U(au),it=SC.items[arg];S.items.splice(S.items.indexOf(arg),1);
+    const parts=[];if(it.use.hp)parts.push('HP +'+heal(a,it.use.hp));
+    if(it.use.mp&&a.kind==='hero'){const was=h.mp;h.mp=Math.min(h.mpMax,h.mp+it.use.mp);parts.push('마력 +'+(h.mp-was));afx({type:'text',target:a.uid,text:'마력 +'+(h.mp-was),color:'#8fb6ff',delay:200})}
+    logB(nm(u)+' — '+arg+(kind==='drink'?'을 마셨다':'을 '+nm(a)+'에게 먹였다')+' ('+parts.join(', ')+')','me');return;
+  }
+  if(kind==='throw'){
+    B.tr.act=0;
+    if(arg==='돌'){attack(u,t,rockP(u));return}
+    const th=SC.items[arg].throw;S.items.splice(S.items.indexOf(arg),1);
+    if(th.dmg)attack(u,t,{name:arg+' 던지기',hit:throwHit(u),ranged:true,crit:20,dtype:th.dtype,dmg:c=>rollDice(th.dmg,c).total});
+    else{afx({type:'cast',from:u.uid,to:t.uid,color:'#8a7a5a'});logB(nm(u)+' — '+josa(arg,'을')+' '+nm(t)+' 쪽으로 던졌다','me');B.last={r:null,txt:josa(arg,'을')+' 던졌다'}}
+    if(th.surface)setSurf(zk(t),th.surface);
+    return;
+  }
+  if(kind==='move'){B.tr.move=0;moveTo(u,arg);return}
+  if(kind==='dis'){B.tr.bonus=0;B.tr.dis=true;logB(josa(nm(u),'이')+' 물러설 틈을 노린다 (이번 차례에 기회 공격을 받지 않는다)','me');return}
   if(kind==='flee'){
-    const rr=rollD20('normal'),r=rr.r,bonus=statVal('민첩')+(S.cls==='rogue'?3:0),dc=10+Math.max.apply(null,alive().map(e=>e.lv)),tot=r+bonus;
-    const okF=r!==1&&(r===20||tot>=dc);
+    B.tr.act=0;const {bonus,dc}=fleeInfo(),rr=rollD20('normal'),r=rr.r,tot=r+bonus,okF=r!==1&&(r===20||tot>=dc);
     B.last={r,txt:'도망 d20('+r+') '+sign(bonus)+' = '+tot+' vs '+dc+(okF?' → 성공':' → 실패')};
-    if(okF){B.over='fled';B.res={title:'도망쳤다',lines:['무사히 빠져나왔다.']};logB('도망쳤다!','sys')}
+    if(okF){B.over='fled';B.res={title:'도망쳤다',lines:['모두 무사히 빠져나왔다.']};logB('도망쳤다!','sys')}
     else{logB('도망치지 못했다!','sys');afx({type:'text',target:'hero',text:'도망 실패',color:'#c8ccd4'})}
     return;
   }
   if(kind==='special'){
-    const sp=specialOf(arg),{dc}=specialDC(sp),rr=rollD20('normal'),r=rr.r,bonus=statVal(sp.stat)+profBonus(),tot=r+bonus;
+    B.tr.act=0;const sp=specialOf(arg),{dc}=specialDC(sp),rr=rollD20('normal'),r=rr.r,bonus=statVal(sp.stat)+profBonus(),tot=r+bonus,b=bossU();
     h.mp-=sp.mp||0;
     const okS=r!==1&&(r===20||tot>=dc);
     B.last={r,txt:sp.label+' d20('+r+') '+sign(bonus)+' = '+tot+' vs DC '+dc+(okS?' → 성공!':' → 실패')};
-    afx({type:'cast',from:'hero',to:'e0',color:'#e6ebf2'});
-    if(okS){B.over=sp.outcome;B.res={title:sp.label+' — 성공!',lines:[]};logB(sp.label+' — 성공했다!','me');afx({type:'text',target:'e0',text:'낙인이 부서진다',color:'#ffffff',delay:300})}
-    else{logB(sp.label+' — '+sp.failText,'foe');if(sp.failHp){h.hp=Math.max(0,h.hp+sp.failHp);logB('HP '+sp.failHp,'foe');afx({type:'hit',target:'hero',val:-sp.failHp,delay:300})}}
+    afx({type:'cast',from:'hero',to:b.uid,color:'#e6ebf2'});
+    if(okS){B.over=sp.outcome;B.res={title:sp.label+' — 성공!',lines:[]};logB(sp.label+' — 성공했다!','me');afx({type:'text',target:b.uid,text:'낙인이 부서진다',color:'#ffffff',delay:300})}
+    else{logB(sp.label+' — '+sp.failText,'foe');if(sp.failHp){const dm=hurt(u,-sp.failHp,'psychic');if(dm)logB('HP -'+dm,'foe')}}
   }
 }
-function allyAct(){
-  const B=S.battle,a=B.ally,e=target();if(!e)return;
-  const id=eid(e),r=d(20),crit=r===20,hit=r!==1&&(crit||r+a.atk>=e.ac);
-  afx({type:'lunge',who:'ally',dir:1});
-  if(!hit){logB(a.name+'의 공격 — 빗나갔다','sys');afx({type:'miss',target:id,delay:fxDelay+260});return}
-  const dm=Math.max(1,rollDice(a.dmg,crit).total);hurt(e,dm);
-  logB(a.name+'의 공격 — '+e.name+'에게 '+(crit?'치명타! ':'')+dm+' 피해'+(e.hp<=0?' · 쓰러뜨렸다!':''),'sys');
-  afx({type:'hit',target:id,val:dm,crit,delay:fxDelay+260});
+function useAb(u,k,t,au){
+  const B=S.battle,ab=abOf(k),h=S.hero,lab=nm(u)+'의 '+ab.name;
+  B.tr[costKey(ab)]=0;
+  if(ab.mp)h.mp-=ab.mp;
+  if(ab.uses){const c=chOf(u);c[k]=usesLeft(u,k)-1}
+  const fx_=(x,txt,col)=>afx({type:'text',target:x.uid,text:txt,color:col||'#f0c75e'});
+  if(ab.kind==='attack'){
+    const P=profile(u,ab),sn=sneakOK(u,t,P),r=attack(u,t,P,{sneak:sn});
+    if(r.hit){if(sn)B.tr.sneak=true;applyOn(t,ab.onHit);if(ab.surface)setSurf(zk(t),ab.surface)}
+    if(P.dtype==='fire')fireTouch(zk(t));return;
+  }
+  if(ab.kind==='darts'){
+    const hits=[];afx({type:'cast',from:u.uid,to:t.uid,color:'#9fc8ff'});
+    for(let i=0;i<ab.darts;i++){const x=up(t)?t:alive().find(y=>!y.hid);if(!x)break;const dm=hurt(x,rollDice(ab.dmg).total,ab.dtype,{d:260+i*120});hits.push(nm(x)+' '+wtxt(dm,x))}
+    B.last={r:null,txt:ab.name+' — '+hits.join(', ')};logB(lab+' — '+hits.join(', ')+(t&&!up(t)?' · 쓰러뜨렸다!':''),'me');return;
+  }
+  if(ab.kind==='save'){
+    const tg=ab.area==='all'?alive():ab.area==='row'?zoneUnits(zk(t)):[t];
+    const dc=spellDC(u,ab),base=rollDice(ab.dmg).total+(u.kind==='hero'?(ab.addStat?statVal(ab.stat):0)+bsum('dmg'):0),parts=[];
+    tg.forEach((x,i)=>{
+      const sv=d(20)+saveMod(x,ab.save),okS=sv>=dc,v=okS?(ab.half?Math.floor(base/2):0):base;
+      afx({type:'cast',from:u.uid,to:x.uid,color:ab.dtype==='fire'?'#ffa95e':ab.dtype==='radiant'?'#ffe6a0':ab.dtype==='thunder'?'#d8c8ff':'#f0a8ff'});
+      if(v>0){const dm=hurt(x,v,ab.dtype,{d:300+i*90});parts.push(nm(x)+' '+(okS?'(내성 성공) ':'')+wtxt(dm,x)+(up(x)?'':' 쓰러짐'))}
+      else{parts.push(nm(x)+' 내성 성공');afx({type:'miss',target:x.uid,delay:fxDelay+300})}
+      if(!okS)applyOn(x,ab.onFail);
+    });
+    if(ab.surface&&t)setSurf(zk(t),ab.surface);
+    if(ab.dtype==='fire')[...new Set(tg.map(zk))].forEach(fireTouch);
+    if(ab.partyHeal)pcs().filter(p=>!p.out).forEach(p=>{const v=heal(p,rollDice(ab.partyHeal).total);if(v)parts.push(nm(p)+' HP +'+v)});
+    B.last={r:null,txt:ab.name+' — 내성 DC '+dc+' · 피해 '+base};
+    logB(lab+' — '+parts.join(' · '),'me');return;
+  }
+  if(ab.kind==='sweep'){const P=profile(u,ab);alive().filter(x=>canMelee(u,x,false)).forEach(x=>{attack(u,x,P);fxDelay+=220});return}
+  if(ab.kind==='pierce'){
+    const P=profile(u,ab);attack(u,t,P);
+    const back=t.row==='front'?alive().find(x=>x.row==='back'&&!x.hid):null;
+    if(back){fxDelay+=260;attack(u,back,P)}return;
+  }
+  if(ab.kind==='heal'){
+    const a=U(au),v=heal(a,rollDice(ab.heal).total+(u.kind==='hero'&&ab.stat?statVal(ab.stat):0));
+    B.last={r:null,txt:ab.name+' → '+nm(a)+' HP +'+v};logB(lab+' — '+nm(a)+' HP +'+v,'me');return;
+  }
+  if(ab.kind==='self'){const v=heal(u,rollDice(ab.heal).total+(ab.healLv?h.level:0));B.last={r:null,txt:ab.name+' → HP +'+v};logB(lab+' — HP +'+v,'me');return}
+  if(ab.kind==='buff'){upPCs().forEach(p=>{p.buffs.push(Object.assign({t:ab.turns,name:ab.name},ab.buff));fx_(p,ab.name)});B.last={r:null,txt:ab.name+' — '+ab.desc};logB(lab+'! '+ab.desc,'me');return}
+  if(ab.kind==='debuffAll'){alive().forEach(e=>{for(const s in ab.status)e.st[s]=Math.max(e.st[s]||0,ab.status[s]);fx_(e,ab.name,'#c8ccd4')});B.last={r:null,txt:ab.name+' — '+ab.desc};logB(lab+'! '+ab.desc,'me');return}
+  if(ab.kind==='taunt'){alive().forEach(e=>{e.st.taunt=ab.turns;e.st.tauntBy=u.uid;fx_(e,'도발당함','#ff9a8a')});B.last={r:null,txt:ab.name};logB(lab+'! 적들이 '+josa(nm(u),'을')+' 노려본다','me');return}
+  if(ab.kind==='surface'){afx({type:'cast',from:u.uid,to:t.uid,color:'#8a7a5a'});logB(lab+' — '+zoneName(zk(t))+' 쪽으로 던졌다','me');setSurf(zk(t),ab.surface);B.last={r:null,txt:ab.name+' → '+zoneName(zk(t))};return}
 }
-function enemyTurn(){
-  const B=S.battle,def=B.def;
-  alive().slice().forEach(e=>{
-    if(B.over||S.hero.hp<=0)return;
-    const E=SC.enemies[e.id],id=eid(e);
-    if(e.st.poison){
-      const p=rollDice(e.st.poison.dmg).total;hurt(e,p);
-      logB(e.name+' — 독 피해 '+p+(e.hp<=0?' · 쓰러졌다!':''),'me');afx({type:'hit',target:id,val:p});fxDelay+=250;
-      if(--e.st.poison.t<=0)delete e.st.poison;
-      if(e.hp<=0)return;
-    }
-    if(e.st.stun>0){e.st.stun--;if(!e.st.stun)delete e.st.stun;logB(josa(e.name,'은')+' 얼어붙어 움직이지 못한다.','sys');afx({type:'text',target:id,text:'얼어붙음',color:'#9fd3ff'});fxDelay+=300;return}
-    if(E.boss&&def.hesitate&&ok(def.hesitate.if)&&Math.random()<def.hesitate.p){logB(def.hesitate.text,'sys');afx({type:'text',target:id,text:'머뭇거림',color:'#f0c75e'});fxDelay+=300;return}
-    let sk=null;
-    for(const s of arr(E.skills)){if(s.once&&e.used[s.name])continue;if(Math.random()<s.p){sk=s;break}}
-    if(sk&&sk.summon){
-      e.used[sk.name]=true;const ne=mkEnemy(sk.summon);ne.name+=' (불려 옴)';B.enemies.push(ne);
-      logB(e.name+' — '+sk.name+'! '+josa(ne.name,'이')+' 나타났다.','foe');afx({type:'text',target:id,text:sk.name,color:'#c8ccd4'});fxDelay+=350;return;
-    }
-    if(sk&&sk.debuff){
-      B.pb.push({atk:sk.debuff.atk,t:sk.debuff.turns,name:sk.name,neg:true});
-      logB(sk.text||(e.name+' — '+sk.name+'!'),'foe');afx({type:'text',target:'hero',text:sk.name+'! 명중 '+sk.debuff.atk,color:'#ff9a8a'});fxDelay+=400;return;
-    }
-    enemyAttack(e,E,sk);
-    fxDelay+=520;
+
+// ── 알아서 싸우기 (자동 동료, '자동' 단추)
+function bestFoe(u,P){const c=alive().filter(t=>canHit(u,t,P));return c.length?c.sort((a,b)=>a.hp-b.hp)[0]:null}
+function aiTurn(u){
+  const B=S.battle,r=R(u),sk=unitSkills(u),can=k=>!resWhy(u,k),dead=()=>B.over||!up(u)||checkEnd();
+  const setT=x=>{if(x)B.target=x.uid};
+  // 1) 쓰러진 동료를 살린다
+  const downed=pcs().find(p=>p!==u&&!up(p)&&!p.out);
+  if(downed){
+    const hk_=sk.find(k=>abOf(k).kind==='heal'&&can(k));
+    if(hk_)useAb(u,hk_,null,downed.uid);
+    else if(B.tr.act&&hpPotions().length)doIt(u,'give',hpPotions()[0],downed.uid);
+    else if(B.tr.act)doIt(u,'help',null,downed.uid);
+    if(dead())return;
+  }
+  // 2) 위급하면 스스로 회복하고, 크게 다친 동료를 돌본다
+  if(r.hp<r.hpMax*0.35){const s=sk.find(k=>abOf(k).kind==='self'&&can(k));if(s)useAb(u,s,null,null);else if(B.tr.bonus&&hpPotions().length)doIt(u,'drink',hpPotions()[0])}
+  const weak=upPCs().filter(p=>R(p).hp<R(p).hpMax*0.4).sort((a,b)=>R(a).hp/R(a).hpMax-R(b).hp/R(b).hpMax)[0];
+  if(weak){const s=sk.find(k=>abOf(k).kind==='heal'&&can(k));if(s)useAb(u,s,null,weak.uid)}
+  if(dead())return;
+  // 3) 보조 행동: 도발, 함성·찬가, 기름
+  const n=alive().length;
+  sk.forEach(k=>{const ab=abOf(k);if(B.over||!can(k)||ab.cost!=='bonus')return;
+    if(ab.kind==='taunt'&&n>=2&&u.row==='front'&&r.hp>r.hpMax*0.5&&!alive().some(e=>e.st.taunt))useAb(u,k);
+    else if(ab.kind==='buff'&&upPCs().length+n>=4&&!(u.buffs||[]).some(b=>!b.neg))useAb(u,k);
+    else if(ab.kind==='surface'&&B.tr.act){const rows=['front','back'].map(rw=>({z:'foe-'+rw,c:standing('foe',rw).length})).filter(x=>x.c>=2&&!(B.surf[x.z]&&B.surf[x.z].t==='oil'));
+      if(rows.length){const x=zoneUnits(rows[0].z)[0];setT(x);useAb(u,k,x)}}
   });
-  if(!alive().length&&!B.over)winBattle();
-}
-function enemyAttack(e,E,sk){
-  const B=S.battle,h=S.hero,id=eid(e);
-  const hm=((sk&&sk.hit)||0)-(e.st.weak?2:0);
-  let r=d(20);if(e.st.blind)r=Math.min(r,d(20));
-  const tot=r+e.atk+hm,ac=heroAC(),crit=r===20,hit=r!==1&&(crit||tot>=ac);
-  const nm=sk?e.name+'의 '+sk.name:e.name+'의 공격';
-  afx({type:'lunge',who:id,dir:-1});
-  if(!hit){logB(nm+' — 빗나갔다 ('+tot+' vs 방어 '+ac+')','foe');afx({type:'miss',target:'hero',delay:fxDelay+260});return}
-  if(S.flags.shield){delete S.flags.shield;logB(nm+' — 별빛 방벽이 막아 냈다!','sys');afx({type:'text',target:'hero',text:'방벽!',color:'#9fc8ff',delay:fxDelay+260});return}
-  let dm=Math.max(1,rollDice((sk&&sk.dmg)||e.dmg,crit).total);
-  if(B.ps.guard)dm=Math.ceil(dm/2);
-  h.hp=Math.max(0,h.hp-dm);
-  logB(nm+' — '+(crit?'치명타! ':'')+'그대에게 '+dm+' 피해'+(B.ps.guard?' (방어로 절반)':''),'foe');
-  afx({type:'hit',target:'hero',val:dm,crit,delay:fxDelay+260});
-  if(E.drain){const v=Math.max(1,Math.floor(dm*E.drain));e.hp=Math.min(e.hpMax,e.hp+v);logB(josa(e.name,'이')+' 피를 빨아 HP '+v+' 회복','foe')}
-  if(E.poison&&Math.random()<E.poison.p){B.ps.poison={t:E.poison.turns,dmg:E.poison.dmg};logB('독에 중독되었다! ('+E.poison.turns+'턴, 공격 불리)','foe');afx({type:'text',target:'hero',text:'중독',color:'#9be37a',delay:fxDelay+500})}
-}
-function endRound(){
-  const B=S.battle,h=S.hero;
-  if(B.ps.poison){
-    let p=rollDice(B.ps.poison.dmg).total;if(race()&&race().poisonResist)p=Math.ceil(p/2);
-    h.hp=Math.max(0,h.hp-p);logB('독 피해 '+p+(race()&&race().poisonResist?' (드워프: 절반)':''),'foe');afx({type:'hit',target:'hero',val:p});
-    if(--B.ps.poison.t<=0)delete B.ps.poison;
-    if(h.hp<=0){loseBattle();return}
+  if(dead())return;
+  // 4) 자리: 근접형은 앞열로, 원거리형은 뒷열로
+  const P0=profile(u,null);
+  if(B.tr.move&&!P0.ranged&&!P0.reach&&u.row==='back'&&!u.st.restrain)doIt(u,'move','front');
+  else if(B.tr.move&&P0.ranged&&u.row==='front'&&frontWall('foe')&&!oaFoes(u).length&&u.kind!=='hero')doIt(u,'move','back');
+  if(dead())return;
+  // 5) 행동: 가장 좋은 공격을 고른다
+  if(B.tr.act){
+    const opts=[];const P=profile(u,null),bt=bestFoe(u,P);
+    if(bt)opts.push({s:1,go:()=>{setT(bt);doIt(u,'attack')}});
+    // 불을 다루면 기름이 깔린 열을 노린다
+    const oilT=P.dtype==='fire'&&alive().find(x=>canHit(u,x,P)&&surfOf(x)==='oil');
+    if(oilT)opts.push({s:5,go:()=>{setT(oilT);doIt(u,'attack')}});
+    sk.forEach(k=>{const ab=abOf(k);if(!can(k)||ab.cost==='bonus')return;
+      if(ab.kind==='attack'){const Q=profile(u,ab),x=bestFoe(u,Q);if(x)opts.push({s:ab.mp===0?1.4:ab.uses?3:2.2,go:()=>{setT(x);useAb(u,k,x)}})}
+      else if(ab.kind==='darts'){const x=alive().find(y=>!y.hid);if(x)opts.push({s:2.4,go:()=>{setT(x);useAb(u,k,x)}})}
+      else if(ab.kind==='save'){
+        if(ab.area==='all'){if(n>=2)opts.push({s:1.4*n,go:()=>useAb(u,k,null)})}
+        else if(ab.area==='row'){const z=['front','back'].map(rw=>'foe-'+rw).sort((a,b)=>zoneUnits(b).length-zoneUnits(a).length)[0],c=zoneUnits(z).length;if(c>=2){const x=zoneUnits(z)[0];opts.push({s:1.6*c,go:()=>{setT(x);useAb(u,k,x)}})}}
+        else{const x=alive().filter(y=>!y.hid).sort((a,b)=>a.hp-b.hp)[0];if(x)opts.push({s:1.3,go:()=>{setT(x);useAb(u,k,x)}})}
+      }
+      else if(ab.kind==='sweep'){const c=alive().filter(x=>canMelee(u,x,false)).length;if(c>=2)opts.push({s:1.6*c,go:()=>useAb(u,k)})}
+      else if(ab.kind==='pierce'){const x=bestFoe(u,profile(u,ab));if(x)opts.push({s:x.row==='front'&&alive().some(y=>y.row==='back')?4:2.5,go:()=>{setT(x);useAb(u,k,x)}})}
+      else if(ab.kind==='debuffAll'&&n>=3)opts.push({s:3,go:()=>useAb(u,k)});
+    });
+    if(opts.length){opts.sort((a,b)=>b.s-a.s);opts[0].go()}
+    else if(!bt&&!P0.ranged&&B.tr.act){const x=alive().find(y=>!y.hid);if(x){setT(x);doIt(u,'throw','돌')}else doIt(u,'dodge')}
   }
-  B.ps.guard=false;
-  B.pb.forEach(b=>b.t--);B.pb=B.pb.filter(b=>b.t>0);
-  alive().forEach(e=>{['weak','blind'].forEach(k=>{if(e.st[k]){e.st[k]--;if(!e.st[k])delete e.st[k]}})});
-  B.round++;
 }
+
+// ── 전투 끝
 function winBattle(){
   const B=S.battle,h=S.hero,out=[],got=[];let xp=0,gold=0;
-  B.enemies.forEach(e=>{
-    const E=SC.enemies[e.id];
+  pcs().forEach(p=>{if(R(p).hp<=0){R(p).hp=1;out.push(nm(p)+' HP 1로 일어남')}});
+  foes().forEach(e=>{
+    const E=E_(e);
     let x=E.xp;if(e.lv<=h.level-3)x=Math.max(1,Math.floor(x/2));
     xp+=x;gold+=rint(E.gold[0],E.gold[1]);
     arr(E.drops).forEach(dr=>{if(dr.once&&S.flags[dr.once])return;if(Math.random()<dr.p){got.push(dr.item);if(dr.once)S.flags[dr.once]=true}});
   });
+  // 경험치는 파티가 나눠 갖는다 (동료는 그대의 레벨을 따라 자란다)
+  const n=pcs().length;if(n>1)xp=Math.max(1,Math.round(xp/n));
   h.xp+=xp;S.gold+=gold;got.forEach(i=>S.items.push(i));if(got.length)autoEquip();
-  out.push('경험치 +'+xp,'금화 +'+gold);got.forEach(i=>out.push('획득: '+i));
+  out.unshift('경험치 +'+xp+(n>1?' ('+n+'명이 나눔)':''),'금화 +'+gold);got.forEach(i=>out.push('획득: '+i));
   settle(out);
   B.over='win';B.res={title:'승리!',lines:out};
   logB('승리!','sys');
-  if(B.kind==='random')logp(nameList(B.def.enemies)+' 처치 (경험치 +'+xp+', 금화 +'+gold+(got.length?', '+got.join(', '):'')+')');
+  if(B.kind==='random')logp(nameList(foes().map(e=>e.id))+' 처치 (경험치 +'+xp+', 금화 +'+gold+(got.length?', '+got.join(', '):'')+')');
 }
 function loseBattle(){
   const B=S.battle;B.over='lose';
-  B.res={title:'패배…',lines:[B.kind==='story'?'쓰러졌지만, 이야기는 계속된다.':'그대는 쓰러졌다…']};
-  logB('그대는 쓰러졌다…','foe');
+  B.res={title:'패배…',lines:[B.kind==='story'?'모두 쓰러졌지만, 이야기는 계속된다.':'모두 쓰러졌다…']};
+  logB('모두 쓰러졌다…','foe');
 }
 function knockout(){
   const h=S.hero,k=SC.knockout||{};
   const toGate=k.gate&&ok(k.gate.if)&&k.gate.locs.includes(S.loc);
   const dest=toGate?'gate':SC.startLoc;
   S.loc=dest;h.hp=Math.ceil(h.hpMax/2);h.mp=Math.ceil(h.mpMax/2);
+  for(const id in (S.comp||{}))S.comp[id].hp=Math.max(S.comp[id].hp,Math.ceil(S.comp[id].hpMax/2));
   const lost=Math.floor(S.gold*0.25);S.gold-=lost;
   S.counters.falls=(S.counters.falls||0)+1;
   S.notice=tpl((k.text||'{place}에서 깨어났다.').replace('{place}',SC.locations[dest].name))+(lost?' (금화 -'+lost+')':'');
@@ -775,16 +1260,20 @@ function knockout(){
 }
 function endBattle(){
   const B=S.battle;if(!B||!B.over)return;
+  for(const id in (S.comp||{}))if(S.comp[id].hp<=0)S.comp[id].hp=1;
   S.battle=null;cmenu=null;
   if(B.kind==='story'){
     const key=B.over,def=B.def;
     const oc=def[key]||(key==='win'?def.win:def.lose);
-    if(key==='lose'||key==='fled'){const h=S.hero;h.hp=Math.max(1,Math.ceil(h.hpMax/4));S.counters.falls=(S.counters.falls||0)+1}
+    const h=S.hero;
+    if(key==='lose'||key==='fled'){h.hp=Math.max(1,Math.ceil(h.hpMax/4));S.counters.falls=(S.counters.falls||0)+1}
+    else if(h.hp<=0)h.hp=1;
     S.mode='event';
     applyOutcome(oc,{label:nameList(def.enemies),key:key==='lose'||key==='fled'?'fail':'success',battleEnd:key,extra:key==='win'?B.res.lines:null});
     save();render();toTop();return;
   }
   if(B.over==='lose')knockout();
+  else if(S.hero.hp<=0)S.hero.hp=1;
   S.mode='world';save();render();toTop();
 }
 
@@ -815,7 +1304,11 @@ function artSpec(){
   if(m==='event')return pickArt(ev().art)||loc;
   return loc;
 }
-function artInfo(){return {cls:S.cls||(S.mk&&S.mk.cls),relic:S.items?hasRelicSafe():false,battle:S.mode==='combat'?S.battle:null,heroHp:S.hero?S.hero.hp:1}}
+function artInfo(){
+  const B=S.mode==='combat'&&S.battle&&S.battle.units?S.battle:null;let bat=null;
+  if(B){const cu=curU();bat={over:!!B.over,surf:B.surf,field:B.field,units:B.units.map(u=>({id:u.uid,side:u.side,row:u.row,k:u.art,high:!!u.high,hid:!!u.hid,prone:!!u.st.prone,down:!up(u),cur:cu===u&&!B.over,target:B.target===u.uid}))}}
+  return {cls:S.cls||(S.mk&&S.mk.cls),relic:S.items?hasRelicSafe():false,battle:bat};
+}
 function hasRelicSafe(){try{return !!S.cls&&hasRelic()}catch(e){return false}}
 
 // ── 그리기
@@ -851,8 +1344,9 @@ function render(){
     renderChoices();renderMods();updateRollBtn();renderResult();
   }else if(m==='combat'){
     const B=S.battle;$('stitle').textContent='전투';
-    const seen={};B.enemies.forEach(e=>{const ds=SC.enemies[e.id].desc;if(ds&&!seen[e.id]){seen[e.id]=1;sc.appendChild(el('p',null,ds))}});
-    $('clock').textContent=L().name+' · 라운드 '+B.round+' · 그림의 적을 눌러 대상을 고를 수 있다';renderCombat();
+    const seen={};foes().forEach(e=>{const ds=SC.enemies[e.id].desc;if(ds&&!seen[e.id]){seen[e.id]=1;sc.appendChild(el('p',null,ds))}});
+    const f=B.field,fl=[];if(f.high)fl.push('고지대');if(f.cover)fl.push('엄폐물 (숨기 유리)');if(f.water)fl.push('물');if(f.rain)fl.push('비 (불이 빨리 꺼짐)');
+    $('clock').textContent=L().name+' · 라운드 '+B.round+(fl.length?' · 지형: '+fl.join(', '):'')+' · 그림을 눌러 대상을 고를 수 있다';renderCombat();
   }else if(m==='end'){
     $('stitle').textContent='제1장 끝';
     para(['그대의 선택과 주사위가 새긴 이야기는 이렇게 기록되었다.','이 기록은 제2장으로 그대로 이어진다. 그때까지 세상은 열려 있다 — 계속 사냥하며 힘을 기를 수 있다.']);
@@ -877,6 +1371,12 @@ function renderHud(){
   line.appendChild(document.createTextNode('공격 명중 '+sign(weaponHit())+' · 피해 '+w.dice+sign(weaponDmgBonus())+(w.crit?' ('+w.crit+'~20 치명타)':'')+' · 방어 '+heroAC()+' · 숙련 +'+profBonus()+' · '));
   const ins=el('span','insp','영감 '+'✦'.repeat(S.insp||0)+'·'.repeat(Math.max(0,max-(S.insp||0))));ins.title='배경다운 선택을 하면 쌓이고, 실패한 판정을 다시 굴릴 때 쓴다';line.appendChild(ins);
   c.appendChild(line);
+  const pt=party();
+  if(pt.length||S.mode==='world'){
+    const pl=el('div','mini');
+    pl.textContent=(pt.length?'동료: '+pt.map(id=>COMP(id).name+' '+S.comp[id].hp+'/'+S.comp[id].hpMax).join(' · ')+' · ':'')+'짧은 휴식 '+((S.rest&&S.rest.short)||0)+'/2 · 야영 물자 '+countItem('야영 물자');
+    c.appendChild(pl);
+  }
   const st=el('div','stats');
   S.stats.forEach(s=>{const dv=el('div','stat');if(s.note)dv.title=s.note;dv.appendChild(el('span','sub',s.n));dv.appendChild(el('b',null,sign(s.v)));st.appendChild(dv)});
   c.appendChild(st);
@@ -903,7 +1403,9 @@ function renderWorld(){
   arr(l.actions).filter(a=>ok(a.if)).forEach(a=>actBtn(acts,a.label,null,()=>startEvent(a.event),{star:a.star}));
   if(l.encounters)actBtn(acts,'사냥한다','전투를 벌여 경험치와 금화를 얻는다 · 이곳의 적 레벨 '+l.lv,()=>{S.notice=null;startRandomBattle(false)});
   if(l.encounters||arr(l.explore).length)actBtn(acts,'탐색한다','무언가를 찾아내거나, 무언가와 마주친다',explore);
-  if(canRest())actBtn(acts,tpl(l.rest),'HP·마력 모두 회복',rest,{disabled:h.hp>=h.hpMax&&h.mp>=h.mpMax});
+  if(canRest()){const sup=countItem('야영 물자');actBtn(acts,'긴 휴식 — '+tpl(l.rest),l.restFree?'모두 회복 · 짧은 휴식과 기술 충전':sup?'야영 물자 1 (보유 '+sup+') · 모두 회복 · 짧은 휴식과 기술 충전':'야영 물자가 없다 — 절반만 회복',longRest)}
+  const sr=(S.rest&&S.rest.short)||0;
+  actBtn(acts,'짧은 휴식 ('+sr+'/2)','HP 절반 회복 · 짧은 휴식 기술 충전'+(S.cls==='mage'?' · 마력 절반 회복':'')+(S.cls==='bard'?' · 휴식의 노래 +1d6':'')+' · 긴 휴식으로 다시 채운다',shortRest,{disabled:sr<=0});
   if(l.shop)actBtn(acts,(shopOpen?'▾ ':'▸ ')+l.shop.name,'물약과 장비를 판다 · 금화 '+S.gold,()=>{shopOpen=!shopOpen;render()});
   if(l.shop&&shopOpen){
     const sh=el('div');sh.style.marginTop='6px';acts.appendChild(sh);
@@ -933,6 +1435,8 @@ function renderWorld(){
   const gl=el('div');gl.appendChild(el('b',null,'★ '));gl.appendChild(document.createTextNode(goalText()));q.appendChild(gl);
   arr(SC.quests).filter(x=>ok(x.if)).forEach(x=>{const d1=el('div');d1.style.marginTop='6px';d1.appendChild(el('b',null,x.name+' '));d1.appendChild(el('span','sub',tpl(x.t)));q.appendChild(d1)});
 
+  renderParty(box);
+
   box.appendChild(el('h2',null,'기술 판정'));
   const skc=el('div','card');box.appendChild(skc);
   skc.appendChild(el('div','sub','d20 + 능력치 + 숙련(●, 전문 ●●) 보너스. 이야기 선택지의 [기술] 판정에 쓰인다.'));
@@ -952,7 +1456,12 @@ function renderWorld(){
     const it=SC.items[n]||{};
     const row=el('div','item'),info=el('div');
     info.appendChild(el('b',null,n+(counts[n]>1?' ×'+counts[n]:'')+' '));info.appendChild(el('span','sub','['+(it.kind||'소지품')+'] '+itemInfo(n)));row.appendChild(info);
-    if(it.use){const b=el('button',null,'사용');b.disabled=(it.use.hp&&h.hp>=h.hpMax&&!it.use.mp)||(it.use.mp&&h.mp>=h.mpMax&&!it.use.hp);b.onclick=()=>useItem(n);row.appendChild(b)}
+    if(it.use){
+      const bx=el('div','row');bx.style.flex='none';bx.style.gap='4px';
+      const b=el('button',null,Object.keys(S.comp||{}).length&&it.use.hp?'그대':'사용');b.disabled=(it.use.hp&&h.hp>=h.hpMax&&!it.use.mp)||(it.use.mp&&h.mp>=h.mpMax&&!it.use.hp);b.onclick=()=>useItem(n);bx.appendChild(b);
+      if(it.use.hp)Object.keys(S.comp||{}).forEach(id=>{const c=S.comp[id],b2=el('button',null,COMP(id).name);b2.disabled=c.hp>=c.hpMax;b2.onclick=()=>useItem(n,id);bx.appendChild(b2)});
+      row.appendChild(bx);
+    }
     inv.appendChild(row);
   });
 
@@ -961,7 +1470,7 @@ function renderWorld(){
   clsSkills().forEach(k=>{
     const s=SC.combatSkills[k],known=s.lv<=h.level;
     const d1=el('div');if(!known)d1.style.opacity='.5';
-    d1.appendChild(el('b',null,s.name+' '));d1.appendChild(el('span','sub','[전투 · 마력 '+s.mp+'] '+s.desc+(known?'':' · 레벨 '+s.lv+'에 익힌다')));sk.appendChild(d1);
+    d1.appendChild(el('b',null,s.name+' '));d1.appendChild(el('span','sub','['+abCost(s)+(s.uses&&known?', 남은 '+usesLeft({kind:'hero'},k):'')+'] '+s.desc+(known?'':' · 레벨 '+s.lv+'에 익힌다')));sk.appendChild(d1);
   });
   S.skills.forEach(id=>{
     const s=SC.skillDefs[id];if(!s)return;
@@ -978,6 +1487,29 @@ function renderWorld(){
   const lb=el('label','sub'),cb=el('input');cb.type='checkbox';cb.id='karmic';cb.checked=!!(S.opt&&S.opt.karmic);
   cb.onchange=()=>{S.opt.karmic=cb.checked;save()};
   lb.appendChild(cb);lb.appendChild(document.createTextNode(' 업보 주사위 — 이야기 판정에서 두 번 연달아 실패하면 다음 판정이 유리해진다'));so.appendChild(lb);
+  const la=el('label','sub'),ca=el('input');ca.type='checkbox';ca.id='autocomp';ca.checked=!!S.opt.autoComp;
+  ca.onchange=()=>{S.opt.autoComp=ca.checked;save()};
+  la.appendChild(ca);la.appendChild(document.createTextNode(' 동료 자동 전투 — 동료의 차례를 알아서 진행한다 (그대의 차례만 고른다)'));la.style.display='block';la.style.marginTop='6px';so.appendChild(la);
+}
+// 동료와 전투 시작 위치
+function renderParty(box){
+  const ids=Object.keys(SC.companions||{}).filter(compKnown);
+  box.appendChild(el('h2',null,'동료와 진형'));
+  const pc=el('div','card');box.appendChild(pc);
+  pc.appendChild(el('div','sub','전투는 앞열·뒷열로 나뉜다. 근접 공격은 앞열에서만 하고, 적의 근접 공격은 앞열에 선 자가 있는 한 뒷열에 닿지 않는다. 시작 위치를 정해 두자.'));
+  const rowSeg=id=>{const sg=el('div','seg');sg.style.marginTop='4px';['front','back'].forEach(r=>{const b=el('button',rowPref(id)===r?'on':'',ROWN[r]);b.onclick=()=>{S.rows[id]=r;save();render()};sg.appendChild(b)});return sg};
+  const me=el('div');me.style.marginTop='8px';me.appendChild(el('b',null,S.hero.name+' '));me.appendChild(el('span','sub','시작 위치'));me.appendChild(rowSeg('hero'));pc.appendChild(me);
+  if(!ids.length){pc.appendChild(el('div','sub','아직 함께하는 동료가 없다. 숲과 계단에서 누군가를 만날지도 모른다.'));return}
+  ids.forEach(id=>{
+    const C=COMP(id),r=S.comp[id],here=compHere(id),d1=el('div');d1.style.marginTop='10px';
+    const t=el('div','hudtop');t.appendChild(el('b',null,C.name+' · '+C.title));t.appendChild(el('span','mini',here?'함께 있다':'지금은 떨어져 있다'));d1.appendChild(t);
+    if(r){d1.appendChild(el('div','mini','HP '+r.hp+'/'+r.hpMax+' · 방어 '+C.ac+' · '+C.attack.name+' 명중 '+sign(C.attack.hit+lvB())+' 피해 '+C.attack.dice+sign(C.attack.dmgB+lvB())+(C.attack.ranged?' (원거리)':C.attack.reach?' (긴 창)':'')));d1.appendChild(bar('var(--hp)',r.hp,r.hpMax))}
+    d1.appendChild(el('div','sub',C.blurb));
+    if(!here&&C.awayText)d1.appendChild(el('div','sub',C.awayText));
+    (C.skills||[]).forEach(k=>{const ab=SC.combatSkills[k],kn=ab.lv<=S.hero.level;const x=el('div','sub');if(!kn)x.style.opacity='.6';x.textContent='· '+ab.name+' ['+abCost(ab)+(ab.uses&&kn&&r?', 남은 '+usesLeft({kind:'comp',id},k):'')+'] '+ab.desc+(kn?'':' · 레벨 '+ab.lv);d1.appendChild(x)});
+    const rl=el('div','sub','시작 위치');rl.style.marginTop='4px';d1.appendChild(rl);d1.appendChild(rowSeg(id));
+    pc.appendChild(d1);
+  });
 }
 function itemInfo(n){
   const it=SC.items[n]||{};
@@ -1009,39 +1541,77 @@ function mapSvg(){
   return svg;
 }
 
+function stTags(u){
+  const t=[],st=u.st||{};
+  if(st.stun)t.push('얼어붙음');if(st.poison)t.push('독 '+st.poison.t);if(st.weak)t.push('명중 -2');if(st.blind)t.push('연막');if(st.burn)t.push('불붙음');
+  if(st.prone)t.push('넘어짐');if(st.restrain)t.push('속박');if(st.wet)t.push('젖음');if(st.taunt)t.push('도발당함');
+  if(u.hid)t.push('숨음');if(u.high)t.push('고지대');if(u.dodge)t.push('회피');
+  (u.buffs||[]).forEach(b=>t.push(b.name+' '+['atk','dmg','ac'].filter(k=>b[k]).map(k=>({atk:'명중',dmg:'피해',ac:'방어'})[k]+sign(b[k])).join(' ')+' ('+b.t+')'));
+  return t;
+}
+function zoneHead(label,z){
+  const s=S.battle.surf[z],side=z.split('-')[0],d0=el('div','zone');
+  d0.appendChild(el('b',null,label));
+  if(s)d0.appendChild(el('span','surf '+s.t,SURF[s.t].n+(s.r<90?' · '+s.r+'라운드':'')));
+  if(z.endsWith('back')&&canClimb(side))d0.appendChild(el('span','surf high','고지대'));
+  return d0;
+}
+function foeCard(e,u){
+  const B=S.battle,P=u?profile(u,null):null,b=el('button','foe'+(B.target===e.uid&&up(e)?' on':'')+(up(e)?'':' dead'));
+  const t=el('div','hudtop');t.appendChild(el('b',null,e.name));
+  let info='Lv '+e.lv+' · 방어 '+acOf(e);
+  if(up(e)&&u&&!B.over)info+=canHit(u,e,P)?' · 명중 '+pct(hitP(u,e,P)):' · 닿지 않음';
+  t.appendChild(el('span','mini',info));b.appendChild(t);
+  b.appendChild(bar('var(--foe)',e.hp,e.hpMax));
+  const ln=el('div','mini','HP '+e.hp+'/'+e.hpMax+(up(e)?'':' · 쓰러짐'));
+  const tags=up(e)?stTags(e):[];if(tags.length)ln.appendChild(el('span','tag',' · '+tags.join(' · ')));
+  b.appendChild(ln);
+  b.disabled=!up(e)||!!B.over||rolling;
+  b.onclick=()=>{B.target=e.uid;save();renderCombat()};
+  return b;
+}
+function pcCard(p){
+  const B=S.battle,r=R(p),c=el('div','foe pc'+(curU()===p&&!B.over?' on':'')+(up(p)?'':' down'));
+  const t=el('div','hudtop');t.appendChild(el('b',null,(curU()===p&&!B.over?'▶ ':'')+p.name));
+  t.appendChild(el('span','mini','방어 '+acOf(p)+(p.kind==='hero'?' · 마력 '+S.hero.mp+'/'+S.hero.mpMax:'')));c.appendChild(t);
+  c.appendChild(bar('var(--hp)',r.hp,r.hpMax));
+  let s='HP '+r.hp+'/'+r.hpMax;
+  if(!up(p))s+=p.out?' · 의식 잃음':p.stable?' · 쓰러짐 (안정)':' · 쓰러짐 — 죽음 내성 성공 '+'●'.repeat(p.saves.s)+'○'.repeat(Math.max(0,3-p.saves.s))+' 실패 '+'●'.repeat(Math.min(3,p.saves.f))+'○'.repeat(Math.max(0,3-p.saves.f));
+  const ln=el('div','mini',s);const tags=up(p)?stTags(p):[];if(tags.length)ln.appendChild(el('span','tag',' · '+tags.join(' · ')));
+  c.appendChild(ln);
+  return c;
+}
 function renderCombat(){
-  const B=S.battle,box=$('combat'),h=S.hero;box.innerHTML='';
+  const B=S.battle,box=$('combat');box.innerHTML='';
+  const u=curU(),mine=myTurn();
+  // 주도권 순서
+  const ib=el('div','initbar');
+  B.order.forEach((id,i)=>{const x=U(id);if(!x||(x.side==='foe'&&!up(x))||x.out)return;
+    ib.appendChild(el('span','ini s-'+x.side+(i===B.turn&&!B.over?' cur':'')+(up(x)?'':' down'),x.name.replace(' (불려 옴)','')))});
+  box.appendChild(ib);
+  // 적과 아군, 열마다
   box.appendChild(el('h2',null,'적'+(alive().length>1?' — 눌러서 대상 고르기':'')));
-  const foes=el('div','foes');box.appendChild(foes);
-  B.enemies.forEach((e,i)=>{
-    const b=el('button','foe'+(i===B.target&&e.hp>0?' on':'')+(e.hp<=0?' dead':''));
-    const t=el('div','hudtop');t.appendChild(el('b',null,e.name));t.appendChild(el('span','mini','Lv '+e.lv+' · 방어 '+e.ac+(e.hp>0&&!B.over?' · 명중 '+pct(hitChance(e,weaponHit(),wpn().crit||20)):'')));b.appendChild(t);
-    b.appendChild(bar('var(--foe)',e.hp,e.hpMax));
-    const st=[];if(e.st.stun)st.push('얼어붙음 (공격 유리)');if(e.st.poison)st.push('독 '+e.st.poison.t);if(e.st.weak)st.push('명중 -2');if(e.st.blind)st.push('연막 (공격 유리)');
-    const ln=el('div','mini','HP '+e.hp+'/'+e.hpMax+(e.hp<=0?' · 쓰러짐':''));if(st.length)ln.appendChild(el('span','tag',' · '+st.join(' · ')));
-    if(i===B.target&&e.hp>0&&alive().length>1)ln.appendChild(el('span','tag',' · 대상'));
-    b.appendChild(ln);
-    b.disabled=e.hp<=0||!!B.over||rolling;
-    b.onclick=()=>{B.target=i;save();renderCombat()};
-    foes.appendChild(b);
+  ['front','back'].forEach(row=>{
+    const z='foe-'+row,list=foes().filter(e=>e.row===row);if(!list.length&&!B.surf[z])return;
+    box.appendChild(zoneHead('적 '+ROWN[row],z));
+    const g=el('div','foes two');list.forEach(e=>g.appendChild(foeCard(e,mine?u:null)));box.appendChild(g);
   });
-  const info=[];
-  if(B.ally)info.push('함께 싸움: '+B.ally.name+' (명중 '+sign(B.ally.atk)+', 피해 '+B.ally.dmg+')');
-  const me=[];B.pb.forEach(b=>me.push(b.name+' '+['atk','dmg','ac'].filter(k=>b[k]).map(k=>({atk:'명중',dmg:'피해',ac:'방어'})[k]+sign(b[k])).join(' ')+' ('+b.t+'턴)'));
-  if(B.ps.poison)me.push('중독 '+B.ps.poison.t+'턴 (공격 불리)');if(S.flags.shield)me.push('별빛 방벽');
-  if(me.length)info.push('그대: '+me.join(' · '));
-  if(info.length){const ic=el('div','sub',info.join('  ·  '));ic.style.marginTop='8px';box.appendChild(ic)}
+  box.appendChild(el('h2',null,'아군'));
+  ['front','back'].forEach(row=>{
+    const z='pc-'+row,list=pcs().filter(p=>p.row===row);if(!list.length&&!B.surf[z])return;
+    box.appendChild(zoneHead('아군 '+ROWN[row],z));
+    const g=el('div','foes two');list.forEach(p=>g.appendChild(pcCard(p)));box.appendChild(g);
+  });
 
-  box.appendChild(el('h2',null,'행동'));
+  box.appendChild(el('h2',null,B.over?'전투 끝':mine?josa(u.name,'의')+' 차례 · 라운드 '+B.round:'라운드 '+B.round));
   const card=el('div','card');box.appendChild(card);
   const dr=el('div','row');card.appendChild(dr);
   const dw=el('div','die');dw.style.width='92px';dw.style.height='92px';dw.appendChild(dieSvg('cshape','cnum',B.last&&B.last.r));dr.appendChild(dw);
   const cc=el('div');cc.style.flex='1';cc.style.minWidth='160px';
-  const tg=target();
-  cc.appendChild(el('div','sub',B.over?'전투가 끝났다':rolling?'굴리는 중…':'라운드 '+B.round+' · 그대의 차례'+(tg?' · 대상: '+tg.name:'')));
+  const t=tgtU();
+  cc.appendChild(el('div','sub',B.over?'전투가 끝났다':rolling?'굴리는 중…':mine?ROWN[u.row]+(u.high?' (고지대)':'')+(t&&up(t)?' · 대상: '+t.name:''):''));
   cc.appendChild(el('div',null,B.last?B.last.txt:'행동을 고르면 주사위를 굴린다'));
-  const am=tg&&!B.over?atkMode(tg):null;
-  if(am&&am.mode!=='normal')cc.appendChild(el('div','sub',(am.mode==='adv'?'유리: '+am.adv.join(', '):'불리: '+am.dis.join(', '))+' — d20 두 개를 굴린다'));
+  if(mine&&t&&up(t)){const am=atkMode(u,t,profile(u,null));if(am.mode!=='normal')cc.appendChild(el('div','sub',(am.mode==='adv'?'유리: '+am.adv.join(', '):'불리: '+am.dis.join(', '))+' — d20 두 개를 굴린다'))}
   dr.appendChild(cc);
 
   if(B.over){
@@ -1050,40 +1620,68 @@ function renderCombat(){
     if(B.res.lines.length){const cs=el('div','chips');B.res.lines.forEach(l=>cs.appendChild(el('span','chip',l)));r.appendChild(cs)}
     card.appendChild(r);
     const nb=el('button','next','계속 →');nb.onclick=endBattle;card.appendChild(nb);
-  }else{
-    const grid=el('div','acts');grid.style.marginTop='10px';card.appendChild(grid);
-    const add=(label,small,fn,dis,cl)=>{const b=el('button',cl||'');b.appendChild(el('b',null,label));if(small)b.appendChild(el('small',null,small));b.disabled=!!dis||rolling;b.onclick=fn;grid.appendChild(b);return b};
-    const w=wpn();
-    add('공격','명중 '+(tg?pct(hitChance(tg,weaponHit(),w.crit||20)):'-')+' · '+w.dice+sign(weaponDmgBonus()),()=>act('attack'));
-    const ks=knownSkills();
-    add((cmenu==='skill'?'▾ ':'')+'기술',ks.length?'마력 '+h.mp+'/'+h.mpMax:'없음',()=>{cmenu=cmenu==='skill'?null:'skill';renderCombat()},!ks.length,cmenu==='skill'?'on':'');
+  }else if(mine){
+    const tr=B.tr,pp=el('div','pips');
+    [['act','행동'],['bonus','보조 행동'],['move','이동']].forEach(([k,n])=>pp.appendChild(el('span',tr[k]?'on':'',(tr[k]?'● ':'○ ')+n)));
+    card.appendChild(pp);
+    const grid=el('div','acts');card.appendChild(grid);
+    const add=(label,small,fn,c,cl)=>{const b=el('button',cl||'');b.appendChild(el('b',null,label));if(small)b.appendChild(el('small',null,small));b.disabled=!(c.ok||c.pick)||rolling;b.onclick=fn;grid.appendChild(b);return b};
+    const tog=m=>()=>{cmenu=cmenu===m?null:m;renderCombat()};
+    const P=profile(u,null);let c=canDo(u,'attack');
+    add(P.name,c.ok?'행동 · 명중 '+pct(hitP(u,t,P))+' · '+P.dice:c.why,()=>pcAct('attack'),c);
+    const ks=unitSkills(u);
+    add((cmenu==='skill'?'▾ ':'')+'기술',!ks.length?'없음':u.kind==='hero'&&ks.some(k=>abOf(k).mp)?'마력 '+S.hero.mp+'/'+S.hero.mpMax:ks.length+'개',tog('skill'),{ok:ks.length>0},cmenu==='skill'?'on':'');
+    const mo=moveOpts(u);
+    add((cmenu==='move'?'▾ ':'')+'이동',mo.length?'지금 '+ROWN[u.row]+(u.high?' · 고지대':''):tr.move?'움직일 수 없다':'이동을 썼다',tog('move'),{ok:mo.length>0},cmenu==='move'?'on':'');
     const its=[...new Set(S.items.filter(n=>SC.items[n]&&SC.items[n].battle))];
-    add((cmenu==='item'?'▾ ':'')+'물품',its.length?its.length+'종':'없음',()=>{cmenu=cmenu==='item'?null:'item';renderCombat()},!its.length,cmenu==='item'?'on':'');
-    add('방어','피해 절반 · 마력 +1',()=>act('guard'));
-    add('도망',B.def.noFlee?'도망칠 수 없다':'민첩 판정',()=>act('flee'),!!B.def.noFlee);
-    arr(B.def.special).filter(sp=>ok(sp.if)).forEach(sp=>{
-      const {dc,why}=specialDC(sp),bonus=statVal(sp.stat)+profBonus();
-      add('✦ '+sp.label,sp.stat+' '+sign(bonus)+' vs DC '+dc+(why.length?' ('+why.join(', ')+')':'')+' · 성공 '+pct(chance(bonus,dc,'normal',0,{lucky:race()&&race().lucky}))+' · 마력 '+sp.mp+' · '+sp.note,()=>act('special',sp.id),!specialReady(sp),'wide');
+    add((cmenu==='item'?'▾ ':'')+'물품·던지기',its.length?its.length+'종':'돌 던지기',tog('item'),{ok:true},cmenu==='item'?'on':'');
+    c=canDo(u,'shove');add('밀치기',c.ok?'행동 · 성공 '+pct(shoveP(u,t))+' · 뒷열로 밀고 넘어뜨림':c.why,()=>pcAct('shove'),c);
+    c=canDo(u,'hide');add('숨기',c.ok?(rogue(u)?'보조':'행동')+' · 성공 '+pct(chance(hideMod(u),hideDC(),B.field.cover?'adv':'normal',0,{}))+(B.field.cover?' (엄폐 유리)':''):c.why,()=>pcAct('hide'),c);
+    if(pcs().some(p=>!up(p)&&!p.out)){c=canDo(u,'help');add('돕기',c.ok||c.pick?'행동 · 쓰러진 동료를 HP 1로':c.why,()=>pcAct('help'),c)}
+    c=canDo(u,'dodge');add('회피',c.ok?'행동 · 받는 공격 불리'+(u.kind==='hero'?', 마력 +1':''):c.why,()=>pcAct('dodge'),c);
+    if(rogue(u)){c=canDo(u,'dis');add('물러서기',c.ok?'보조 · 기회 공격 없이 물러남':'쓸 수 없다',()=>pcAct('dis'),c)}
+    if(u.kind==='hero'){const fi=fleeInfo();c=canDo(u,'flee');add('도망',c.ok?'행동 · 민첩 '+sign(fi.bonus)+' vs '+fi.dc+' · '+pct(chance(fi.bonus,fi.dc,'normal',0,{})):c.why,()=>pcAct('flee'),c)}
+    add('자동','이 차례는 알아서 싸운다',autoNow,{ok:true});
+    add('턴 끝 →',spent()?'':'남은 행동을 버린다',endTurn,{ok:true},'go');
+    if(u.kind==='hero')arr(B.def.special).filter(sp=>ok(sp.if)).forEach(sp=>{
+      const {dc,why}=specialDC(sp),bonus=statVal(sp.stat)+profBonus();c=canDo(u,'special',sp.id);
+      add('✦ '+sp.label,sp.stat+' '+sign(bonus)+' vs DC '+dc+(why.length?' ('+why.join(', ')+')':'')+' · 성공 '+pct(chance(bonus,dc,'normal',0,{lucky:race()&&race().lucky}))+' · 마력 '+sp.mp+' · '+sp.note,()=>pcAct('special',sp.id),c,'wide');
     });
-    if(cmenu==='skill'){
-      const sub=el('div');sub.style.marginTop='8px';card.appendChild(sub);
-      ks.forEach(k=>{
-        const s=SC.combatSkills[k];let ch='';
-        if(tg&&s.act==='attack')ch=' · 명중 '+pct(hitChance(tg,s.weapon?weaponHit(s.hit):spellHit(s),Math.min(s.weapon?(w.crit||20):20,s.crit||20)));
-        if(s.auto)ch=' · 반드시 맞음';
-        actBtn(sub,s.name+' (마력 '+s.mp+')',s.desc+ch,()=>act('skill',k),{disabled:h.mp<s.mp||rolling});
-      });
-    }
+    const sub=el('div');sub.style.marginTop='8px';
+    if(cmenu==='skill')ks.forEach(k=>{
+      const ab=abOf(k),c=canDo(u,'skill',k);let s=ab.desc+' · '+abCost(ab)+(ab.uses?' (남은 '+usesLeft(u,k)+')':'');
+      if(t&&up(t)){
+        if(ab.kind==='attack'||ab.kind==='pierce'){const Q=profile(u,ab);s+=canHit(u,t,Q)?' · 명중 '+pct(hitP(u,t,Q)):''}
+        else if(ab.kind==='save'&&ab.area!=='all')s+=' · '+(ab.area==='row'?zoneName(zk(t))+' '+zoneUnits(zk(t)).length+'명 · ':'')+'내성 실패 '+pct(failP(t,ab.save,spellDC(u,ab)));
+        else if(ab.kind==='surface')s+=' · '+zoneName(zk(t));
+      }
+      if(!(c.ok||c.pick))s=c.why+' · '+s;
+      actBtn(sub,ab.name,s,()=>pcAct('skill',k),{disabled:!(c.ok||c.pick)||rolling});
+    });
+    if(cmenu==='move')mo.forEach(o=>actBtn(sub,o.label,o.small,()=>pcAct('move',o.id),{disabled:rolling}));
     if(cmenu==='item'){
-      const sub=el('div');sub.style.marginTop='8px';card.appendChild(sub);
-      its.forEach(n=>actBtn(sub,n+' ×'+countItem(n),SC.items[n].desc,()=>act('item',n),{disabled:rolling}));
+      its.forEach(n=>{
+        const it=SC.items[n],cnt=' ×'+countItem(n);
+        if(it.use){
+          const c1=canDo(u,'drink',n);actBtn(sub,n+cnt+' — 마신다',(c1.ok?'보조 행동 · ':c1.why+' · ')+it.desc,()=>pcAct('drink',n),{disabled:!c1.ok||rolling});
+          if(it.use.hp&&pcs().length>1){const c2=canDo(u,'give',n);actBtn(sub,n+' — 동료에게 먹인다',(c2.ok||c2.pick?'행동 · ':c2.why+' · ')+'쓰러진 동료도 일으킨다',()=>pcAct('give',n),{disabled:!(c2.ok||c2.pick)||rolling})}
+        }else if(it.throw){const c3=canDo(u,'throw',n);actBtn(sub,n+cnt+' — 던진다',(c3.ok?'행동 · '+(t?zoneName(zk(t))+' · ':''):c3.why+' · ')+it.desc,()=>pcAct('throw',n),{disabled:!c3.ok||rolling})}
+      });
+      const c4=canDo(u,'throw','돌'),RP=rockP(u);actBtn(sub,'돌 던지기',(c4.ok?'행동 · 명중 '+pct(hitP(u,t,RP))+' · ':c4.why+' · ')+'원거리 '+RP.dice,()=>pcAct('throw','돌'),{disabled:!c4.ok||rolling});
     }
+    if(cmenu&&cmenu.pick){
+      sub.appendChild(el('div','sub','누구에게?'));
+      pcs().forEach(p=>{const c=canDo(u,cmenu.pick,cmenu.arg,p.uid);if(!c.ok)return;actBtn(sub,p.name,'HP '+R(p).hp+'/'+R(p).hpMax+(up(p)?'':' · 쓰러짐'),()=>pcAct(cmenu.pick,cmenu.arg,p.uid),{disabled:rolling})});
+      actBtn(sub,'취소',null,()=>{cmenu=null;renderCombat()});
+    }
+    if(sub.children.length)card.appendChild(sub);
   }
 
   box.appendChild(el('h2',null,'전투 기록'));
   const lc=el('div','card');box.appendChild(lc);
   const ul=el('ul','clog');lc.appendChild(ul);
-  B.log.slice(-12).reverse().forEach(x=>{const li=el('li',x.k+(x.r<B.round-1?' old':''),x.t);ul.appendChild(li)});
+  B.log.slice(-14).reverse().forEach(x=>ul.appendChild(el('li',x.k+(x.r<B.round-1?' old':''),x.t)));
+  if(window.Art)Art.redraw();
 }
 
 // ── 사건 화면 (선택지 · 판정 · 결과)
@@ -1262,8 +1860,9 @@ $('freset').onclick=()=>{fhist=[];ftype=20;$('fres').textContent='';$('fhist').t
 
 // ── 시작
 S=restore()||fresh();
+if(S.hero)syncComps();
 if(window.Art){
   Art.mount($('art'),artInfo);
-  Art.onPick(i=>{const B=S.battle;if(S.mode==='combat'&&B&&!B.over&&!rolling&&B.enemies[i]&&B.enemies[i].hp>0){B.target=i;save();renderCombat()}});
+  Art.onPick(id=>{const B=S.battle;if(S.mode!=='combat'||!B||B.over||rolling)return;const u=U(id);if(u&&u.side==='foe'&&up(u)){B.target=id;save();renderCombat();Art.redraw()}});
 }
 render();

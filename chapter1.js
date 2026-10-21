@@ -35,7 +35,8 @@ function HOUNDS(enemies) {
   return {
     enemies: enemies, noFlee: true, art: { sky: 'star', bg: 'tomb', fx: ['motes'] },
     intro: '남은 사냥개들이 이빨을 드러내며 달려든다!',
-    ally: { if: { min: { bond: 1 } }, name: '오르덴', atk: 5, dmg: '1d10+2' },
+    // 동료가 많을수록 무리도 많이 남는다 (오르덴 한 명까지는 그대로)
+    scale: ['scout', 'hound'], scaleFree: 1,
     win: {
       text: [
         '마지막 사냥개가 잿가루가 되어 흩어졌다.',
@@ -55,7 +56,9 @@ function HOUNDS(enemies) {
 
 // 결계의 방: 잿빛 송곳니와의 결전
 const BOSS = {
-  enemies: ['alpha'], boss: true, noFlee: true, art: { sky: 'cave', bg: 'barrier' },
+  enemies: ['alpha'], boss: true, noFlee: true, art: { sky: 'cave', bg: 'barrier' }, field: { cover: true },
+  // 동료 한 명마다 HP +28, 동료가 둘 이상이면 한 라운드에 두 번 움직인다
+  perPC: { hp: 28 }, extraTurn: 2,
   intro: '결계가 빛난다. 잿빛 송곳니가 낮게 으르렁거린다. 이제 물러설 곳은 없다.',
   mods: [
     { if: { flag: 'alpha_hurt' }, hp: -15, why: '짓눌린 뒷다리 (HP -15)' },
@@ -63,10 +66,10 @@ const BOSS = {
     { if: { flag: 'spear' }, ac: -2, atk: -1, why: '꿰뚫린 어깨 (방어 -2, 명중 -1)' }
   ],
   hesitate: { if: { flag: 'pup_safe' }, p: 0.25, text: '품 안의 새끼가 울자, 잿빛 송곳니가 머뭇거린다.' },
-  ally: { if: { or: [{ flag: 'oath' }, { min: { bond: 2 } }] }, name: '오르덴', atk: 6, dmg: '1d10+3' },
   special: [
     { id: 'unbind', label: '회색 낙인을 부순다', if: { flag: 'mark_seen' }, below: 0.4, mp: 3, stat: '지혜', dc: 16,
-      dcMod: [{ if: { flag: 'mark_cracked' }, v: -3, why: '금 간 낙인' }, { if: { flag: 'pup_safe' }, v: -3, why: '새끼의 부름' }],
+      dcMod: [{ if: { flag: 'mark_cracked' }, v: -3, why: '금 간 낙인' }, { if: { flag: 'pup_safe' }, v: -3, why: '새끼의 부름' },
+        { if: { party: 'bran' }, v: -2, why: '낙인을 아는 브란' }],
       note: '우두머리 HP가 40% 이하일 때. 성공하면 죽이지 않고 끝낸다',
       outcome: 'freed', failText: '얼음 같은 사슬이 손바닥을 타고 올라왔다. 그대는 억지로 손을 떼어 냈다.', failHp: -5 }
   ],
@@ -90,16 +93,62 @@ const BOSS = {
     log: '잿빛 송곳니의 낙인을 부숴 사냥꾼의 사슬에서 해방했다.', next: 'n9' },
   lose: {
     text: [
-      { if: { or: [{ flag: 'oath' }, { min: { bond: 2 } }] }, t: '짐승의 송곳니가 그대를 감싸던 오르덴의 가슴 갑주를 물어뜯었다. 천 년을 버텨 온 은빛 갑주에 깊은 균열이 갔다.' },
+      { if: { party: 'orden' }, t: '짐승의 송곳니가 그대를 감싸던 오르덴의 가슴 갑주를 물어뜯었다. 천 년을 버텨 온 은빛 갑주에 깊은 균열이 갔다.' },
       '쓰러진 그대를 내려다보던 잿빛 송곳니는, 결계 기둥 하나를 들이받아 무너뜨렸다.',
       { if: { not: 'pup_safe' }, t: '짐승은 새끼의 목덜미를 물고, 무너진 틈으로 뛰쳐나갔다.' },
       { if: { flag: 'pup_safe' }, t: '짐승은 그대의 품에서 새끼를 낚아채듯 물어 올리고, 무너진 틈으로 뛰쳐나갔다.' },
       '빗속으로 사라지는 그 뒷모습을, 그대는 쓰러진 채 바라볼 수밖에 없었다.'
     ],
     fx: { set: ['alpha_fled'] },
-    fxIf: [{ if: { or: [{ flag: 'oath' }, { min: { bond: 2 } }] }, fx: { set: ['orden_cracked'] } }].concat(AFTER_BATTLE),
+    fxIf: [{ if: { party: 'orden' }, fx: { set: ['orden_cracked'] } }].concat(AFTER_BATTLE),
     log: '잿빛 송곳니가 결계를 부수고 새끼와 함께 달아났다.', next: 'n9' }
 };
+
+// 검은 소나무 숲: 세나와 함께 거미와 싸운다 (어느 쪽이든 세나는 동료가 된다)
+function SENA_FIGHT(surprise, enemies) {
+  return {
+    enemies: enemies || ['spider', 'spider'], noFlee: true, surprise: surprise ? 'foe' : null,
+    art: { sky: 'rain', bg: 'forest', props: ['web'], fx: ['rain'] },
+    intro: '거미가 거미줄을 타고 내려온다!',
+    win: {
+      text: [
+        '마지막 거미가 다리를 오그리며 떨어졌다. 여자가 머리카락에 붙은 거미줄을 털어 내며 활시위를 고쳐 맸다.',
+        '“세나예요. 마을 등불지기의 손녀.” 그녀가 쏟아진 약초를 주워 담았다. “할머니 눈에 바를 별꽃을 캐러 왔다가 이 꼴이 됐네요.”',
+        '세나가 그대를 똑바로 바라보았다. “할머니가 그러더군요. 별 냄새가 나는 사람이 올 거라고. 관문으로 가는 거죠? 숲길이라면 나만큼 아는 사람도 없어요. 같이 가요.”'
+      ],
+      fx: { xp: 4 }, log: '약초꾼 세나가 동료가 되었다.', next: 'map' },
+    lose: {
+      text: [
+        '거미의 독이 퍼져 무릎이 꺾였다. 흐려지는 시야 속에서, 화살 세 대가 연달아 날아가 거미의 눈을 꿰뚫는 것이 보였다.',
+        '정신을 차렸을 때, 젊은 여자가 그대의 상처에 짓이긴 약초를 바르고 있었다. “세나예요. 등불지기의 손녀.” 그녀가 웃었다. “구하러 온 사람을 내가 구했네요.”',
+        '“그래도 고마워요. 관문까지 같이 가요. 그대를 혼자 두면 안 될 것 같으니까.”'
+      ],
+      log: '거미에게 쓰러졌지만 세나가 구해 냈다. 세나가 동료가 되었다.', next: 'map' }
+  };
+}
+
+// 천 개의 계단 초소: 브란과 함께 사냥개와 싸운다 (어느 쪽이든 브란은 동료가 된다)
+function BRAN_FIGHT(surprise) {
+  return {
+    enemies: ['scout', 'scout'], noFlee: true, surprise: surprise ? 'foe' : null, scale: ['scout'], scaleFree: 1,
+    art: { sky: 'rain', bg: 'stairs', fx: ['rain'] },
+    intro: '사냥개들이 이빨을 드러내며 달려든다!',
+    win: {
+      text: [
+        '마지막 사냥개가 잿가루가 되어 흩어지자, 사내는 지팡이에 몸을 기댄 채 숨을 몰아쉬었다.',
+        '“브란이오. 한때는 회색 사냥꾼의 추종자였지.” 그가 지져진 손등을 내려다보았다. “낙인이 내 뜻을 갉아먹는 게 느껴져서, 불로 지져 냈소. 그 뒤로 개들이 나를 쫓고 있지.”',
+        '“그대에게서 별 냄새가 나는군. 사냥꾼이 가장 두려워하는 냄새요.” 브란이 씁쓸하게 웃었다. “낙인에 대해서라면 내가 누구보다 잘 아오. 함께 가겠소. 어차피 혼자서는 오래 못 버틸 테니.”'
+      ],
+      fx: { xp: 4 }, log: '낙인을 지진 자 브란이 동료가 되었다.', next: 'map' },
+    lose: {
+      text: [
+        '사냥개의 이빨에 쓰러지는 순간, 초소 전체가 불길에 휩싸였다. 사내가 마지막 기름을 쏟아붓고 불을 지른 것이다.',
+        '그을린 얼굴로 그대를 끌어낸 사내가 말했다. “브란이오. 한때는 회색 사냥꾼의 추종자였지. 이 손등을 보시오. 낙인을 불로 지져 냈소.”',
+        '“빚을 졌으니 갚아야겠지. 그대와 함께 가겠소.”'
+      ],
+      log: '사냥개에게 쓰러졌지만 브란이 불길로 구해 냈다. 브란이 동료가 되었다.', next: 'map' }
+  };
+}
 
 window.SCENARIO = {
   id: 'fallen-star-ch1-world',
@@ -151,24 +200,24 @@ window.SCENARIO = {
   classes: [
     { id: 'mage', name: '마법사', key: '지혜', hp: 20, mp: 10, hpGain: 4, mpGain: 3, passive: 'eye', amp: '마력 증폭',
       weapon: '지팡이', item: '낡은 지팡이', fine: '잘 다듬은 지팡이', relic: '별빛 지팡이', armor: '여행자의 망토',
-      skills: ['bolt', 'frost', 'starfire'],
+      skills: ['runebolt', 'bolt', 'frost', 'starfire'], row: 'back',
       profs: ['비전', '통찰'],
-      blurb: '룬을 읽고 마력을 다루는 학자. 마력이 넉넉하고 강한 주문을 쓰지만 몸이 약하다.' },
+      blurb: '룬을 읽고 마력을 다루는 학자. 뒷열에서 주문을 쏜다. 마력이 넉넉하고 강한 주문을 쓰지만 몸이 약하다.' },
     { id: 'warrior', name: '전사', key: '힘', hp: 26, mp: 4, hpGain: 7, mpGain: 1, passive: 'might', amp: '투지',
       weapon: '검', item: '낡은 검', fine: '잘 벼린 검', relic: '별빛 검', armor: '낡은 사슬 조끼',
-      skills: ['smash', 'warcry', 'whirl'],
+      skills: ['smash', 'second', 'warcry', 'whirl'], row: 'front',
       profs: ['운동', '생존'],
-      blurb: '수많은 전장을 건너온 검사. HP와 방어가 가장 높아 앞에서 오래 버틴다.' },
+      blurb: '수많은 전장을 건너온 검사. HP와 방어가 가장 높아 앞열에서 오래 버틴다. 기술은 짧은 휴식마다 충전된다.' },
     { id: 'rogue', name: '도적', key: '민첩', hp: 22, mp: 6, hpGain: 5, mpGain: 2, passive: 'shadow', amp: '급소 노리기',
       weapon: '단검', item: '낡은 단검', fine: '잘 벼린 단검', relic: '별빛 단검', armor: '가죽 조끼',
-      skills: ['stab', 'smoke', 'venom'],
+      skills: ['stab', 'smoke', 'venom'], row: 'front', sneak: true,
       profs: ['은신', '곡예'],
-      blurb: '그림자를 밟고 다니는 떠돌이. 치명타가 잘 터지고 도망에 능하다.' },
+      blurb: '그림자를 밟고 다니는 떠돌이. 유리하거나 동료가 적을 붙잡고 있을 때 기습 피해를 더하고, 보조 행동으로 숨는다.' },
     { id: 'bard', name: '음유시인', key: '매력', hp: 22, mp: 8, hpGain: 5, mpGain: 2, passive: 'voice', amp: '영감',
       weapon: '류트', item: '낡은 류트', fine: '새 줄을 건 류트', relic: '별빛 류트', armor: '가죽 조끼',
-      skills: ['discord', 'mend', 'anthem', 'starsong'],
+      skills: ['mock', 'discord', 'mend', 'anthem', 'starsong'], row: 'back',
       profs: ['공연', '기만'],
-      blurb: '옛 노래를 기억하는 가객. 노래로 적을 흔들고 스스로를 치유한다.' }
+      blurb: '옛 노래를 기억하는 가객. 노래로 적을 흔들고 동료를 치유한다.' }
   ],
 
   // 이야기 판정용 재능 (레벨 업 때 능력치 대신 고를 수 있다)
@@ -184,34 +233,87 @@ window.SCENARIO = {
     C: { name: '행운의 별', kind: '재능', desc: '이야기 판정의 d20에서 1이 나오면 10으로 바꾼다' }
   },
 
-  // 전투 기술. act: attack(한 대상) / aoe(모든 적) / heal / buff / debuffAll
+  // 전투 기술. cost: 'action'(행동, 기본) | 'bonus'(보조 행동)
+  // 자원: mp(마력) 또는 uses + per('short' 짧은 휴식마다 / 'long' 긴 휴식마다)
+  // kind: attack(한 대상 명중 굴림) / darts(반드시 맞는 화살) / save(적이 내성 굴림, area: one|row|all) / sweep(닿는 적 모두)
+  //       pierce(앞열과 그 뒤) / heal(아군 하나) / self / buff(아군 모두) / debuffAll / taunt / surface(열 바닥에 표면)
+  // dtype: phys, fire(불), cold(냉기), arcane(마력), radiant(별빛), thunder(천둥), psychic(정신), poison(독)
   combatSkills: {
-    bolt: { cls: 'mage', lv: 1, name: '마력 탄', mp: 2, act: 'attack', stat: '지혜', hit: 2, dmg: '2d6', addStat: true,
-      desc: '명중 +2, 피해 2d6+지혜' },
-    frost: { cls: 'mage', lv: 3, name: '서리 사슬', mp: 3, act: 'attack', stat: '지혜', dmg: '1d8', addStat: true, onHit: { stun: 1 },
-      desc: '피해 1d8+지혜. 맞으면 적이 1턴 얼어붙는다' },
-    starfire: { cls: 'mage', lv: 5, name: '별불', mp: 5, act: 'aoe', stat: '지혜', dmg: '3d6', addStat: true, auto: true,
-      desc: '모든 적에게 피해 3d6+지혜 (반드시 맞는다)' },
-    smash: { cls: 'warrior', lv: 1, name: '강타', mp: 1, act: 'attack', weapon: true, extra: '1d8',
-      desc: '무기 피해 +1d8' },
-    warcry: { cls: 'warrior', lv: 3, name: '전투 함성', mp: 2, act: 'buff', buff: { atk: 2, dmg: 2, ac: 2 }, turns: 3,
-      desc: '3턴 동안 명중·피해·방어 +2' },
-    whirl: { cls: 'warrior', lv: 5, name: '회오리 베기', mp: 3, act: 'aoe', weapon: true,
-      desc: '모든 적에게 무기 공격' },
-    stab: { cls: 'rogue', lv: 1, name: '급소 찌르기', mp: 2, act: 'attack', weapon: true, hit: 2, crit: 18, extra: '1d6',
-      desc: '명중 +2, 피해 +1d6, 18~20에 치명타' },
-    smoke: { cls: 'rogue', lv: 3, name: '연막', mp: 2, act: 'debuffAll', status: { blind: 2 },
-      desc: '2턴 동안 모든 적의 공격이 불리해진다 (d20 두 번 중 낮은 값)' },
-    venom: { cls: 'rogue', lv: 5, name: '독칼', mp: 3, act: 'attack', weapon: true, onHit: { poison: 3 },
-      desc: '무기 공격. 맞으면 3턴 동안 매 턴 1d6 독 피해' },
-    discord: { cls: 'bard', lv: 1, name: '불협화음', mp: 2, act: 'attack', stat: '매력', dmg: '2d6', addStat: true, onHit: { weak: 2 },
-      desc: '피해 2d6+매력. 맞으면 2턴 동안 적 명중 -2' },
-    mend: { cls: 'bard', lv: 1, name: '치유의 노래', mp: 2, act: 'heal', dmg: '2d6', stat: '매력', addStat: true,
-      desc: 'HP 2d6+매력 회복' },
-    anthem: { cls: 'bard', lv: 3, name: '전장의 찬가', mp: 2, act: 'buff', buff: { atk: 2, dmg: 2 }, turns: 3,
-      desc: '3턴 동안 명중·피해 +2' },
-    starsong: { cls: 'bard', lv: 5, name: '별의 노래', mp: 4, act: 'aoe', stat: '매력', dmg: '2d8', addStat: true, auto: true, heal: '1d8',
-      desc: '모든 적에게 피해 2d8+매력 (반드시 맞는다), HP 1d8 회복' }
+    // 마법사 — 마력
+    runebolt: { cls: 'mage', lv: 1, name: '룬 화살', mp: 0, kind: 'attack', attack: 'spell', stat: '지혜', dmg: '1d8', addStat: true, dtype: 'arcane',
+      desc: '원거리 주문 공격. 마력 1d8+지혜. 마력을 쓰지 않는다' },
+    bolt: { cls: 'mage', lv: 1, name: '마력 탄', mp: 2, kind: 'darts', darts: 3, dmg: '1d4+1', dtype: 'arcane',
+      desc: '반드시 맞는 별빛 화살 세 발, 각 1d4+1. 대상이 쓰러지면 남은 화살은 다른 적에게' },
+    frost: { cls: 'mage', lv: 3, name: '서리 사슬', mp: 3, kind: 'attack', attack: 'spell', stat: '지혜', dmg: '2d6', addStat: true, dtype: 'cold', onHit: { stun: 1 }, surface: 'ice',
+      desc: '원거리 주문 공격. 냉기 2d6+지혜, 맞으면 1턴 얼어붙는다. 대상이 선 열의 바닥이 얼음으로 덮인다' },
+    starfire: { cls: 'mage', lv: 5, name: '별불', mp: 5, kind: 'save', area: 'all', save: '민첩', stat: '지혜', dmg: '3d6', addStat: true, dtype: 'fire', half: true,
+      desc: '모든 적에게 불 3d6+지혜 (민첩 내성에 성공하면 절반). 기름에 불이 붙는다' },
+    // 전사 — 짧은 휴식마다 충전
+    smash: { cls: 'warrior', lv: 1, name: '강타', uses: 2, per: 'short', kind: 'attack', weapon: true, extra: '1d8', onHit: { prone: 1 },
+      desc: '무기 피해 +1d8. 맞으면 넘어뜨린다 (거대한 적 제외)' },
+    second: { cls: 'warrior', lv: 1, name: '재정비', cost: 'bonus', uses: 1, per: 'short', kind: 'self', heal: '1d10', healLv: true,
+      desc: 'HP 1d10+레벨 회복' },
+    warcry: { cls: 'warrior', lv: 3, name: '전투 함성', cost: 'bonus', uses: 1, per: 'short', kind: 'buff', buff: { atk: 2, dmg: 2 }, turns: 3,
+      desc: '아군 모두 3턴 동안 명중·피해 +2' },
+    whirl: { cls: 'warrior', lv: 5, name: '회오리 베기', uses: 1, per: 'short', kind: 'sweep', weapon: true,
+      desc: '닿는 적 모두에게 무기 공격' },
+    // 도적 — 짧은 휴식마다 충전. 숨기·물러서기는 보조 행동으로 할 수 있다
+    stab: { cls: 'rogue', lv: 1, name: '급소 찌르기', uses: 2, per: 'short', kind: 'attack', weapon: true, hit: 2, crit: 18, extra: '1d6',
+      desc: '명중 +2, 피해 +1d6, 18~20 치명타' },
+    smoke: { cls: 'rogue', lv: 3, name: '연막', uses: 1, per: 'short', kind: 'debuffAll', status: { blind: 2 },
+      desc: '2턴 동안 모든 적이 연막에 갇힌다 (적의 공격 불리, 적을 향한 공격 유리)' },
+    venom: { cls: 'rogue', lv: 5, name: '독칼', uses: 2, per: 'short', kind: 'attack', weapon: true, onHit: { poison: 3 },
+      desc: '무기 공격. 맞으면 3턴 동안 매 턴 독 1d6' },
+    // 음유시인 — 마력
+    mock: { cls: 'bard', lv: 1, name: '비웃는 노래', mp: 0, kind: 'save', area: 'one', save: '지혜', stat: '매력', dmg: '1d6', addStat: true, dtype: 'psychic', onFail: { weak: 1 },
+      desc: '대상이 지혜 내성에 실패하면 정신 1d6+매력, 다음 턴 명중 -2. 마력을 쓰지 않는다' },
+    discord: { cls: 'bard', lv: 1, name: '불협화음', mp: 2, kind: 'save', area: 'row', save: '힘', stat: '매력', dmg: '2d6', addStat: true, dtype: 'thunder', half: true, onFail: { push: 1 },
+      desc: '대상이 선 열 전체에 천둥 2d6+매력 (힘 내성에 성공하면 절반). 실패한 앞열의 적은 뒷열로 밀려나 넘어진다' },
+    mend: { cls: 'bard', lv: 1, name: '치유의 노래', mp: 2, cost: 'bonus', kind: 'heal', heal: '1d8', stat: '매력',
+      desc: '아군 하나 HP 1d8+매력 회복. 쓰러진 동료도 일으킨다' },
+    anthem: { cls: 'bard', lv: 3, name: '전장의 찬가', mp: 2, cost: 'bonus', kind: 'buff', buff: { atk: 2, dmg: 2 }, turns: 3,
+      desc: '아군 모두 3턴 동안 명중·피해 +2' },
+    starsong: { cls: 'bard', lv: 5, name: '별의 노래', mp: 4, kind: 'save', area: 'all', save: '지혜', stat: '매력', dmg: '2d8', addStat: true, dtype: 'radiant', half: true, partyHeal: '1d8',
+      desc: '모든 적에게 별빛 2d8+매력 (지혜 내성에 성공하면 절반), 아군 모두 HP 1d8 회복' },
+    // 오르덴
+    pierce: { comp: 'orden', lv: 1, name: '꿰뚫는 창', uses: 2, per: 'short', kind: 'pierce', weapon: true,
+      desc: '앞열의 적과 그 뒤 뒷열의 적 하나를 함께 찌른다' },
+    taunt: { comp: 'orden', lv: 1, name: '도발의 외침', cost: 'bonus', uses: 1, per: 'short', kind: 'taunt', turns: 2,
+      desc: '2턴 동안 적들이 오르덴만 노린다 (닿을 수 있으면)' },
+    // 세나
+    aimed: { comp: 'sena', lv: 1, name: '조준 사격', uses: 2, per: 'short', kind: 'attack', weapon: true, hit: 2, extra: '1d8',
+      desc: '명중 +2, 피해 +1d8' },
+    herb: { comp: 'sena', lv: 1, name: '약초 찜질', uses: 2, per: 'short', kind: 'heal', heal: '1d8+3',
+      desc: '아군 하나 HP 1d8+3 회복. 쓰러진 동료도 일으킨다' },
+    net: { comp: 'sena', lv: 3, name: '그물 화살', uses: 1, per: 'short', kind: 'attack', weapon: true, onHit: { restrain: 2 },
+      desc: '맞으면 2턴 동안 속박 (움직이지 못하고, 공격이 불리하고, 받는 공격이 유리)' },
+    // 브란
+    oil: { comp: 'bran', lv: 1, name: '기름 병', cost: 'bonus', uses: 2, per: 'long', kind: 'surface', surface: 'oil',
+      desc: '대상이 선 열의 바닥에 기름을 뿌린다 (미끄러져 넘어지고, 불이 닿으면 폭발한다)' },
+    wave: { comp: 'bran', lv: 3, name: '화염 파도', uses: 1, per: 'short', kind: 'save', area: 'row', save: '민첩', dmg: '2d6+3', dtype: 'fire', half: true, surface: 'fire',
+      desc: '대상이 선 열 전체에 불 2d6+3 (민첩 내성에 성공하면 절반). 그 열에 불이 붙는다' }
+  },
+
+  // 동료. joinIf: 함께하게 되는 조건, locs: 이 장소들에서만 함께 싸운다 (anywhereIf가 맞으면 어디서나)
+  // attack: 기본 공격 (hit 명중, dice+dmgB 피해, ranged 원거리, reach 뒷열에서도 적 앞열을 찌른다). 레벨마다 조금씩 강해진다
+  companions: {
+    orden: { name: '오르덴', title: '맹세기사', art: 'orden', joinIf: { flag: 'done_n4', min: { bond: 1 } },
+      locs: ['gate', 'tomb', 'hall', 'stairs', 'aqueduct'], anywhereIf: { flag: 'orden_joins' },
+      awayText: '관문을 멀리 떠날 수 없다. 계단·관문·수로·무덤·회랑에서만 함께 싸운다',
+      hp: 30, hpGain: 7, ac: 17, init: 0, row: 'front', str: 4, dex: 0, wis: 2,
+      attack: { name: '장창', hit: 5, dice: '1d10', dmgB: 3, reach: true },
+      skills: ['pierce', 'taunt'], guard: true,
+      blurb: '엘레우스의 마지막 맹세기사. 장창이 길어 뒷열에서도 적 앞열을 찌른다. 앞열에 서 있으면 다른 동료를 노린 근접 공격 하나를 라운드마다 불리하게 만든다 (수호).' },
+    sena: { name: '세나', title: '약초꾼 궁수', art: 'sena', joinIf: { flag: 'sena_met' },
+      hp: 18, hpGain: 5, ac: 14, init: 3, row: 'back', str: 0, dex: 3, wis: 2,
+      attack: { name: '사냥 활', hit: 5, dice: '1d8', dmgB: 3, ranged: true },
+      skills: ['aimed', 'herb', 'net'],
+      blurb: '등불지기 노파의 손녀. 뒷열에서 활을 쏘고, 약초로 쓰러진 동료를 일으킨다.' },
+    bran: { name: '브란', title: '낙인을 지진 자', art: 'bran', joinIf: { flag: 'bran_met' },
+      hp: 16, hpGain: 4, ac: 12, init: 1, row: 'back', str: 0, dex: 1, wis: 3, dc: 3,
+      attack: { name: '불씨', hit: 5, dice: '1d10', dmgB: 0, ranged: true, dtype: 'fire', burn: true },
+      skills: ['oil', 'wave'],
+      blurb: '회색 사냥꾼의 추종자였던 주술사. 불씨를 던지면 맞은 적이 불붙고, 기름 위로 떨어지면 폭발한다.' }
   },
 
   items: {
@@ -235,46 +337,56 @@ window.SCENARIO = {
     '엘레우스 기사의 흉갑': { kind: '방어구', slot: 'armor', ac: 4, desc: '물에 잠겨서도 녹슬지 않은 은빛 흉갑' },
     '은빛 물약': { kind: '물약', use: { hp: 15 }, battle: true, price: 15, desc: 'HP 15 회복' },
     '푸른 물약': { kind: '물약', use: { mp: 8 }, battle: true, price: 20, desc: '마력 8 회복' },
+    '기름 병': { kind: '투척', throw: { surface: 'oil' }, battle: true, price: 8, desc: '전투에서 던지면 그 열의 바닥이 기름으로 덮인다. 불이 닿으면 폭발' },
+    '불꽃 병': { kind: '투척', throw: { dmg: '1d6', dtype: 'fire', surface: 'fire' }, battle: true, price: 14, desc: '전투에서 던진다. 맞으면 불 1d6, 그 열에 불이 붙는다' },
+    '야영 물자': { kind: '물자', price: 6, desc: '쉼터 밖에서 긴 휴식을 할 때 하나를 쓴다' },
     '회색 낙인 조각': { kind: '재료', desc: '사냥개의 목에서 떨어진 낙인 조각. 세 개를 모으면 살펴볼 수 있다' },
     '기사의 반지': { kind: '증표', desc: '물에 잠긴 기사가 끼고 있던 은반지. 오르덴이 알아볼지도 모른다' },
     '잿빛 새끼': { kind: '동료', desc: '어미를 잃은 사냥개 새끼. 이마에 아직 낙인이 없다' },
     '잿빛 털 한 줌': { kind: '증표', desc: '해방된 잿빛 송곳니가 남긴 털. 언젠가 그 울음이 그대를 도울 것이다' }
   },
 
-  // 적. atk: 명중 보너스, ac: 방어, dmg: 피해 주사위
+  // 적. atk: 명중 보너스, ac: 방어, dmg: 피해 주사위, row: 처음 서는 열 (기본 앞열)
+  // ranged: 원거리 공격, fly: 날아다님 (어느 열이든 닿고 바닥 표면을 밟지 않는다), big: 거대함 (넘어뜨리거나 밀 수 없다)
+  // pack: 무리 사냥 (함께 싸우는 짐승이 있으면 명중 +2), init: 주도권 보너스, resist/vuln: 피해 종류 저항(절반)/약점(두 배)
+  // 기술: p(확률), dmg, hit, ranged, onHit{prone, restrain, poison}, sweep(앞열 모두), debuff(아군 모두 명중 감소), summon
   enemies: {
-    wolf: { art: 'wolf', name: '굶주린 늑대', lv: 1, hp: 10, ac: 11, atk: 3, dmg: '1d6+1', xp: 5, gold: [2, 6],
-      desc: '비에 젖은 털 사이로 갈비뼈가 드러난 늑대.' },
-    bats: { art: 'bats', name: '안개 박쥐 떼', lv: 1, hp: 8, ac: 13, atk: 4, dmg: '1d4+1', xp: 4, gold: [1, 4],
-      desc: '안개 속에서 날개 소리만 들리는 박쥐 떼.' },
-    boar: { art: 'boar', name: '진흙 멧돼지', lv: 2, hp: 16, ac: 12, atk: 4, dmg: '1d8+2', xp: 8, gold: [3, 8],
-      drops: [{ item: '은빛 물약', p: 0.15 }], desc: '진흙을 뒤집어쓴 성난 멧돼지.' },
-    spider: { art: 'spider', name: '검은 소나무 거미', lv: 2, hp: 14, ac: 12, atk: 4, dmg: '1d6+1', xp: 8, gold: [2, 7],
-      poison: { p: 0.35, turns: 2, dmg: '1d4' }, drops: [{ item: '푸른 물약', p: 0.1 }],
-      desc: '송아지만 한 검은 거미. 송곳니에서 독이 떨어진다.' },
-    bear: { art: 'bear', name: '이끼 곰', lv: 3, hp: 28, ac: 12, atk: 5, dmg: '1d10+3', xp: 14, gold: [5, 12],
-      skills: [{ name: '짓누르기', p: 0.25, dmg: '2d8+3', hit: -1 }], drops: [{ item: '은빛 물약', p: 0.25 }],
+    wolf: { art: 'wolf', name: '굶주린 늑대', lv: 1, hp: 10, ac: 11, atk: 3, dmg: '1d6+1', xp: 5, gold: [2, 6], pack: true, init: 2,
+      desc: '비에 젖은 털 사이로 갈비뼈가 드러난 늑대. 무리 지어 사냥한다.' },
+    bats: { art: 'bats', name: '안개 박쥐 떼', lv: 1, hp: 8, ac: 13, atk: 4, dmg: '1d4+1', xp: 4, gold: [1, 4], fly: true, init: 3,
+      desc: '안개 속에서 날개 소리만 들리는 박쥐 떼. 날아서 뒷열까지 덮친다.' },
+    boar: { art: 'boar', name: '진흙 멧돼지', lv: 2, hp: 16, ac: 12, atk: 4, dmg: '1d8+2', xp: 8, gold: [3, 8], str: 4,
+      skills: [{ name: '돌진', p: 0.3, dmg: '1d8+2', onHit: { prone: 1 } }],
+      drops: [{ item: '은빛 물약', p: 0.15 }, { item: '야영 물자', p: 0.3 }], desc: '진흙을 뒤집어쓴 성난 멧돼지. 돌진에 맞으면 넘어진다.' },
+    spider: { art: 'spider', name: '검은 소나무 거미', lv: 2, hp: 14, ac: 12, atk: 4, dmg: '1d6+1', xp: 8, gold: [2, 7], row: 'back', vuln: ['fire'],
+      poison: { p: 0.35, turns: 2, dmg: '1d4' },
+      skills: [{ name: '거미줄 뿜기', p: 0.4, ranged: true, dmg: '1d2', onHit: { restrain: 2 } }],
+      drops: [{ item: '푸른 물약', p: 0.1 }], desc: '송아지만 한 검은 거미. 뒤에서 거미줄을 뿜고, 송곳니에서 독이 떨어진다. 불에 약하다.' },
+    bear: { art: 'bear', name: '이끼 곰', lv: 3, hp: 28, ac: 12, atk: 5, dmg: '1d10+3', xp: 14, gold: [5, 12], big: true,
+      skills: [{ name: '짓누르기', p: 0.25, dmg: '2d8+3', hit: -1, onHit: { prone: 1 } }], drops: [{ item: '은빛 물약', p: 0.25 }, { item: '야영 물자', p: 0.5 }],
       desc: '등에 이끼가 자란 거대한 곰. 숲의 주인이다.' },
-    scout: { art: 'scout', name: '잿빛 사냥개 정찰병', lv: 2, hp: 14, ac: 13, atk: 4, dmg: '1d6+2', xp: 9, gold: [2, 6],
+    scout: { art: 'scout', name: '잿빛 사냥개 정찰병', lv: 2, hp: 14, ac: 13, atk: 4, dmg: '1d6+2', xp: 9, gold: [2, 6], pack: true, init: 3,
       drops: [{ item: '회색 낙인 조각', p: 0.5 }], desc: '목덜미에 회색 표식이 깜박이는 사냥개.' },
-    hound: { art: 'hound', name: '잿빛 사냥개', lv: 3, hp: 20, ac: 13, atk: 5, dmg: '1d8+2', xp: 12, gold: [3, 9],
+    hound: { art: 'hound', name: '잿빛 사냥개', lv: 3, hp: 20, ac: 13, atk: 5, dmg: '1d8+2', xp: 12, gold: [3, 9], pack: true, init: 2,
       drops: [{ item: '회색 낙인 조각', p: 0.4 }], desc: '회색 사냥꾼에게 묶인 잿빛 사냥개.' },
-    leech: { art: 'leech', name: '수로 거머리', lv: 3, hp: 18, ac: 11, atk: 5, dmg: '1d6+2', xp: 11, gold: [2, 6], drain: 0.5,
+    leech: { art: 'leech', name: '수로 거머리', lv: 3, hp: 18, ac: 11, atk: 5, dmg: '1d6+2', xp: 11, gold: [2, 6], drain: 0.5, vuln: ['fire'],
       desc: '사람 팔뚝만 한 거머리. 문 자리에서 피를 빨아 회복한다.' },
-    drowned: { art: 'drowned', name: '물에 잠긴 기사', lv: 5, hp: 44, ac: 15, atk: 6, dmg: '1d10+3', xp: 35, gold: [20, 35], elite: true,
-      skills: [{ name: '녹슨 대검 내려치기', p: 0.3, dmg: '2d10+3', hit: -2 }],
+    drowned: { art: 'drowned', name: '물에 잠긴 기사', lv: 5, hp: 44, ac: 15, atk: 6, dmg: '1d10+3', xp: 35, gold: [20, 35], elite: true, big: true,
+      resist: ['cold', 'poison'], vuln: ['radiant'],
+      skills: [{ name: '녹슨 대검 휩쓸기', p: 0.3, dmg: '2d8+3', hit: -2, sweep: true }],
       drops: [{ item: '기사의 반지', p: 1, once: 'got_ring' }, { item: '엘레우스 기사의 흉갑', p: 1, once: 'got_cuirass' }, { item: '은빛 물약', p: 0.5 }],
-      desc: '천 년 동안 수로 바닥에 잠들어 있던 기사. 녹슨 투구 속에서 푸른 불꽃이 탄다.' },
-    acolyte: { art: 'acolyte', name: '회색 사냥꾼의 추종자', lv: 4, hp: 26, ac: 14, atk: 6, dmg: '1d8+3', xp: 20, gold: [10, 20],
+      desc: '천 년 동안 수로 바닥에 잠들어 있던 기사. 녹슨 투구 속에서 푸른 불꽃이 탄다. 냉기와 독에 강하고, 별빛에 약하다.' },
+    acolyte: { art: 'acolyte', name: '회색 사냥꾼의 추종자', lv: 4, hp: 26, ac: 14, atk: 6, dmg: '1d8+3', xp: 20, gold: [10, 20], row: 'back', ranged: true,
       skills: [{ name: '사냥개 부르기', p: 0.3, summon: 'hound', once: true }],
       drops: [{ item: '회색 낙인 조각', p: 0.6 }, { item: '푸른 물약', p: 0.3 }],
-      desc: '회색 두건을 쓴 사람. 손등에 사냥개와 같은 낙인이 있다.' },
-    alpha: { art: 'alpha', name: '잿빛 송곳니', lv: 6, hp: 90, ac: 15, atk: 7, dmg: '2d6+4', xp: 80, gold: [40, 60], boss: true,
+      desc: '회색 두건을 쓴 사람. 뒷열에서 회색 화살을 쏜다. 손등에 사냥개와 같은 낙인이 있다.' },
+    alpha: { art: 'alpha', name: '잿빛 송곳니', lv: 6, hp: 90, ac: 15, atk: 7, dmg: '2d6+4', xp: 80, gold: [40, 60], boss: true, big: true, init: 3, multi: 2,
       skills: [
-        { name: '포효', p: 0.22, debuff: { atk: -2, turns: 2 }, text: '잿빛 송곳니가 포효한다. 다리가 굳는다! (2턴 동안 명중 -2)' },
-        { name: '돌진', p: 0.25, dmg: '2d8+4', hit: -1 }
+        { name: '포효', p: 0.2, debuff: { atk: -2, turns: 2 }, text: '잿빛 송곳니가 포효한다. 다리가 굳는다! (2턴 동안 모두 명중 -2)' },
+        { name: '꼬리 휩쓸기', p: 0.25, dmg: '2d6+2', sweep: true, needFront: 2 },
+        { name: '돌진', p: 0.25, dmg: '2d8+4', hit: -1, onHit: { prone: 1 }, reach: true }
       ],
-      desc: '이마에 회색 왕관 같은 낙인을 단 사냥개 무리의 우두머리. 다른 놈들보다 두 배는 크다.' }
+      desc: '이마에 회색 왕관 같은 낙인을 단 사냥개 무리의 우두머리. 다른 놈들보다 두 배는 크다. 한 번에 두 번 물고, 돌진은 뒷열까지 닿는다.' }
   },
 
   // ── 세계 지도. x, y는 지도 위 위치 (0~320, 0~240)
@@ -289,8 +401,8 @@ window.SCENARIO = {
         '마을 어귀에는 빗속의 행상인이 낡은 수레를 세워 두었다.',
         { if: { flag: 'done_n10' }, t: '천 년 만에 비가 그친 지붕 위로 햇살이 내려앉았다.' }
       ],
-      rest: '노파의 오두막에서 쉰다',
-      shop: { name: '빗속의 행상인', items: ['은빛 물약', '푸른 물약', '{fine}', '가죽 갑옷', '사슬 갑옷'] },
+      rest: '노파의 오두막에서 쉰다', restFree: true,
+      shop: { name: '빗속의 행상인', items: ['은빛 물약', '푸른 물약', '야영 물자', '기름 병', '불꽃 병', '{fine}', '가죽 갑옷', '사슬 갑옷'] },
       actions: [
         { label: '등불이 켜진 오두막의 문을 두드린다', event: 'n1', if: { not: 'done_n1' }, star: true },
         { label: '노파의 부탁을 듣는다', event: 'q_wolves_start', if: { flag: 'done_n1', not: 'q_wolves' } },
@@ -307,7 +419,7 @@ window.SCENARIO = {
         { if: { flag: 'shortcut' }, t: '서쪽 절벽 아래, 덩굴에 가려진 옛 수로의 입구가 보인다.' }
       ],
       encounters: [{ w: 4, e: ['wolf'] }, { w: 2, e: ['wolf', 'wolf'] }, { w: 3, e: ['bats'] }, { w: 1, e: ['boar'] }],
-      ambush: 0.2,
+      ambush: 0.2, field: { high: 'both', cover: true },
       explore: ['ex_glint', 'ex_herb'],
       links: [{ to: 'village' }, { to: 'forest' }, { to: 'stairs' }, { to: 'aqueduct' }]
     },
@@ -319,8 +431,11 @@ window.SCENARIO = {
         '비탈보다 훨씬 위험하다.'
       ],
       encounters: [{ w: 3, e: ['spider'] }, { w: 2, e: ['boar'] }, { w: 2, e: ['bear'] }, { w: 1, e: ['spider', 'spider'] }, { w: 1, e: ['wolf', 'wolf'] }],
-      ambush: 0.3,
+      ambush: 0.3, field: { cover: true },
       explore: ['ex_trap', 'ex_web', 'ex_herb'],
+      actions: [
+        { label: '거미줄 너머에서 들려오는 비명을 따라간다', event: 'c_sena', if: { not: 'done_c_sena' }, star: true }
+      ],
       links: [{ to: 'village' }, { to: 'slope' }]
     },
     stairs: {
@@ -332,8 +447,11 @@ window.SCENARIO = {
       ],
       onEnter: [{ event: 'n2', if: { not: 'done_n2' } }],
       encounters: [{ w: 3, e: ['scout'] }, { w: 2, e: ['scout', 'scout'] }, { w: 2, e: ['hound'] }, { w: 1, e: ['wolf', 'bats'] }],
-      ambush: 0.25,
+      ambush: 0.25, field: { high: 'both' },
       explore: ['ex_rune'],
+      actions: [
+        { label: '무너진 초소에서 들려오는 사냥개의 울음을 따라간다', event: 'c_bran', if: { flag: 'done_n2', not: 'done_c_bran' }, star: true }
+      ],
       links: [{ to: 'slope' }, { to: 'gate' }]
     },
     aqueduct: {
@@ -344,7 +462,7 @@ window.SCENARIO = {
         { if: { not: 'got_ring' }, t: '깊은 곳에서 녹슨 갑주가 부딪히는 소리가 들린다.' }
       ],
       encounters: [{ w: 4, e: ['leech'] }, { w: 2, e: ['leech', 'leech'] }, { w: 1, e: ['drowned'] }],
-      ambush: 0.25,
+      ambush: 0.25, field: { water: true },
       explore: ['ex_bones', 'ex_coins', 'ex_depths'],
       links: [{ to: 'slope' }, { to: 'gate' }]
     },
@@ -361,7 +479,7 @@ window.SCENARIO = {
         { if: { flag: 'done_n10' }, t: '비가 그친 관문 위로 별이 뜬다. 모닥불 곁에 오르덴의 창이 기대어 있다.' }
       ],
       onEnter: [{ event: 'n3', if: { not: 'done_n3' } }],
-      rest: '오르덴 곁 모닥불에서 쉰다', restIf: { flag: 'done_n4' },
+      rest: '오르덴 곁 모닥불에서 야영한다', restIf: { flag: 'done_n4' },
       actions: [
         { label: '오르덴에게 기사의 반지를 건넨다', event: 'q_ring_end', if: { flag: 'done_n4', item: '기사의 반지' } },
         { label: '회색 낙인 조각을 맞춰 본다', event: 'study_mark', if: { flag: 'done_n4', not: 'mark_seen', count: { '회색 낙인 조각': 3 } } }
@@ -373,7 +491,7 @@ window.SCENARIO = {
         { if: { flag: 'done_n5' }, sky: 'star', bg: 'tomb', fx: ['motes'] },
         { sky: 'star', bg: 'tomb', props: ['relic'], fx: ['motes'] }
       ],
-      name: '별의 무덤', x: 150, y: 25, lv: '3~4', if: { flag: 'done_n4' },
+      name: '별의 무덤', x: 150, y: 25, lv: '3~4', if: { flag: 'done_n4' }, field: { high: 'pc' },
       desc: [
         '비가 내리지 않는 거대한 원형 전당. 그 중심에 깨진 수정관이 하늘을 향해 열려 있다.',
         { if: { flag: 'done_n5' }, t: '수정관은 비었다. 별빛의 잔향만이 공기 속에 떠돈다.' }
@@ -391,7 +509,7 @@ window.SCENARIO = {
         { if: { not: 'done_n8' }, t: '가장 깊은 곳, 결계의 방 쪽에서 잿빛 송곳니의 숨소리가 들린다.' }
       ],
       encounters: [{ w: 3, e: ['hound'] }, { w: 2, e: ['hound', 'hound'] }, { w: 2, e: ['acolyte'] }, { w: 1, e: ['acolyte', 'hound'] }],
-      ambush: 0.3,
+      ambush: 0.3, field: { high: 'foe', cover: true },
       explore: ['ex_corpse', 'ex_rune'],
       actions: [
         { label: '회랑 깊은 곳으로 잿빛 송곳니를 쫓는다 (권장 레벨 5)', event: 'n7', if: { not: 'done_n7' }, star: true }
@@ -411,6 +529,8 @@ window.SCENARIO = {
   quests: [
     { name: '노파의 부탁', if: { flag: 'q_wolves', not: 'q_wolves_done' }, t: '안개 비탈의 굶주린 늑대 {#kill_wolf}/5 처치 → 마을의 노파에게' },
     { name: '가라앉은 맹세', if: { flag: 'found_bones', not: 'q_ring_done' }, t: '옛 수로 깊은 곳의 물에 잠긴 기사에게서 반지를 찾아 관문의 오르덴에게 (권장 레벨 5)' },
+    { name: '숲의 비명', if: { flag: 'done_n1', not: 'done_c_sena' }, t: '노파의 손녀 세나가 검은 소나무 숲에서 돌아오지 않았다' },
+    { name: '초소의 울음', if: { flag: 'done_n2', not: 'done_c_bran' }, t: '천 개의 계단 옆 무너진 초소에서 사냥개들이 누군가를 몰아붙이고 있다' },
     { name: '회색 낙인', if: { not: 'mark_seen' }, t: '회색 낙인 조각 {@회색 낙인 조각}/3을 모아 마을이나 관문에서 맞춰 보면 낙인의 비밀을 알 수 있다' }
   ],
 
@@ -459,7 +579,9 @@ window.SCENARIO = {
       text: [
         '언덕 끝 오두막의 문을 열자, 불가에 앉은 눈먼 노파가 천천히 그대 쪽으로 고개를 돌렸다.',
         '“별 냄새가 나는구나.” 노파가 갈라진 목소리로 말했다. “사흘 전부터 잿빛 사냥개들이 울었다. 사냥꾼이 돌아온 게야. 그 관문으로 올라간 자는 아무도 내려오지 못했다.”',
-        '벽에는 빛바랜 양피지 지도 한 장이 걸려 있고, 기울어진 처마 사이로 빗물이 새어 든다.'
+        '벽에는 빛바랜 양피지 지도 한 장이 걸려 있고, 기울어진 처마 사이로 빗물이 새어 든다.',
+        { if: { not: 'sena_met' }, t: '“내 손녀 세나가 검은 소나무 숲으로 별꽃을 캐러 갔는데, 사흘째 소식이 없구나.” 노파가 혼잣말처럼 중얼거렸다.' },
+        { if: { party: 'sena' }, t: '“할머니!” 세나가 노파에게 달려가 안겼다. 노파의 먼 눈이 처음으로 웃었다.' }
       ],
       choices: [
         { id: 1, skill: '설득', insp: 'song', label: '노파 곁에 앉아 관문의 옛이야기를 청한다', stat: '매력', dc: 10,
@@ -537,7 +659,8 @@ window.SCENARIO = {
       clock: '마지막 마을',
       text: [
         '늑대 다섯 마리를 쫓았다는 말에, 노파는 한참을 말없이 그대의 손을 쓰다듬었다.',
-        '“고맙구나.” 노파는 마루 밑에서 오래된 가죽 주머니를 꺼냈다.'
+        '“고맙구나.” 노파는 마루 밑에서 오래된 가죽 주머니를 꺼냈다.',
+        { if: { party: 'sena' }, t: '세나가 할머니의 손을 꼭 잡았다. “이제 우물가에 늑대는 안 올 거예요.”' }
       ],
       choices: [
         { id: 1, label: '주머니를 받는다', roll: false,
@@ -559,7 +682,7 @@ window.SCENARIO = {
       ],
       choices: [
         { id: 1, skill: '비전', insp: 'lore', label: '낙인의 룬을 읽어 낸다', stat: '지혜', dc: 12,
-          adv: [{ if: { flag: 'lore' }, why: '노파의 전승' }],
+          adv: [{ if: { flag: 'lore' }, why: '노파의 전승' }, { if: { party: 'bran' }, why: '브란의 지식' }],
           note: '성공하면 낙인의 비밀을 안다',
           success: {
             text: [
@@ -1138,6 +1261,8 @@ window.SCENARIO = {
         { if: { flag: 'alpha_hurt' }, t: '놈의 뒷다리에서는 여전히 피가 흐르고 있다.' },
         { if: { flag: 'mark_cracked' }, t: '금 간 낙인 아래에서, 놈의 눈빛이 이따금 흔들린다.' },
         { if: { flag: 'hunter_saw' }, t: '어딘가 아주 먼 곳에서, 누군가가 이쪽을 지켜보고 있다는 느낌이 가시지 않는다.' },
+        { if: { party: 'sena' }, t: '세나가 무너진 기둥 위로 뛰어올라 시위를 당겼다. “위에서 엄호할게요.”' },
+        { if: { party: 'bran' }, t: '브란이 우두머리의 이마를 노려보았다. “저 왕관 같은 낙인은 사냥꾼이 직접 새긴 거요. 끊을 수 있다면, 별빛을 쥔 그대뿐이오.”' },
         '싸움이 시작되기 전, 단 한 수를 둘 시간이 있다.'
       ],
       choices: [
@@ -1292,6 +1417,80 @@ window.SCENARIO = {
       ]
     },
 
+    // ───────────────────────── 동료: 세나 (검은 소나무 숲)
+    c_sena: {
+      art: { sky: 'rain', bg: 'forest', props: ['web'], actors: [{ k: 'hero', x: 0.22 }, { k: 'sena', x: 0.6, face: -1 }, { k: 'spider', x: 0.83, face: -1 }], fx: ['rain'] },
+      title: '거미줄 속의 약초꾼',
+      clock: '동료 · 세나',
+      text: [
+        '검은 소나무 사이로 날카로운 비명이 울렸다.',
+        '거대한 거미줄 한가운데, 활을 등에 멘 젊은 여자가 반쯤 감긴 채 버둥거리고 있었다. 허리춤의 약초 바구니에서 은빛 잎사귀가 쏟아져 빗물에 떠내려간다.',
+        '“거기 누구 있어요? 움직이지 말고… 위를 봐요!”',
+        '머리 위 나뭇가지에서 검은 다리 여덟 개가 천천히 내려오고 있었다. 하나가 아니었다.'
+      ],
+      choices: [
+        { id: 1, skill: '운동', insp: 'brave', label: '거미줄을 맨손으로 찢어 그녀부터 끌어낸다', stat: '힘', dc: 12,
+          note: '성공하면 거미가 내려오기 전에 그녀가 활을 쥔다 (적이 기습당한다)',
+          success: {
+            text: ['끈적한 줄이 손바닥에 들러붙었지만, 그대는 이를 악물고 거미줄을 통째로 뜯어냈다. 여자가 흙바닥에 굴러떨어지며 등의 활을 잡아챘다.', '“고마워요. 이제 내 차례예요!” 내려오던 거미들이 허공에서 멈칫했다.'],
+            fx: { set: ['sena_met'], xp: 3 }, battle: SENA_FIGHT(true), log: '거미줄을 찢어 약초꾼을 구해 냈다.', next: 'map' },
+          fail: {
+            text: ['줄은 생각보다 질겼다. 그대의 팔까지 거미줄에 감기는 사이, 거미들이 바닥에 내려앉았다.', '여자가 버둥거리며 한 손을 빼내 활을 쥐었다. “같이 싸워요. 둘이 엉켜 죽을 순 없잖아요!”'],
+            fx: { set: ['sena_met'], hp: -2 }, battle: SENA_FIGHT(false), log: '거미줄에 같이 엉켰다 (HP -2).', next: 'map' } },
+        { id: 2, skill: '생존', insp: 'wild', label: '거미줄을 받치는 굵은 줄을 찾아 끊어 거미를 떨어뜨린다', stat: '지혜', dc: 12,
+          note: '성공하면 거미 한 마리가 떨어져 죽는다',
+          success: {
+            text: ['그대는 거미줄이 어느 가지에 매달려 있는지 읽었다. 가장 굵은 줄을 끊자, 그물 전체가 출렁이며 내려오던 거미 한 마리를 바닥에 내리꽂았다.', '여자가 풀려난 손으로 활을 당겼다. 남은 한 마리가 성난 소리를 내며 달려든다!'],
+            fx: { set: ['sena_met'], xp: 3 }, battle: SENA_FIGHT(true, ['spider']), log: '굵은 줄을 끊어 거미 한 마리를 떨어뜨렸다.', next: 'map' },
+          fail: {
+            text: ['엉뚱한 줄을 끊었다. 거미줄이 출렁이자 거미들이 오히려 서둘러 내려왔다.'],
+            fx: { set: ['sena_met'] }, battle: SENA_FIGHT(false), log: '거미줄을 잘못 건드렸다.', next: 'map' } },
+        { id: 3, skill: '은신', insp: 'sly', label: '나무 뒤로 돌아 거미의 등 뒤를 노린다', stat: '민첩', dc: 13,
+          note: '성공하면 적이 기습당한다',
+          success: {
+            text: ['그대는 빗소리에 발소리를 묻고 소나무 뒤로 돌아갔다. 거미들은 버둥거리는 먹잇감만 보고 있었다.'],
+            fx: { set: ['sena_met'], xp: 3 }, battle: SENA_FIGHT(true), log: '거미의 등 뒤를 잡았다.', next: 'map' },
+          fail: {
+            text: ['젖은 솔잎이 발밑에서 미끄러졌다. 거미 한 마리가 그대 쪽으로 몸을 틀었다.'],
+            fx: { set: ['sena_met'], hp: -2 }, battle: SENA_FIGHT(false), log: '미끄러져 들켰다 (HP -2).', next: 'map' } }
+      ]
+    },
+
+    // ───────────────────────── 동료: 브란 (천 개의 계단)
+    c_bran: {
+      art: { sky: 'rain', bg: 'stairs', actors: [{ k: 'hero', x: 0.2 }, { k: 'bran', x: 0.48, face: -1 }, { k: 'scout', x: 0.7, face: -1 }, { k: 'scout', x: 0.86, face: -1 }], fx: ['rain'] },
+      title: '낙인을 지진 자',
+      clock: '동료 · 브란',
+      text: [
+        '계단 옆 무너진 초소에서 사냥개들의 울음이 터져 나왔다.',
+        '회색 두건을 쓴 사내 하나가 벽에 등을 붙인 채, 끝이 그을린 지팡이를 휘두르고 있었다. 지팡이 끝에서 튄 불씨가 빗속에서 치익 소리를 내며 꺼진다. 사냥개들이 그를 몰아붙이고 있었다.',
+        '두건 아래로 드러난 손등에는 낙인이 없었다. 대신, 낙인이 있던 자리가 시뻘겋게 지져져 있었다.',
+        '“사냥꾼의 개들이 배신자를 쫓는 중이오.” 사내가 이를 악물었다. “도와주든 지나가든 마음대로 하시오. 다만 빨리 정해 주면 고맙겠군.”'
+      ],
+      choices: [
+        { id: 1, insp: 'brave', label: '그의 곁으로 뛰어들어 함께 싸운다', roll: false, note: '전투',
+          then: {
+            text: ['그대는 사내와 등을 맞대고 섰다. “좋소. 불씨가 젖기 전에 끝냅시다.”'],
+            fx: { set: ['bran_met'] }, battle: BRAN_FIGHT(false), log: '회색 두건의 사내 곁에서 싸웠다.', next: 'map' } },
+        { id: 2, skill: '통찰', insp: 'mercy', label: '손등의 화상을 살펴, 정말 낙인을 끊은 자인지 가늠한다', stat: '지혜', dc: 12,
+          note: '성공하면 그를 믿고 함께 싸운다',
+          success: {
+            text: ['스스로 지진 화상이었다. 그것도 여러 번. 낙인이 다시 살아날 때마다 불로 지졌으리라.', '“믿겠소.” 그대의 말에 사내의 눈빛이 달라졌다. 지팡이 끝에 다시 불씨가 피어올랐다.'],
+            fx: { set: ['bran_met', 'bran_trust'], xp: 3 }, battle: BRAN_FIGHT(false), log: '사내의 화상이 스스로 지진 것임을 알아보았다.', next: 'map' },
+          fail: {
+            text: ['그대가 망설이는 사이, 사냥개 한 마리가 사내의 다리를 물고 늘어졌다.', '“의심은 나중에 하시오!” 사내가 피를 흘리며 외쳤다.'],
+            fx: { set: ['bran_met'] }, battle: BRAN_FIGHT(false), log: '망설이는 사이 사내가 다쳤다.', next: 'map' } },
+        { id: 3, skill: '은신', insp: 'sly', label: '초소 지붕으로 돌아 올라가 사냥개들을 위에서 덮친다', stat: '민첩', dc: 13,
+          note: '성공하면 적이 기습당한다',
+          success: {
+            text: ['그대는 무너진 지붕을 타고 올라가, 빗소리에 숨어 사냥개들의 머리 위에 섰다.'],
+            fx: { set: ['bran_met'], xp: 3 }, battle: BRAN_FIGHT(true), log: '초소 지붕 위에서 사냥개들을 덮쳤다.', next: 'map' },
+          fail: {
+            text: ['젖은 기와가 미끄러졌다. 그대는 사냥개들 한가운데로 떨어졌다.'],
+            fx: { set: ['bran_met'], hp: -3 }, battle: BRAN_FIGHT(false), log: '지붕에서 떨어졌다 (HP -3).', next: 'map' } }
+      ]
+    },
+
     // ───────────────────────── 탐색 사건 (반복)
     ex_glint: {
       title: '바위 틈의 반짝임', clock: '탐색',
@@ -1308,7 +1507,7 @@ window.SCENARIO = {
       title: '빗속의 약초', clock: '탐색',
       text: ['바위 그늘에 은빛 잎사귀가 돋아 있다. 상처에 좋다는 별꽃 약초 같기도 하고, 독초 같기도 하다.'],
       choices: [
-        { id: 1, skill: '의학', insp: 'wild', label: '잎맥을 살펴 약초인지 가려낸다', stat: '지혜', dc: 10,
+        { id: 1, skill: '의학', insp: 'wild', label: '잎맥을 살펴 약초인지 가려낸다', stat: '지혜', dc: 10, adv: [{ if: { party: 'sena' }, why: '세나의 눈' }],
           success: { text: ['별꽃 약초가 맞다. 그대는 잎을 짓이겨 작은 병에 담았다.'], fx: { items: ['은빛 물약'], xp: 2 }, log: '별꽃 약초로 은빛 물약을 만들었다.', next: 'map' },
           fail: { text: ['잎을 씹는 순간 혀가 저려 왔다. 독초였다.'], fx: { hp: -2 }, log: '독초를 씹었다 (HP -2).', next: 'map' } },
         { id: 2, label: '건드리지 않는다', roll: false, then: { text: ['그대는 잎사귀를 그대로 두었다.'], next: 'map' } }
@@ -1418,6 +1617,12 @@ window.SCENARIO = {
         { if: { flag: 'orden_joins' }, t: '맹세를 지켜 그대와 동행한다' },
         { if: { min: { bond: 1 } }, t: '그대를 믿지만, 관문을 지키기 위해 남았다' }
       ], else: '관문을 지키는 문지기로 남았다' },
+    { label: '세나', cases: [
+        { if: { flag: 'sena_met' }, t: '등불지기의 손녀. 그대와 함께 관문까지 왔다' }
+      ], else: '검은 소나무 숲에서 만나지 못했다' },
+    { label: '브란', cases: [
+        { if: { flag: 'bran_met' }, t: '낙인을 지져 낸 옛 추종자. 그대와 함께 사냥꾼에 맞선다' }
+      ], else: '천 개의 계단 초소에서 만나지 못했다' },
     { label: '잿빛 송곳니', cases: [
         { if: { flag: 'alpha_slain' }, t: '쓰러뜨렸다' },
         { if: { flag: 'alpha_freed' }, t: '낙인에서 해방되어 야생으로 돌아갔다' },
