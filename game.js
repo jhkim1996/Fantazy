@@ -834,7 +834,7 @@ function hurt(t,raw,dt,o){
   r.hp=Math.max(0,r.hp-dm);t.lastWhy=why;
   afx({type:'hit',target:t.uid,val:dm,crit:o.crit,delay:fxDelay+(o.d==null?260:o.d)});
   if(r.hp===0)drop(t);
-  else if(dt==='cold'&&t.st.wet&&!big(t)&&!t.st.stun){t.st.stun=1;logB(nm(t)+'의 젖은 몸이 얼어붙었다!','sys');afx({type:'text',target:t.uid,text:'얼어붙음',color:'#9fd3ff',delay:fxDelay+460})}
+  else if(dt==='cold'&&t.st.wet&&!big(t)&&!t.st.stun&&!freezeImmune(t)){t.st.stun=1;logB(nm(t)+'의 젖은 몸이 얼어붙었다!','sys');afx({type:'text',target:t.uid,text:'얼어붙음',color:'#9fd3ff',delay:fxDelay+460})}
   return dm;
 }
 function wtxt(dm,t){return dm+(t.lastWhy&&t.lastWhy.length?'('+t.lastWhy.join('·')+')':'')}
@@ -851,11 +851,15 @@ function heal(t,v){
   if(r.hp>was)afx({type:'heal',target:t.uid,val:r.hp-was,delay:fxDelay+200});
   return r.hp-was;
 }
+// 얼어붙음: 다음 차례를 쉰다. 한 라운드에 두 번 움직이는 우두머리는 다음 두 차례(한 라운드 몫)를 쉰다.
+// 정예·우두머리는 얼음에서 풀린 뒤 한 라운드 동안 다시 얼지 않는다 (번개·서리로 계속 묶어 둘 수는 없다)
+function freezeImmune(t){if(t.side!=='foe')return false;const E=E_(t);return !!((E.boss||E.elite)&&t.thawR!=null&&S.battle.round<=t.thawR+1)}
 function applyOn(t,o){
   if(!o||!up(t))return;
+  if(o.stun&&freezeImmune(t)){o=Object.assign({},o);delete o.stun;logB(josa(nm(t),'이')+' 얼음을 떨쳐 냈다 (막 풀려나 한 라운드 동안 다시 얼지 않는다)','sys');afx({type:'text',target:t.uid,text:'얼지 않음',color:'#c8ccd4',delay:fxDelay+460})}
   const say=(k,txt,col)=>{logB(josa(nm(t),'이')+' '+txt,hk(t));afx({type:'text',target:t.uid,text:ST_N[k],color:col,delay:fxDelay+460})};
   const tooBig=()=>{logB(josa(nm(t),'은')+' 너무 거대해 꿈쩍도 하지 않는다','sys');return true};
-  if(o.stun){t.st.stun=Math.max(t.st.stun||0,o.stun);say('stun','얼어붙었다!','#9fd3ff')}
+  if(o.stun){const k=S.battle.order.includes(t.uid+'*')?2:1;t.st.stun=Math.max(t.st.stun||0,o.stun*k);say('stun','얼어붙었다!','#9fd3ff')}
   if(o.poison){t.st.poison={t:o.poison,dmg:o.pdmg||'1d6'};say('poison','중독되었다!','#9be37a')}
   if(o.weak){t.st.weak=Math.max(t.st.weak||0,o.weak);say('weak','기가 꺾였다 (명중 -2)','#f0c75e')}
   if(o.restrain){t.st.restrain=Math.max(t.st.restrain||0,o.restrain);say('restrain','속박되었다!','#e8e2d2')}
@@ -976,7 +980,7 @@ function startTurn(u){
   if(up(u)&&u.st.burn){const dm=hurt(u,rollDice('1d4').total,'fire');if(dm)logB(nm(u)+' — 불붙은 몸에서 불 피해 '+wtxt(dm,u),hk(u));if(--u.st.burn<=0)delete u.st.burn}
   if(up(u)&&u.st.poison){const p=u.st.poison,dm=hurt(u,rollDice(p.dmg).total,'poison');if(dm)logB(nm(u)+' — 독 피해 '+wtxt(dm,u),hk(u));if(--p.t<=0)delete u.st.poison}
   if(!up(u))return false;
-  if(u.st.stun){if(--u.st.stun<=0)delete u.st.stun;logB(josa(nm(u),'은')+' 얼어붙어 움직이지 못한다','sys');afx({type:'text',target:u.uid,text:'얼어붙음',color:'#9fd3ff'});return false}
+  if(u.st.stun){if(--u.st.stun<=0){delete u.st.stun;u.thawR=B.round}logB(josa(nm(u),'은')+' 얼어붙어 움직이지 못한다','sys');afx({type:'text',target:u.uid,text:'얼어붙음',color:'#9fd3ff'});return false}
   if(u.st.restrain){B.tr.move=0;if(--u.st.restrain<=0)delete u.st.restrain}
   if(u.st.prone)B.tr.move=0;
   return true;
@@ -1004,7 +1008,7 @@ function runTurns(){
     if(u.side==='foe'){
       if(!up(u))continue;
       if(String(id).endsWith('*')){
-        if(u.st.stun)logB(josa(nm(u),'은')+' 얼어붙어 움직이지 못한다','sys');
+        if(u.st.stun){if(--u.st.stun<=0){delete u.st.stun;u.thawR=B.round}logB(josa(nm(u),'은')+' 얼어붙어 움직이지 못한다','sys')}
         else{B.tr={act:1,bonus:1,move:u.st.prone||u.st.restrain?0:1};if(!checkEnd())foeTurn(u)}
       }else{if(startTurn(u)&&!checkEnd())foeTurn(u);endTurnFx(u)}
       fxDelay+=520;if(checkEnd())return;continue;
@@ -1456,9 +1460,15 @@ function aiTurn(u){
     sk.forEach(k=>{const ab=abOf(k);if(!can(k)||ab.cost==='bonus')return;
       if(ab.kind==='attack'){
         const Q=profile(u,ab);let x=bestFoe(u,Q),sc=ab.mp===0?1.4:ab.uses?3:2.2;
+        // 주문: 기대 피해(명중 확률 × 평균 피해 × 약점·저항)가 큰 대상과 주문을 고른다. 얼릴 수 있으면 덤
+        if(ab.attack==='spell'){
+          const ev=y=>hitP(u,y,Q)*(avgDice(ab.dmg)+(ab.addStat?statVal(ab.stat):0))*mult(y,ab.dtype).m;
+          const cands=alive().filter(y=>canHit(u,y,Q)).sort((a,b)=>ev(b)-ev(a));
+          if(cands.length){x=cands[0];const fr=!x.st.stun&&!freezeImmune(x);sc=ev(x)/5+(ab.onHit&&ab.onHit.stun&&fr?1.2:0)+(ab.shock&&x.st.wet&&fr?1.2:0)-(ab.mp||0)*0.05}
+        }
         if(ab.execute){const lo=alive().find(y=>canHit(u,y,Q)&&y.hp<=y.hpMax/2);if(lo){x=lo;sc=5}else sc=1.5}
         if(ab.critAdv&&x)sc=atkMode(u,x,Q).mode==='adv'?5:2;
-        if(ab.chain)sc=2.2+0.8*Math.min(ab.chain,n-1)+alive().filter(y=>y.st.wet).length*0.6;
+        if(ab.chain)sc+=0.8*Math.min(ab.chain,n-1)+alive().filter(y=>y.st.wet).length*0.3;
         if(x)opts.push({s:sc,go:()=>{setT(x);useAb(u,k,x)}});
       }
       else if(ab.kind==='darts'){const x=alive().find(y=>!y.hid);if(x)opts.push({s:2.4,go:()=>{setT(x);useAb(u,k,x)}})}
