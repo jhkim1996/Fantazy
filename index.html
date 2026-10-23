@@ -6,9 +6,9 @@
 <title>떨어진 별의 노래</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&display=swap">
 <style>
-:root{--bg:#faf9f5;--card:#f1efe8;--text:#2c2c2a;--sub:#5f5e5a;--acc-bg:#e6f1fb;--acc-line:#185fa5;--acc-text:#0c447c;--line:#d3d1c7;--ok:#27500a;--ok-bg:#eaf3de;--bad:#791f1f;--bad-bg:#fcebeb;--neu:#5c4813;--neu-bg:#f3ead2;--hp:#e24b4a;--mp:#378add;--xp:#ba7517;--foe:#a03a2c;--star:#b8860b;--r-unc:#2f7a2f;--r-rare:#1f5fbf;--r-leg:#b0570f}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;--foe:#e8836f;--star:#f0c75e;--r-unc:#93d493;--r-rare:#8ab8ff;--r-leg:#f2a65a;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;--foe:#e8836f;--star:#f0c75e;--r-unc:#93d493;--r-rare:#8ab8ff;--r-leg:#f2a65a;color-scheme:dark}
+:root{--bg:#faf9f5;--card:#f1efe8;--text:#2c2c2a;--sub:#5f5e5a;--acc-bg:#e6f1fb;--acc-line:#185fa5;--acc-text:#0c447c;--line:#d3d1c7;--ok:#27500a;--ok-bg:#eaf3de;--bad:#791f1f;--bad-bg:#fcebeb;--neu:#5c4813;--neu-bg:#f3ead2;--hp:#e24b4a;--mp:#378add;--xp:#ba7517;--foe:#a03a2c;--star:#b8860b;--r-unc:#2f7a2f;--r-rare:#1f5fbf;--r-leg:#b0570f;--r-set:#0b7a6e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;--foe:#e8836f;--star:#f0c75e;--r-unc:#93d493;--r-rare:#8ab8ff;--r-leg:#f2a65a;--r-set:#5fd6c4;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1f1e1d;--card:#2c2c2a;--text:#f1efe8;--sub:#b4b2a9;--acc-bg:#0c447c;--acc-line:#85b7eb;--acc-text:#b5d4f4;--line:#444441;--ok:#c0dd97;--ok-bg:#27500a;--bad:#f7c1c1;--bad-bg:#791f1f;--neu:#ecd9a6;--neu-bg:#4a3c17;--foe:#e8836f;--star:#f0c75e;--r-unc:#93d493;--r-rare:#8ab8ff;--r-leg:#f2a65a;--r-set:#5fd6c4;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;padding-block:12px;padding-inline:16px;background:var(--bg);color:var(--text);font-family:system-ui,"Malgun Gothic",sans-serif;font-size:14px;line-height:1.5}
@@ -52,8 +52,11 @@ summary{cursor:pointer;color:var(--sub);font-size:13px}
 .chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;background:var(--bg)}
 .downbox{margin-top:8px;padding:10px 12px;border-radius:8px;border:1px dashed var(--bad);color:var(--bad);font-size:13px}
 .next{display:block;width:100%;margin-top:12px;padding:10px;font-weight:500;background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text)}
-.item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0}
+.item{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;padding:6px 0}
+.item+.item{border-top:1px solid var(--line)}
 .item>div{min-width:0}
+.item>div:first-child{flex:1 1 220px}
+.acts2{gap:4px;margin-left:auto}
 .item button{padding:2px 10px;font-size:12px;flex:none}
 .sumrow{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
 .sumrow:last-child{border-bottom:0}
@@ -162,6 +165,8 @@ body.combat .art{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;curs
 .rar-uncommon{color:var(--r-unc)}
 .rar-rare{color:var(--r-rare)}
 .rar-legendary{color:var(--r-leg)}
+.rar-set{color:var(--r-set)}
+.chip.loot{border-color:currentColor;font-weight:500}
 .lvopt{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .lvopt .opt{margin:0}
 /* 배치: 좁은 화면은 한 줄(상태 → 장면 → 할 일 → 전장), 넓은 화면은 오른쪽에 상태나 전장을 붙인다 */
@@ -225,6 +230,46 @@ h3{font-size:12px;font-weight:500;color:var(--sub);margin:0 0 6px}
 .abl.off{opacity:.5}
 .abl .cost{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-left:4px;white-space:nowrap}
 .setrow{display:block}
+/* 소지품: 장비 부위 */
+.gearsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.gearsum>div{background:var(--bg);border-radius:8px;padding:6px;text-align:center}
+.gearsum b{display:block;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.gearfx{margin-bottom:8px}
+.slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+@media (min-width:520px){.slots{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.slotbtn{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;padding:8px 10px;background:var(--bg);min-height:66px}
+.slotbtn b{font-weight:600;font-size:13px;line-height:1.35}
+.slotbtn small{font-size:11px;color:var(--sub);line-height:1.35}
+.slotbtn.empty b{color:var(--sub)}
+.slotbtn.on{background:var(--acc-bg);border-color:var(--acc-line)}
+.slotbtn.on small,.slotbtn.on .sl{color:var(--acc-text)}
+.sl{font-size:11px;color:var(--sub);display:flex;gap:4px;width:100%}
+.sl .cnt{margin-left:auto;color:var(--acc-text)}
+.sl .cnt.new,.tabs .cnt.new{color:var(--r-set);font-weight:600}
+.picker{margin-top:8px;padding:8px 10px;border:1px solid var(--acc-line);border-radius:8px;background:var(--bg)}
+.picker .item button.go,.acts2 .go{background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text)}
+.dls{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.dl{font-size:11px;padding:0 6px;border-radius:999px;border:1px solid var(--line);color:var(--sub);font-variant-numeric:tabular-nums}
+.dl.up{border-color:var(--ok);color:var(--ok)}
+.dl.down{border-color:var(--bad);color:var(--bad)}
+.newtag{font-size:10px;font-weight:600;color:var(--r-set);border:1px solid var(--r-set);border-radius:999px;padding:0 6px;margin-left:6px;vertical-align:1px}
+.filters{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px}
+.filters button{padding:3px 10px;font-size:12px;border-radius:999px}
+.sellb{color:var(--star);border-color:var(--star)}
+.setcard{margin-top:0}
+.setcard+.setcard{margin-top:8px}
+.setcard summary{color:var(--text);font-size:14px}
+.piece{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--line)}
+.piece .pm{color:var(--sub);line-height:1.5}
+.piece.on .pm,.piece.got .pm{color:var(--r-set)}
+.piece:not(.got):not(.on) b{color:var(--sub);font-weight:500}
+.piece button{padding:2px 10px;font-size:12px}
+.tiers{display:grid;gap:2px;margin:8px 0 4px}
+.tier{font-size:12px;color:var(--sub);padding-left:8px;border-left:3px solid var(--line)}
+.tier.on{color:var(--text);border-color:var(--r-set);font-weight:500}
+.qbtn{margin-left:6px;padding:1px 8px;font-size:11px;border-color:var(--hp);color:var(--text)}
+.kbd{font-size:11px;color:var(--sub);margin-top:6px}
+@media (hover:none){.kbd{display:none}}
 .setrow+.setrow{margin-top:8px}
 </style>
 </head>
@@ -256,6 +301,7 @@ h3{font-size:12px;font-weight:500;color:var(--sub);margin:0 0 6px}
   <div id="playwrap">
     <h2>선택지</h2>
     <div id="choices"></div>
+    <div class="kbd">숫자 키로 고르고 Enter로 굴린다</div>
     <div id="rollwrap">
       <h2>판정</h2>
       <div class="card">

@@ -7,7 +7,7 @@
 // 모든 결과는 이야기를 끊지 않는다. 결과는 플래그와 수치로 남아 뒤의 문장·난이도·선택지·전투를 바꾼다.
 //
 // 직업별 문장: { mage: '…', warrior: '…', rogue: '…', bard: '…', _: '기본' }
-// 낱말 치환: {name} {cls} {weapon} {item} {fine} {relic} {amp}, 조사: {item:을} {relic:으로} {name:이여}
+// 낱말 치환: {name} {cls} {weapon} {item} {fine} {relic} {oath} {amp}, 조사: {item:을} {relic:으로} {name:이여}
 // 수치 표시: {#kill_wolf} (카운터), {@회색 낙인 조각} (소지 개수)
 
 // 사건이 끝날 때마다 done_<사건 id> 플래그가 자동으로 켜진다.
@@ -53,6 +53,23 @@ function HOUNDS(enemies) {
       log: '사냥개 무리에게 쓰러졌지만 오르덴이 구해 냈다. 우두머리는 무너지는 회랑으로 물러났다.', next: 'map' }
   };
 }
+
+// 옛 수로의 묘실: 가라앉은 기사단장 (사냥터 우두머리, 되풀이해 싸운다)
+const CAPTAIN_FIGHT = {
+  // 동료 한 명마다 HP +25, 동료가 둘 이상이면 한 라운드에 두 번 움직인다
+  enemies: ['captain'], noFlee: true, perPC: { hp: 25 }, extraTurn: 2,
+  art: { sky: 'cave', bg: 'aqueduct', fx: ['drip'] },
+  intro: '기사단장이 녹슨 장검을 물 밖으로 들어 올렸다. 묘실의 물이 일제히 일렁인다!',
+  win: {
+    text: [
+      '기사단장이 한쪽 무릎을 꿇었다. 투구 속 금빛 불꽃이 잦아들며, 그는 다시 묘실의 물속으로 가라앉았다.',
+      '그러나 완전히 꺼지지는 않았다. 맹세는 아직 끝나지 않았다는 듯, 물 밑에서 희미한 빛이 깜박였다. 그대가 쉬고 나면 그는 다시 일어설 것이다.'
+    ],
+    fx: { set: ['captain_slept'], add: { captain_wins: 1 } }, log: '가라앉은 기사단장을 잠재웠다. 긴 휴식 뒤에 다시 일어난다.', next: 'map' },
+  lose: {
+    text: ['녹슨 장검이 그대를 묘실 밖으로 내동댕이쳤다. 물살이 그대를 수로 어귀까지 떠밀었다.', '묘실 깊은 곳에서 금빛 불꽃이 다시 그대를 기다린다.'],
+    log: '가라앉은 기사단장에게 쓰러졌다.', next: 'map' }
+};
 
 // 결계의 방: 잿빛 송곳니와의 결전
 const BOSS = {
@@ -249,22 +266,22 @@ window.SCENARIO = {
 
   classes: [
     { id: 'mage', name: '마법사', key: '지혜', hp: 20, mp: 10, hpGain: 4, mpGain: 3, passive: 'eye', amp: '마력 증폭',
-      weapon: '지팡이', item: '낡은 지팡이', fine: '잘 다듬은 지팡이', relic: '별빛 지팡이', armor: '여행자의 망토',
+      weapon: '지팡이', item: '낡은 지팡이', fine: '잘 다듬은 지팡이', relic: '별빛 지팡이', oath: '엘레우스의 별지팡이', armor: '여행자의 망토',
       skills: ['runebolt', 'bolt', 'frost', 'starfire'], row: 'back',
       profs: ['비전', '통찰'],
       blurb: '룬을 읽고 마력을 다루는 학자. 뒷열에서 주문을 쏜다. 마력이 넉넉하고 강한 주문을 쓰지만 몸이 약하다.' },
     { id: 'warrior', name: '전사', key: '힘', hp: 26, mp: 4, hpGain: 7, mpGain: 1, passive: 'might', amp: '투지',
-      weapon: '검', item: '낡은 검', fine: '잘 벼린 검', relic: '별빛 검', armor: '낡은 사슬 조끼',
+      weapon: '검', item: '낡은 검', fine: '잘 벼린 검', relic: '별빛 검', oath: '엘레우스의 장검', armor: '낡은 사슬 조끼',
       skills: ['smash', 'second', 'warcry', 'whirl'], row: 'front',
       profs: ['운동', '생존'],
       blurb: '수많은 전장을 건너온 검사. HP와 방어가 가장 높아 앞열에서 오래 버틴다. 기술은 짧은 휴식마다 충전된다.' },
     { id: 'rogue', name: '도적', key: '민첩', hp: 22, mp: 6, hpGain: 5, mpGain: 2, passive: 'shadow', amp: '급소 노리기',
-      weapon: '단검', item: '낡은 단검', fine: '잘 벼린 단검', relic: '별빛 단검', armor: '가죽 조끼',
+      weapon: '단검', item: '낡은 단검', fine: '잘 벼린 단검', relic: '별빛 단검', oath: '엘레우스의 단검', armor: '가죽 조끼',
       skills: ['stab', 'smoke', 'venom'], row: 'front', sneak: true,
       profs: ['은신', '곡예'],
       blurb: '그림자를 밟고 다니는 떠돌이. 유리하거나 동료가 적을 붙잡고 있을 때 기습 피해를 더하고, 보조 행동으로 숨는다.' },
     { id: 'bard', name: '음유시인', key: '매력', hp: 22, mp: 8, hpGain: 5, mpGain: 2, passive: 'voice', amp: '영감',
-      weapon: '류트', item: '낡은 류트', fine: '새 줄을 건 류트', relic: '별빛 류트', armor: '가죽 조끼',
+      weapon: '류트', item: '낡은 류트', fine: '새 줄을 건 류트', relic: '별빛 류트', oath: '엘레우스의 류트', armor: '가죽 조끼',
       skills: ['mock', 'discord', 'mend', 'anthem', 'starsong'], row: 'back',
       profs: ['공연', '기만'],
       blurb: '옛 노래를 기억하는 가객. 노래로 적을 흔들고 동료를 치유한다.' }
@@ -389,12 +406,36 @@ window.SCENARIO = {
     '낡은 류트': { kind: '무기', slot: 'weapon', dice: '1d6', bonus: 0, desc: '줄 하나가 늘어진 낡은 류트. 울림으로 친다' },
     '새 줄을 건 류트': { kind: '무기', slot: 'weapon', rar: 'uncommon', dice: '1d6', bonus: 1, price: 45, desc: '은실 줄을 새로 건 류트' },
     '별빛 류트': { kind: '무기', slot: 'weapon', rar: 'legendary', dice: '1d8', bonus: 2, desc: '일곱째 별 아스텔의 마지막 빛' },
+    // 가라앉은 기사단장이 지키던 엘레우스의 무기 (직업마다 하나, 단장에게서만 나온다)
+    '엘레우스의 별지팡이': { kind: '무기', slot: 'weapon', rar: 'legendary', dice: '1d8', bonus: 2, fx: { mp: 4 }, desc: '엘레우스 궁정 마법사의 지팡이. 끝에 별 조각이 박혀 있다' },
+    '엘레우스의 장검': { kind: '무기', slot: 'weapon', rar: 'legendary', dice: '1d10', bonus: 2, fx: { hp: 6 }, desc: '기사단장이 물속에서도 놓지 않은 장검' },
+    '엘레우스의 단검': { kind: '무기', slot: 'weapon', rar: 'legendary', dice: '1d8', bonus: 2, crit: 18, fx: { init: 2 }, desc: '기사단 첩자의 은빛 단검. 18~20 치명타' },
+    '엘레우스의 류트': { kind: '무기', slot: 'weapon', rar: 'legendary', dice: '1d8', bonus: 2, fx: { check: 1, save: 1 }, desc: '기사단의 행진곡을 연주하던 궁정 류트' },
     '여행자의 망토': { kind: '방어구', slot: 'armor', ac: 0, desc: '비를 겨우 막는 망토' },
     '가죽 조끼': { kind: '방어구', slot: 'armor', ac: 1, desc: '얇은 가죽 조끼' },
     '낡은 사슬 조끼': { kind: '방어구', slot: 'armor', ac: 2, desc: '군데군데 고리가 빠진 사슬 조끼' },
     '가죽 갑옷': { kind: '방어구', slot: 'armor', ac: 2, price: 40, desc: '기름 먹인 두꺼운 가죽 갑옷' },
     '사슬 갑옷': { kind: '방어구', slot: 'armor', rar: 'uncommon', ac: 3, price: 90, desc: '촘촘한 사슬 갑옷' },
-    '엘레우스 기사의 흉갑': { kind: '방어구', slot: 'armor', rar: 'rare', ac: 4, desc: '물에 잠겨서도 녹슬지 않은 은빛 흉갑' },
+    '엘레우스 기사의 흉갑': { nosell: true, kind: '방어구', slot: 'armor', rar: 'rare', ac: 4, desc: '물에 잠겨서도 녹슬지 않은 은빛 흉갑' },
+    '곰가죽 갑옷': { kind: '방어구', slot: 'armor', rar: 'uncommon', ac: 3, fx: { hp: 4 }, desc: '이끼 곰의 두꺼운 가죽을 덧댄 갑옷' },
+    // 머리·손·발 (fx는 장신구와 같은 효과를 쓴다)
+    '가죽 두건': { kind: '머리', slot: 'head', fx: { hp: 3 }, price: 18, desc: '빗물을 막아 주는 가죽 두건' },
+    '철 투구': { kind: '머리', slot: 'head', rar: 'uncommon', ac: 1, price: 70, desc: '행상인이 어디선가 구해 온 둥근 철 투구' },
+    '수로 산호 투구': { kind: '머리', slot: 'head', rar: 'rare', ac: 1, fx: { save: 1, resist: ['cold'] }, desc: '수로 바닥의 산호가 엉겨 붙은 투구. 차가운 물을 막는다' },
+    '가죽 장갑': { kind: '손', slot: 'hands', fx: { init: 1 }, price: 16, desc: '손에 착 붙는 가죽 장갑' },
+    '거미 비단 장갑': { kind: '손', slot: 'hands', rar: 'uncommon', fx: { init: 2 }, desc: '거미줄로 짠 가벼운 장갑' },
+    '곰 발톱 건틀릿': { kind: '손', slot: 'hands', rar: 'rare', fx: { hit: 1, dmg: 1 }, desc: '이끼 곰의 발톱을 손등에 박아 넣은 건틀릿' },
+    '여행자의 장화': { kind: '발', slot: 'feet', fx: { save: 1 }, price: 16, desc: '진흙 길에도 미끄러지지 않는 장화' },
+    '박쥐 날개 장화': { kind: '발', slot: 'feet', rar: 'uncommon', fx: { init: 2 }, desc: '안개 박쥐의 날개 가죽으로 지은 가벼운 장화' },
+    // 세트: 같은 세트를 여러 부위 입으면 세트 효과가 더해진다 (sets 참고)
+    '늑대가죽 두건': { kind: '머리', slot: 'head', rar: 'set', set: 'wolfhide', fx: { hp: 3, init: 1 }, desc: '안개 비탈 늑대의 가죽으로 지은 두건' },
+    '늑대가죽 장갑': { kind: '손', slot: 'hands', rar: 'set', set: 'wolfhide', fx: { dmg: 1 }, desc: '늑대 발톱 자국이 남은 가죽 장갑' },
+    '늑대가죽 장화': { kind: '발', slot: 'feet', rar: 'set', set: 'wolfhide', fx: { init: 1, hp: 2 }, desc: '늑대처럼 소리 없이 걷게 해 주는 장화' },
+    '맹세기사의 투구': { kind: '머리', slot: 'head', rar: 'set', set: 'oathknight', ac: 1, fx: { hp: 5 }, desc: '물에 잠긴 기사들이 쓰던 은빛 투구. 이마에 일곱 별이 새겨져 있다' },
+    '맹세기사의 흉갑': { kind: '방어구', slot: 'armor', rar: 'set', set: 'oathknight', ac: 4, fx: { hp: 4, save: 1 }, desc: '기사단장 바렌의 흉갑. 천 년을 물속에서 버텼다' },
+    '맹세기사의 건틀릿': { kind: '손', slot: 'hands', rar: 'set', set: 'oathknight', fx: { hit: 1 }, desc: '사냥개들이 무덤에서 물어 온 은빛 건틀릿. 이빨 자국이 남았다' },
+    '맹세기사의 각반': { kind: '발', slot: 'feet', rar: 'set', set: 'oathknight', ac: 1, fx: { init: 1 }, desc: '수로 거머리 떼가 엉겨 붙어 있던 은빛 각반' },
+    '맹세기사의 별 인장': { kind: '장신구', slot: 'trinket', rar: 'set', set: 'oathknight', fx: { save: 1, check: 1 }, desc: '추종자들이 기사의 무덤에서 빼앗아 간 맹세의 인장. 그대가 차야 세트에 든다' },
     '은빛 물약': { kind: '물약', use: { hp: 15 }, battle: true, price: 15, desc: 'HP 15 회복' },
     '푸른 물약': { kind: '물약', use: { mp: 8 }, battle: true, price: 20, desc: '마력 8 회복' },
     '기름 병': { kind: '투척', throw: { surface: 'oil' }, battle: true, price: 8, desc: '전투에서 던지면 그 열의 바닥이 기름으로 덮인다. 불이 닿으면 폭발' },
@@ -404,17 +445,16 @@ window.SCENARIO = {
     '기사의 반지': { kind: '증표', desc: '물에 잠긴 기사가 끼고 있던 은반지. 오르덴이 알아볼지도 모른다' },
     '잿빛 새끼': { kind: '동료', desc: '어미를 잃은 사냥개 새끼. 이마에 아직 낙인이 없다' },
     '잿빛 털 한 줌': { kind: '장신구', slot: 'trinket', rar: 'legendary', fx: { init: 3, hit: 1, death: true }, desc: '해방된 잿빛 송곳니가 남긴 털. 언젠가 그 울음이 그대를 도울 것이다' },
-    // 장신구: 그대나 동료 한 명이 찬다. fx: hp(최대 HP) ac hit dmg fire(불 피해) init save check(이야기 판정) resist[] hide(숨기 유리) death(죽음 내성 유리)
+    // 장신구: 그대나 동료 한 명이 찬다. fx: hp(최대 HP) mp(최대 마력) ac hit dmg fire(불 피해) init save check(이야기 판정) resist[] hide(숨기 유리) death(죽음 내성 유리) smite(무기 공격에 별빛 피해)
     '여행자의 행운 부적': { kind: '장신구', slot: 'trinket', rar: 'uncommon', fx: { check: 1 }, price: 45, desc: '길 떠나는 이의 목에 걸어 주던 은방울' },
     '회색 두건': { kind: '장신구', slot: 'trinket', rar: 'uncommon', fx: { hide: true, init: 1 }, desc: '추종자의 두건. 그림자에 녹아든다' },
     '곰 송곳니 목걸이': { kind: '장신구', slot: 'trinket', rar: 'uncommon', fx: { dmg: 1 }, desc: '이끼 곰의 송곳니를 꿴 목걸이' },
-    '거미 비단 장갑': { kind: '장신구', slot: 'trinket', rar: 'uncommon', fx: { init: 2 }, desc: '거미줄로 짠 가벼운 장갑' },
-    '이끼 왕관': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hp: 8 }, desc: '늙은 이끼 곰의 둥지에서 자란 이끼가 왕관처럼 엉긴 것' },
-    '등불지기의 등불': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { check: 1, save: 1 }, desc: '잿빛 안개 속에서도 꺼지지 않는 등불지기 대대의 불씨' },
-    '세나 어머니의 화살촉': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hit: 1, init: 1 }, desc: '사냥개 세 마리를 쏜 화살촉. 지켜야 할 사람에게 넘겨준다' },
-    '브란의 불씨 반지': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { fire: 2, resist: ['fire'] }, desc: '회색 장부를 태운 불씨가 깃든 무쇠 반지' },
-    '카이론의 반지': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { ac: 1, save: 1 }, desc: '오르덴의 동생이 끼던 맹세기사의 은반지' },
-    '사냥꾼의 휘장': { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hit: 1, resist: ['psychic'] }, desc: '추종자 우두머리가 지니던 회색 왕관 문양. 속삭임을 막아 준다' },
+    '이끼 왕관': { nosell: true, kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hp: 8 }, desc: '늙은 이끼 곰의 둥지에서 자란 이끼가 왕관처럼 엉긴 것' },
+    '등불지기의 등불': { nosell: true, kind: '장신구', slot: 'trinket', rar: 'rare', fx: { check: 1, save: 1 }, desc: '잿빛 안개 속에서도 꺼지지 않는 등불지기 대대의 불씨' },
+    '세나 어머니의 화살촉': { nosell: true, kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hit: 1, init: 1 }, desc: '사냥개 세 마리를 쏜 화살촉. 지켜야 할 사람에게 넘겨준다' },
+    '브란의 불씨 반지': { nosell: true, kind: '장신구', slot: 'trinket', rar: 'rare', fx: { fire: 2, resist: ['fire'] }, desc: '회색 장부를 태운 불씨가 깃든 무쇠 반지' },
+    '카이론의 반지': { nosell: true, kind: '장신구', slot: 'trinket', rar: 'rare', fx: { ac: 1, save: 1 }, desc: '오르덴의 동생이 끼던 맹세기사의 은반지' },
+    '사냥꾼의 휘장': { nosell: true, kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hit: 1, resist: ['psychic'] }, desc: '추종자 우두머리가 지니던 회색 왕관 문양. 속삭임을 막아 준다' },
     '달빛 별꽃': { kind: '약초', desc: '달빛도 없는데 은빛으로 빛나는 꽃. 낙인의 빛이 남긴 상처를 씻는다' },
     '달빛 별꽃의 이슬': { kind: '약초', desc: '꽃을 꺾지 않고 받아 온 달빛 별꽃의 이슬. 낙인의 빛이 남긴 상처를 씻는다' },
     '회색 장부': { kind: '증표', desc: '낙인이 찍힌 모든 이름이 적힌 장부. 브란이 이것을 찾고 있었다' },
@@ -427,8 +467,10 @@ window.SCENARIO = {
   // 기술: p(확률), dmg, hit, ranged, onHit{prone, restrain, poison}, sweep(앞열 모두), debuff(아군 모두 명중 감소), summon
   enemies: {
     wolf: { art: 'wolf', name: '굶주린 늑대', lv: 1, hp: 10, ac: 11, atk: 3, dmg: '1d6+1', xp: 5, gold: [2, 6], pack: true, init: 2,
+      drops: [{ item: '늑대가죽 두건', p: 0.07, pity: 22, uniq: true }, { item: '늑대가죽 장갑', p: 0.07, pity: 22, uniq: true }, { item: '늑대가죽 장화', p: 0.07, pity: 22, uniq: true }],
       desc: '비에 젖은 털 사이로 갈비뼈가 드러난 늑대. 무리 지어 사냥한다.' },
     bats: { art: 'bats', name: '안개 박쥐 떼', lv: 1, hp: 8, ac: 13, atk: 4, dmg: '1d4+1', xp: 4, gold: [1, 4], fly: true, init: 3,
+      drops: [{ item: '박쥐 날개 장화', p: 0.07, uniq: true }],
       desc: '안개 속에서 날개 소리만 들리는 박쥐 떼. 날아서 뒷열까지 덮친다.' },
     boar: { art: 'boar', name: '진흙 멧돼지', lv: 2, hp: 16, ac: 12, atk: 4, dmg: '1d8+2', xp: 8, gold: [3, 8], str: 4,
       skills: [{ name: '돌진', p: 0.3, dmg: '1d8+2', onHit: { prone: 1 } }],
@@ -438,22 +480,23 @@ window.SCENARIO = {
       skills: [{ name: '거미줄 뿜기', p: 0.4, ranged: true, dmg: '1d2', onHit: { restrain: 2 } }],
       drops: [{ item: '푸른 물약', p: 0.1 }, { item: '거미 비단 장갑', p: 0.08 }], desc: '송아지만 한 검은 거미. 뒤에서 거미줄을 뿜고, 송곳니에서 독이 떨어진다. 불에 약하다.' },
     bear: { art: 'bear', name: '이끼 곰', lv: 3, hp: 28, ac: 12, atk: 5, dmg: '1d10+3', xp: 14, gold: [5, 12], big: true,
-      skills: [{ name: '짓누르기', p: 0.25, dmg: '2d8+3', hit: -1, onHit: { prone: 1 } }], drops: [{ item: '은빛 물약', p: 0.25 }, { item: '야영 물자', p: 0.5 }, { item: '곰 송곳니 목걸이', p: 0.15 }],
+      skills: [{ name: '짓누르기', p: 0.25, dmg: '2d8+3', hit: -1, onHit: { prone: 1 } }], drops: [{ item: '은빛 물약', p: 0.25 }, { item: '야영 물자', p: 0.5 }, { item: '곰 송곳니 목걸이', p: 0.15 }, { item: '곰가죽 갑옷', p: 0.06, uniq: true }, { item: '곰 발톱 건틀릿', p: 0.05, uniq: true }],
       desc: '등에 이끼가 자란 거대한 곰. 숲의 주인이다.' },
     scout: { art: 'scout', name: '잿빛 사냥개 정찰병', lv: 2, hp: 14, ac: 13, atk: 4, dmg: '1d6+2', xp: 9, gold: [2, 6], pack: true, init: 3,
       drops: [{ item: '회색 낙인 조각', p: 0.5 }], desc: '목덜미에 회색 표식이 깜박이는 사냥개.' },
     hound: { art: 'hound', name: '잿빛 사냥개', lv: 3, hp: 20, ac: 13, atk: 5, dmg: '1d8+2', xp: 12, gold: [3, 9], pack: true, init: 2,
-      drops: [{ item: '회색 낙인 조각', p: 0.4 }], desc: '회색 사냥꾼에게 묶인 잿빛 사냥개.' },
+      drops: [{ item: '회색 낙인 조각', p: 0.4 }, { item: '맹세기사의 건틀릿', p: 0.04, pity: 30, uniq: true }], desc: '회색 사냥꾼에게 묶인 잿빛 사냥개.' },
     leech: { art: 'leech', name: '수로 거머리', lv: 3, hp: 18, ac: 11, atk: 5, dmg: '1d6+2', xp: 11, gold: [2, 6], drain: 0.5, vuln: ['fire'],
+      drops: [{ item: '맹세기사의 각반', p: 0.05, pity: 25, uniq: true }],
       desc: '사람 팔뚝만 한 거머리. 문 자리에서 피를 빨아 회복한다.' },
     drowned: { art: 'drowned', name: '물에 잠긴 기사', lv: 5, hp: 44, ac: 15, atk: 6, dmg: '1d10+3', xp: 35, gold: [20, 35], elite: true, big: true, people: true,
       resist: ['cold', 'poison'], vuln: ['radiant'],
       skills: [{ name: '녹슨 대검 휩쓸기', p: 0.3, dmg: '2d8+3', hit: -2, sweep: true }],
-      drops: [{ item: '기사의 반지', p: 1, once: 'got_ring' }, { item: '엘레우스 기사의 흉갑', p: 1, once: 'got_cuirass' }, { item: '은빛 물약', p: 0.5 }],
+      drops: [{ item: '기사의 반지', p: 1, once: 'got_ring' }, { item: '엘레우스 기사의 흉갑', p: 1, once: 'got_cuirass' }, { item: '은빛 물약', p: 0.5 }, { item: '맹세기사의 투구', p: 0.25, pity: 6, uniq: true }, { item: '수로 산호 투구', p: 0.12, uniq: true }],
       desc: '천 년 동안 수로 바닥에 잠들어 있던 기사. 녹슨 투구 속에서 푸른 불꽃이 탄다. 냉기와 독에 강하고, 별빛에 약하다.' },
     acolyte: { art: 'acolyte', name: '회색 사냥꾼의 추종자', people: true, lv: 4, hp: 26, ac: 14, atk: 6, dmg: '1d8+3', xp: 20, gold: [10, 20], row: 'back', ranged: true,
       skills: [{ name: '사냥개 부르기', p: 0.3, summon: 'hound', once: true }],
-      drops: [{ item: '회색 낙인 조각', p: 0.6 }, { item: '푸른 물약', p: 0.3 }, { item: '회색 두건', p: 0.12 }],
+      drops: [{ item: '회색 낙인 조각', p: 0.6 }, { item: '푸른 물약', p: 0.3 }, { item: '회색 두건', p: 0.12 }, { item: '맹세기사의 별 인장', p: 0.06, pity: 20, uniq: true }],
       desc: '회색 두건을 쓴 사람. 뒷열에서 회색 화살을 쏜다. 손등에 사냥개와 같은 낙인이 있다.' },
     oldbear: { art: 'bear', name: '늙은 이끼 곰', lv: 5, hp: 60, ac: 13, atk: 6, dmg: '2d6+3', xp: 40, gold: [3, 10], elite: true, big: true, multi: 2,
       skills: [{ name: '짓누르기', p: 0.3, dmg: '2d8+4', hit: -1, onHit: { prone: 1 } }],
@@ -466,6 +509,17 @@ window.SCENARIO = {
       ],
       drops: [{ item: '사냥꾼의 휘장', p: 1, once: 'got_insignia' }],
       desc: '이마 전체에 낙인이 새겨진 늙은 사내. 회색 장부를 허리에 찼다. 그 속삭임은 마음을 꺾는다.' },
+    // 사냥터 우두머리: 옛 수로 묘실의 기사단장. 이기면 긴 휴식을 할 때까지 잠든다 (되풀이해 싸울 수 있다)
+    captain: { art: 'captain', name: '가라앉은 기사단장', where: '옛 수로의 묘실', people: true, lv: 7, hp: 160, ac: 16, atk: 9, dmg: '2d8+6', xp: 90, gold: [50, 80], boss: true, big: true, multi: 2, init: 1,
+      resist: ['cold', 'poison'], vuln: ['radiant'],
+      skills: [
+        { name: '녹슨 맹세의 휩쓸기', p: 0.3, dmg: '2d8+5', hit: -2, sweep: true },
+        { name: '물의 사슬', p: 0.2, ranged: true, dmg: '1d8', dtype: 'cold', onHit: { restrain: 2 } },
+        { name: '가라앉은 맹세', p: 0.15, debuff: { atk: -2, turns: 2 }, text: '기사단장이 물속에서 맹세를 읊는다. 차가운 물이 발목을 붙든다! (2턴 동안 모두 명중 -2)' },
+        { name: '가라앉은 자들을 부른다', p: 0.25, summon: 'leech', once: true }
+      ],
+      drops: [{ item: '맹세기사의 흉갑', p: 0.2, pity: 6, uniq: true }, { item: '{oath}', p: 0.15, pity: 8, uniq: true }, { item: '푸른 물약', p: 0.5 }, { item: '은빛 물약', p: 0.6 }],
+      desc: '수로 가장 깊은 묘실을 지키는 엘레우스의 기사단장. 녹슨 투구 속에서 금빛 불꽃이 탄다. 한 번에 두 번 베고, 동료가 둘 이상이면 한 라운드에 두 번 움직인다. 냉기와 독에 강하며 별빛에 약하다.' },
     alpha: { art: 'alpha', name: '잿빛 송곳니', lv: 6, hp: 90, ac: 15, atk: 7, dmg: '2d6+4', xp: 80, gold: [40, 60], boss: true, big: true, init: 3, multi: 2,
       skills: [
         { name: '포효', p: 0.2, debuff: { atk: -2, turns: 2 }, text: '잿빛 송곳니가 포효한다. 다리가 굳는다! (2턴 동안 모두 명중 -2)' },
@@ -488,7 +542,7 @@ window.SCENARIO = {
         { if: { flag: 'done_n10' }, t: '천 년 만에 비가 그친 지붕 위로 햇살이 내려앉았다.' }
       ],
       rest: [{ if: { flag: 'done_n1' }, t: '노파의 오두막에서 쉰다' }, { t: '마을 어귀의 빈 헛간에서 쉰다' }], restFree: true,
-      shop: { name: '빗속의 행상인', items: ['은빛 물약', '푸른 물약', '야영 물자', '기름 병', '불꽃 병', '{fine}', '가죽 갑옷', '사슬 갑옷', '여행자의 행운 부적'] },
+      shop: { name: '빗속의 행상인', items: ['은빛 물약', '푸른 물약', '야영 물자', '기름 병', '불꽃 병', '{fine}', '가죽 갑옷', '사슬 갑옷', '가죽 두건', '철 투구', '가죽 장갑', '여행자의 장화', '여행자의 행운 부적'] },
       actions: [
         { label: '등불이 켜진 오두막의 문을 두드린다', event: 'n1', if: { not: 'done_n1' }, star: true },
         { label: '노파의 부탁을 듣는다', event: 'q_wolves_start', if: { flag: 'done_n1', not: 'q_wolves' } },
@@ -556,6 +610,9 @@ window.SCENARIO = {
       encounters: [{ w: 4, e: ['leech'] }, { w: 2, e: ['leech', 'leech'] }, { w: 1, e: ['drowned'] }],
       ambush: 0.25, field: { water: true },
       explore: ['ex_bones', 'ex_coins', 'ex_depths'],
+      actions: [
+        { label: '가장 깊은 묘실에서 가라앉은 기사단장과 싸운다 (권장 레벨 6 · 되풀이할 수 있다)', event: 'captain_lair', if: { not: 'captain_slept' } }
+      ],
       links: [{ to: 'slope' }, { to: 'gate' }]
     },
     gate: {
@@ -634,6 +691,18 @@ window.SCENARIO = {
   ],
 
   counterNames: { bond: '오르덴과의 유대', ap_sena: '세나의 호감', ap_bran: '브란의 호감' },
+
+  // 세트: 그대가 같은 세트를 n부위 이상 입으면 그 단계의 효과가 모두 더해진다
+  sets: {
+    wolfhide: { name: '안개 늑대가죽', where: '세 부위 모두 굶주린 늑대가 지닌다 (안개 비탈·검은 소나무 숲·천 개의 계단)',
+      pieces: ['늑대가죽 두건', '늑대가죽 장갑', '늑대가죽 장화'],
+      bonus: [{ n: 2, fx: { init: 2 } }, { n: 3, fx: { hit: 1, hp: 6 } }] },
+    oathknight: { name: '엘레우스 맹세기사', where: '옛 수로와 무너지는 회랑. 흉갑은 가라앉은 기사단장만 지닌다',
+      pieces: ['맹세기사의 투구', '맹세기사의 흉갑', '맹세기사의 건틀릿', '맹세기사의 각반', '맹세기사의 별 인장'],
+      bonus: [{ n: 2, fx: { hp: 8 } }, { n: 3, fx: { ac: 1, save: 1 } }, { n: 4, fx: { hit: 1, dmg: 1 } }, { n: 5, fx: { dmg: 2, smite: '1d6', death: true, resist: ['psychic'] } }] }
+  },
+  // 긴 휴식을 하면 꺼지는 플래그 (되풀이해 싸우는 우두머리가 다시 일어난다)
+  restClears: ['captain_slept'],
 
   // 야영지 대화: 쉼터에서 긴 휴식을 하면, 조건이 맞는 첫 이야기가 모닥불 곁에서 시작된다 (한 번씩)
   camp: ['camp_sena2', 'camp_bran2', 'camp_orden2', 'camp_sena1', 'camp_bran1', 'camp_orden1', 'camp_argue'],
@@ -2076,6 +2145,23 @@ window.SCENARIO = {
         { id: 2, label: '그냥 지나친다', roll: false, then: { text: ['그대는 동전을 물속에 그대로 두었다.'], next: 'map' } }
       ]
     },
+    captain_lair: {
+      art: { sky: 'cave', bg: 'aqueduct', actors: [{ k: 'hero', x: 0.26 }, { k: 'captain', x: 0.68, face: -1 }], fx: ['drip'] },
+      title: '가라앉은 묘실', clock: '사냥터의 우두머리',
+      text: [
+        '수로의 가장 깊은 곳, 무너진 아치 아래에 묘실이 잠겨 있다. 물 위로 은빛 갑주의 어깨가 드러나 있다.',
+        '엘레우스의 기사단장 바렌. 별의 무덤을 지키러 수로로 내려가 끝내 돌아오지 않았다는 사람. 녹슨 투구 속에서 금빛 불꽃이 그대를 바라본다.',
+        { if: { min: { captain_wins: 1 } }, t: '그대가 몇 번을 잠재워도, 그는 다시 일어난다. 맹세기사의 갑주 한 벌을 아직 품고 있다는 듯이.' },
+        { if: { party: 'orden' }, t: '오르덴이 창끝을 내렸다. “바렌 단장님… 쉬게 해 드리는 것이 기사의 도리다. 몇 번이 걸리든.”' }
+      ],
+      choices: [
+        { id: 1, insp: 'brave', label: '묘실의 물속으로 걸어 들어가 기사단장과 싸운다', roll: false, note: '전투 (매우 강하다 · 맹세기사의 흉갑과 엘레우스의 무기를 지녔다)',
+          then: { text: ['그대가 물을 가르며 다가가자, 기사단장이 천천히 몸을 일으켰다.'], battle: CAPTAIN_FIGHT, next: 'map' } },
+        { id: 2, label: '아직은 아니다. 조용히 물러난다', roll: false,
+          then: { text: ['그대는 묘실을 등지고 물러났다. 금빛 불꽃이 그대의 등을 오래 지켜보았다.'], next: 'map' } }
+      ]
+    },
+
     ex_depths: {
       art: { sky: 'cave', bg: 'aqueduct', actors: [{ k: 'drowned', x: 0.66, face: -1 }], fx: ['drip'] },
       title: '수로의 깊은 곳', clock: '탐색', if: { flag: 'found_bones', not: 'got_ring' },

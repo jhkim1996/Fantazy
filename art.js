@@ -183,7 +183,9 @@ window.Art=(function(){
   function knight(x,gy,h,f,o){
     o=o||{};
     const col=o.stone?mix(P.ink,P.hz,.42):o.drowned?'#16232b':ink();
-    figure(x,gy,h,f,{col,helm:true,cape:!o.stone,weapon:o.drowned?'bigsword':'spear',eyes:o.stone?null:o.drowned?'#5fd0ff':'#f2c35a'});
+    figure(x,gy,h,f,{col,helm:true,cape:!o.stone,weapon:o.drowned?'bigsword':'spear',eyes:o.stone?null:o.captain?'#ffd27a':o.drowned?'#5fd0ff':'#f2c35a'});
+    // 기사단장: 투구 위의 일곱 별 장식과 금빛 불꽃
+    if(o.captain){g.fillStyle='#d9b45a';for(let i=0;i<7;i++){const a=-Math.PI*(.15+.7*i/6);circ(x+Math.cos(a)*h*.09,gy-h*.93+Math.sin(a)*h*.07,h*.012)}glow(x,gy-h*.86,h*.16,'#ffcf6a',.35)}
     if(o.broken){g.fillStyle=P.top;poly([[x-h*.2,gy-h*1.05],[x+h*.2,gy-h*1.05],[x+h*.2,gy-h*.68],[x-h*.05,gy-h*.8]])}
   }
 
@@ -245,6 +247,7 @@ window.Art=(function(){
     else if(k==='bran'){figure(x,gy,96*s,f,{robe:true,hood:true,weapon:'torch'});glow(x-f*96*s*.11,gy-96*s*.48,10*s,'#ff5a3c',.7)}
     else if(k==='statue')knight(x,gy,118*s,f,{stone:true});
     else if(k==='drowned')knight(x,gy,112*s,f,{drowned:true});
+    else if(k==='captain')knight(x,gy,136*s,f,{drowned:true,captain:true});
     else if(k==='acolyte')figure(x,gy,98*s,f,{robe:true,hood:true,weapon:'dagger',eyes:'#c9d1dc'});
     else if(k==='crone')crone(x,gy,84*s,f);
     else if(k==='wolf')beast('wolf',x,gy-bob,78*s,f,{eye:'#ffb347'});
@@ -302,7 +305,7 @@ window.Art=(function(){
 
   // ── 전투 배치: 열마다 자리를 나눈다 (왼쪽이 아군, 오른쪽이 적)
   const ZX={'pc-front':{c:.34,w:.08,rx:.12},'pc-back':{c:.135,w:.07,rx:.11},'foe-front':{c:.665,w:.09,rx:.17},'foe-back':{c:.885,w:.07,rx:.1}};
-  const HT={wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,acolyte:98,hero:96,orden:118,sena:90,bran:96};
+  const HT={wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,captain:136,acolyte:98,hero:96,orden:118,sena:90,bran:96};
   function battleLayout(info){
     const B=info.battle,list=[];if(!B)return list;
     const groups={};B.units.forEach(u=>{const z=u.side+'-'+u.row;(groups[z]=groups[z]||[]).push(u)});

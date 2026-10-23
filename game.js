@@ -6,7 +6,7 @@ const KEY='fantazy:'+SC.id;
 const CLASSES=SC.classes;
 const CLS_IDS=CLASSES.map(c=>c.id);
 const STATS=SC.stats.map(s=>s.n);
-let S=null,gen=0,rolling=false,ampOn=false,foOn=false,mkRolling=false,cmenu=null,shopOpen=false,fxDelay=0;
+let S=null,gen=0,rolling=false,ampOn=false,foOn=false,mkRolling=false,cmenu=null,shopOpen=false,fxDelay=0,gearPick=null,bagFilter='all';
 
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 function arr(x){return x==null?[]:Array.isArray(x)?x:[x]}
@@ -56,7 +56,7 @@ function josa(w,f){
   if(p[0]==='으로')return w+(b&&b!==8?'으로':'로');
   return w+(b?p[0]:p[1]);
 }
-function tokens(){const c=cls(),h=S.hero||{};return {name:h.name||'떠돌이',cls:c.name,weapon:c.weapon,item:c.item,fine:c.fine,relic:c.relic,amp:(S.amp&&S.amp.name)||c.amp}}
+function tokens(){const c=cls(),h=S.hero||{};return {name:h.name||'떠돌이',cls:c.name,weapon:c.weapon,item:c.item,fine:c.fine,relic:c.relic,oath:c.oath,amp:(S.amp&&S.amp.name)||c.amp}}
 function countItem(n){return S.items.filter(i=>i===n).length}
 function tpl(s){
   if(typeof s!=='string')return s;const T=tokens();
@@ -108,7 +108,7 @@ function freshMake(){
 }
 function fresh(){
   return {mode:'create',mk:freshMake(),cls:null,race:null,bg:null,hero:null,stats:[],amp:null,skills:[],items:[],equip:{},gold:0,
-    insp:0,opt:{karmic:true,autoComp:false},failStreak:0,reroll:null,comp:{},rows:{},ch:{},rest:{short:2},
+    insp:0,opt:{karmic:true,autoComp:false,autoGear:true},failStreak:0,pity:{},newItems:[],reroll:null,comp:{},rows:{},ch:{},rest:{short:2},
     flags:{},counters:{},log:[],loc:SC.startLoc,ev:null,pending:null,sel:null,lvl:0,battle:null,notice:null,done:false};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -124,7 +124,7 @@ function restore(){
         else s.mode='world';
       }
       if(s.insp==null)s.insp=0;if(s.failStreak==null)s.failStreak=0;if(!s.equip)s.equip={};
-      s.opt=Object.assign({karmic:true,autoComp:false},s.opt);
+      s.opt=Object.assign({karmic:true,autoComp:false,autoGear:true},s.opt);if(!s.pity)s.pity={};if(!s.newItems)s.newItems=[];
       if(!s.rest)s.rest={short:2};if(!s.comp)s.comp={};if(!s.rows)s.rows={};if(!s.ch)s.ch={};
       return s;
     }
@@ -147,25 +147,59 @@ function profCount(sk){
   return Math.min(n,2);
 }
 function skillMod(sk){return statVal(SC.skillList[sk])+profCount(sk)*profBonus()}
+// 장비 부위: 무기 · 머리 · 몸 · 손 · 발 · 장신구 (장신구는 동료에게 건넬 수도 있다)
+const SLOTS=[['weapon','무기'],['head','머리'],['armor','몸'],['hands','손'],['feet','발'],['trinket','장신구']];
+function slotName(k){const s=SLOTS.find(x=>x[0]===k);return s?s[1]:k}
 function wpn(){return SC.items[S.equip.weapon]||{dice:'1d4',bonus:0}}
-function arm(){return SC.items[S.equip.armor]||{ac:0}}
+function gearAC(){return SLOTS.reduce((a,[k])=>k==='weapon'?a:a+((SC.items[S.equip[k]]||{}).ac||0),0)}
 function prof(){return Math.floor(S.hero.level/2)}
-function heroAC(){return 10+statVal('민첩')+(arm().ac||0)+(tfx('hero').ac||0)+bsum('ac')}
+function heroAC(){return 10+statVal('민첩')+gearAC()+(tfx('hero').ac||0)+bsum('ac')}
 function atkStat(){return cls().key}
 function weaponHit(extra){return statVal(atkStat())+prof()+(wpn().bonus||0)+(extra||0)+(tfx('hero').hit||0)+bsum('atk')}
 function weaponDmgBonus(){return statVal(atkStat())+(wpn().bonus||0)+(tfx('hero').dmg||0)+bsum('dmg')}
 function clsSkills(){return cls().skills||[]}
 function knownSkills(){return clsSkills().filter(k=>SC.combatSkills[k].lv<=S.hero.level)}
 function hasRelic(){return S.items.some(i=>i===cls().relic)}
-function itemScore(it){if(!it)return -1;if(it.slot==='weapon'){const p=parseDice(it.dice);return p.n*(p.s+1)/2+(it.bonus||0)*1.5}return it.ac||0}
-function autoEquip(){
-  ['weapon','armor'].forEach(slot=>{
-    let best=S.items.includes(S.equip[slot])?S.equip[slot]:null;
-    S.items.forEach(n=>{const it=SC.items[n];if(it&&it.slot===slot&&itemScore(it)>itemScore(SC.items[best]))best=n});
-    S.equip[slot]=best;
+// 장비의 값어치: 저절로 바꿔 낄 때 견준다
+function fxScore(f){if(!f)return 0;return (f.hp||0)/6+(f.mp||0)/5+(f.ac||0)+(f.hit||0)*1.2+(f.dmg||0)+(f.fire||0)*.4+(f.init||0)*.3+(f.save||0)*.5+(f.check||0)*.4+arr(f.resist).length*.4+(f.hide?.4:0)+(f.death?.5:0)+(f.smite?2:0)}
+function gearScore(n){const it=SC.items[n];if(!it)return -1;let v=fxScore(it.fx)+(it.ac||0);if(it.slot==='weapon'){const p=parseDice(it.dice);v+=p.n*(p.s+1)/2+(it.bonus||0)*1.5}return v}
+function wearable(n,slot){const it=SC.items[n];return !!it&&it.slot===slot}
+// 세트 효과를 받고 있는 부위는 저절로 바꾸지 않는다
+function setLocked(n){const it=SC.items[n];return !!(it&&it.set&&setCount(it.set)>=2)}
+// 장비를 바꾸면 최대 HP·마력이 바뀔 수 있다. 지금 값도 같이 움직인다
+function regear(fn){
+  const h=S.hero,a=heroFx();fn();if(!h)return;
+  const b=heroFx(),dh=(b.hp||0)-(a.hp||0),dm=(b.mp||0)-(a.mp||0);
+  if(dh){h.hpMax+=dh;h.hp=Math.max(1,Math.min(h.hpMax,h.hp+dh))}
+  if(dm){h.mpMax+=dm;h.mp=Math.max(0,Math.min(h.mpMax,h.mp+dm))}
+}
+// 더는 없는 장비는 벗고, 새로 얻은 장비(names)는 빈 부위에 낀다.
+// 지금 것보다 좋으면 바꿔 끼지만, '좋은 장비 저절로 끼기'를 껐거나 세트 효과를 받는 중이면 그대로 둔다
+function autoEquip(names){
+  regear(()=>SLOTS.forEach(([k])=>{const n=S.equip[k];if(n&&(!S.items.includes(n)||!wearable(n,k)))S.equip[k]=null}));
+  arr(names).forEach(n=>{
+    const it=SC.items[n];if(!it||!it.slot||it.slot==='trinket'||!S.items.includes(n))return;
+    const cur=S.equip[it.slot];if(cur===n)return;
+    if(!cur||(S.opt.autoGear!==false&&!setLocked(cur)&&gearScore(n)>gearScore(cur)))regear(()=>{S.equip[it.slot]=n});
   });
-  // 더는 갖고 있지 않은 장신구는 벗는다
-  if(S.equip.trinket&&!S.items.includes(S.equip.trinket))setTrinket('hero',null);
+}
+function equipGear(n){
+  const it=SC.items[n];if(!it||!it.slot||!S.items.includes(n)||rolling)return;
+  if(it.slot==='trinket'){equipTrinket(n,'hero');return}
+  regear(()=>{S.equip[it.slot]=n});
+  logp(josa(n,'을')+' '+(it.slot==='weapon'?'손에 쥐었다':'착용했다')+'.');gearPick=null;save();render();
+}
+function unequipSlot(slot){
+  const n=S.equip[slot];if(!n||rolling)return;
+  if(slot==='trinket'){unequipTrinket(n,'hero');return}
+  regear(()=>{S.equip[slot]=null});logp(josa(n,'을')+' 벗었다.');save();render();
+}
+// 예전 저장: 부위가 바뀐 장비(장신구였던 거미 비단 장갑 등)는 벗겨서 맞는 부위에 다시 낀다
+function fixGear(){
+  if(!S.hero)return;
+  const moved=SLOTS.map(([k])=>S.equip[k]).filter(n=>n&&SC.items[n]&&!wearable(n,SLOTS.find(x=>S.equip[x[0]]===n)[0]));
+  autoEquip(moved);
+  for(const id in (S.comp||{})){const t=S.comp[id].trinket;if(t&&!wearable(t,'trinket'))S.comp[id].trinket=null}
 }
 // 새로 얻은 장신구: 그대의 자리가 비어 있으면 가장 귀한 것을 찬다 (일부러 벗은 것은 다시 채우지 않는다)
 function newTrinkets(names){
@@ -173,35 +207,57 @@ function newTrinkets(names){
   arr(names).forEach(n=>{const it=SC.items[n];if(it&&it.slot==='trinket'&&spareOf(n)>0&&(!best||(RANK[it.rar]||0)>(RANK[SC.items[best].rar]||0)))best=n});
   if(best)setTrinket('hero',best);
 }
+// 새로 얻은 장비는 소지품 탭에서 '새것'으로 표시한다
+function markNew(names){arr(names).forEach(n=>{const it=SC.items[n];if(it&&it.slot&&!S.newItems.includes(n))S.newItems.push(n)})}
+// 얻었다는 줄: 세트 부위면 몇 부위를 모았는지 붙인다
+function gotLine(n){const it=SC.items[n],st=it&&it.set&&SC.sets[it.set];return '획득: '+n+(st?' ('+st.name+' '+st.pieces.filter(x=>countItem(x)>0).length+'/'+st.pieces.length+')':'')}
+
+// ── 세트
+function setCount(id){const st=(SC.sets||{})[id];return st?st.pieces.filter(n=>SLOTS.some(([k])=>S.equip[k]===n)).length:0}
+function addFx(a,f){if(!f)return a;for(const k in f){const v=f[k];if(k==='resist')a.resist=[...new Set((a.resist||[]).concat(v))];else if(typeof v==='number')a[k]=(a[k]||0)+v;else a[k]=v}return a}
+function setFx(){const f={};for(const id in (SC.sets||{})){const n=setCount(id);SC.sets[id].bonus.forEach(b=>{if(n>=b.n)addFx(f,b.fx)})}return f}
+// 그대가 입고 찬 모든 장비 + 세트 효과
+function heroFx(){const f={};if(!S.equip)return f;SLOTS.forEach(([k])=>{const it=SC.items[S.equip[k]];if(it)addFx(f,it.fx)});return addFx(f,setFx())}
+
+// ── 팔기: 마을의 행상인에게. 전설·세트·이야기 물건은 팔지 않는다
+function wornCount(n){return SLOTS.filter(([k])=>S.equip[k]===n).length+Object.keys(S.comp||{}).filter(id=>S.comp[id].trinket===n).length}
+function sellPrice(n){
+  const it=SC.items[n];if(!it||it.nosell||it.rar==='legendary'||it.rar==='set'||n===cls().relic||['증표','재료','약초','동료'].includes(it.kind))return 0;
+  return it.price?Math.max(1,Math.floor(it.price/2)):({uncommon:20,rare:45})[it.rar]||4;
+}
+function sell(n){
+  if(!L().shop||rolling)return;const v=sellPrice(n);if(!v||countItem(n)-wornCount(n)<=0)return;
+  S.items.splice(S.items.lastIndexOf(n),1);S.gold+=v;S.newItems=S.newItems.filter(x=>x!==n||countItem(x)>0);
+  logp(josa(n,'을')+' 팔았다 (금화 +'+v+').');save();render();
+}
 
 // ── 장신구와 아이템 등급
-const RAR={uncommon:'고급',rare:'희귀',legendary:'전설'},RANK={uncommon:1,rare:2,legendary:3};
+const RAR={uncommon:'고급',rare:'희귀',legendary:'전설',set:'세트'},RANK={uncommon:1,rare:2,set:2,legendary:3};
 const DTN={fire:'불',cold:'냉기',arcane:'비전',radiant:'별빛',thunder:'천둥',psychic:'정신',poison:'독',phys:'물리'};
 function trinketOn(who){return who==='hero'?S.equip.trinket||null:(S.comp&&S.comp[who]&&S.comp[who].trinket)||null}
-function tfx(who){const n=trinketOn(who),it=n&&SC.items[n];return (it&&it.fx)||{}}
+// 그대는 모든 장비와 세트 효과, 동료는 찬 장신구 하나
+function tfx(who){if(who==='hero')return heroFx();const n=trinketOn(who),it=n&&SC.items[n];return (it&&it.fx)||{}}
 function wearers(n){const w=[];if(S.equip.trinket===n)w.push('hero');for(const id in (S.comp||{}))if(S.comp[id].trinket===n)w.push(id);return w}
 function wearer(n){return wearers(n)[0]||null}
 function spareOf(n){return countItem(n)-wearers(n).length}   // 아무도 차지 않은 개수
 function whoName(who){return who==='hero'?'그대':COMP(who).name}
 function trinketText(fx){
-  const p=[];if(fx.hp)p.push('최대 HP +'+fx.hp);if(fx.ac)p.push('방어 +'+fx.ac);if(fx.hit)p.push('명중 +'+fx.hit);if(fx.dmg)p.push('피해 +'+fx.dmg);
+  const p=[];if(fx.hp)p.push('최대 HP +'+fx.hp);if(fx.mp)p.push('최대 마력 +'+fx.mp);if(fx.ac)p.push('방어 +'+fx.ac);if(fx.hit)p.push('명중 +'+fx.hit);if(fx.dmg)p.push('피해 +'+fx.dmg);
   if(fx.fire)p.push('불 피해 +'+fx.fire);if(fx.init)p.push('주도권 +'+fx.init);if(fx.save)p.push('내성 +'+fx.save);if(fx.check)p.push('이야기 판정 +'+fx.check);
-  if(fx.resist)p.push(fx.resist.map(d=>DTN[d]).join('·')+' 저항');if(fx.hide)p.push('숨기 유리');if(fx.death)p.push('죽음 내성 유리');
+  if(fx.resist)p.push(fx.resist.map(d=>DTN[d]).join('·')+' 저항');if(fx.hide)p.push('숨기 유리');if(fx.death)p.push('죽음 내성 유리');if(fx.smite)p.push('무기 공격에 별빛 '+fx.smite);
   return p.join(', ');
 }
 // 장신구를 바꿔 찬다. 최대 HP가 바뀌면 지금 HP도 같이 움직인다
 function setTrinket(who,n){
-  const old=tfx(who).hp||0;
-  if(who==='hero')S.equip.trinket=n;else S.comp[who].trinket=n;
-  const dl=(tfx(who).hp||0)-old;
-  if(who==='hero'){S.hero.hpMax+=dl;S.hero.hp=Math.max(1,Math.min(S.hero.hpMax,S.hero.hp+dl))}else syncComps();
+  if(who==='hero'){regear(()=>{S.equip.trinket=n});return}
+  S.comp[who].trinket=n;syncComps();
 }
 function equipTrinket(n,who){
   if(trinketOn(who)===n)return;
   if(spareOf(n)<=0){const prev=wearers(n).find(w=>w!==who);if(prev)setTrinket(prev,null)}   // 남는 것이 없으면 다른 이에게서 옮긴다
-  setTrinket(who,n);logp(josa(whoName(who),'이')+' '+josa(n,'을')+' 찼다.');save();render();
+  setTrinket(who,n);logp(josa(whoName(who),'이')+' '+josa(n,'을')+' 찼다.');gearPick=null;save();render();
 }
-function unequipTrinket(n,who){who=who||wearer(n);if(!who)return;setTrinket(who,null);save();render()}
+function unequipTrinket(n,who){who=who||wearer(n);if(!who)return;setTrinket(who,null);gearPick=null;save();render()}
 function rarName(n){const it=SC.items[n]||{};return el('b',it.rar?'rar-'+it.rar:null,n)}
 
 // ── 동료의 호감: 함께 있는 동료만 그대의 선택에 반응한다
@@ -241,8 +297,9 @@ function applyFx(fx,out){
   if(fx.mp){h.mp=Math.max(0,Math.min(h.mpMax,h.mp+fx.mp));out.push('마력 '+sign(fx.mp))}
   if(fx.gold){const g=Array.isArray(fx.gold)?rint(fx.gold[0],fx.gold[1]):fx.gold;S.gold=Math.max(0,S.gold+g);out.push('금화 '+sign(g))}
   arr(fx.drop).forEach(i=>{const k=S.items.indexOf(i);if(k>=0){S.items.splice(k,1);out.push('잃음: '+i)}});
-  arr(fx.items).forEach(i=>{S.items.push(i);out.push('획득: '+i)});
-  if(fx.items||fx.drop)autoEquip();
+  arr(fx.items).forEach(i=>{S.items.push(i);out.push(gotLine(i))});
+  markNew(fx.items);
+  if(fx.items||fx.drop)autoEquip(fx.items);
   newTrinkets(fx.items);
   if(fx.amp){Object.assign(S.amp,fx.amp);out.push(S.amp.name+' d'+S.amp.die)}
   if(fx.stats)for(const n in fx.stats){const s=S.stats.find(x=>x.n===n);if(s){s.v+=fx.stats[n];out.push(n+' '+sign(fx.stats[n]))}}
@@ -480,8 +537,8 @@ function startAdventure(){
   });
   S.amp={die:4,cost:2,source:c.item,name:c.amp};
   S.skills=['amp',c.passive];S.items=[c.item,c.armor,'은빛 물약','야영 물자','야영 물자'].concat(arr(b.items));S.gold=(SC.startGold||0)+(b.gold||0);
-  S.insp=1;S.opt={karmic:true,autoComp:false};S.failStreak=0;S.comp={};S.rows={};S.ch={};S.rest={short:2};
-  autoEquip();
+  S.insp=1;S.opt={karmic:true,autoComp:false,autoGear:true};S.failStreak=0;S.pity={};S.newItems=[];S.comp={};S.rows={};S.ch={};S.rest={short:2};S.equip={};
+  autoEquip(S.items);
   S.loc=SC.startLoc;S.log=[];
   logp(name+' ('+r.name+' '+c.name+', '+b.name+') · '+S.stats.map(s=>s.n+' '+sign(s.v)).join(' '));
   startEvent(SC.start);
@@ -523,7 +580,7 @@ function longRest(){
   const fill=(v,mx)=>full?mx:Math.max(v,Math.ceil(mx/2));
   h.hp=fill(h.hp,h.hpMax);h.mp=fill(h.mp,h.mpMax);
   for(const id in S.comp)S.comp[id].hp=fill(S.comp[id].hp,S.comp[id].hpMax);
-  S.rest={short:2};recharge('long');
+  S.rest={short:2};recharge('long');arr(SC.restClears).forEach(f=>{delete S.flags[f]});
   logp(l.name+'에서 '+(full?'':'빈속으로 ')+'긴 휴식을 했다.');
   const msg=restText(l)+' — '+(full?'밤이 지나고, 모두 HP와 마력을 되찾았다.':'먹을 것이 없어 잠을 설쳤다. 절반만 회복했다.')+(!free&&has?' (야영 물자 -1)':'')+' 짧은 휴식과 기술이 모두 충전되었다.';
   // 모닥불 곁에서 동료가 이야기를 꺼낸다
@@ -545,7 +602,7 @@ function shortRest(){
 }
 function buy(name){
   const it=SC.items[name];if(!it||!it.price||S.gold<it.price)return;
-  S.gold-=it.price;S.items.push(name);autoEquip();newTrinkets([name]);
+  S.gold-=it.price;S.items.push(name);markNew([name]);autoEquip([name]);newTrinkets([name]);
   logp(josa(name,'을')+' 샀다 (금화 -'+it.price+').');
   save();render();
 }
@@ -570,7 +627,7 @@ function calc(c){
   let mod=statVal(statOf(c)),dc=c.dc;const why=[];
   if(c.stat==='class'){mod+=profBonus();why.push('직업 숙련 +'+profBonus())}
   else if(c.skill){const n=profCount(c.skill);if(n){mod+=n*profBonus();why.push((n>1?'전문 +':'숙련 +')+n*profBonus())}}
-  const tc=tfx('hero').check;if(tc){mod+=tc;why.push('장신구 '+sign(tc))}
+  const tc=tfx('hero').check;if(tc){mod+=tc;why.push('장비 '+sign(tc))}
   arr(c.bonus).forEach(b=>{if(ok(b.if)){mod+=b.v;why.push(b.why+' '+sign(b.v))}});
   arr(c.dcMod).forEach(b=>{if(ok(b.if)){dc+=b.v;why.push(b.why+' DC '+sign(b.v))}});
   const adv=arr(c.adv).filter(a=>ok(a.if)).map(a=>a.why),dis=arr(c.dis).filter(a=>ok(a.if)).map(a=>a.why);
@@ -707,9 +764,9 @@ function profile(u,ab){
   if(u.kind==='hero'){
     if(ab&&ab.attack==='spell'){const st=ab.stat||atkStat(),add=ab.addStat?statVal(st):0;
       return {name:ab.name,hit:spellHit(ab)-wk,ranged:true,crit:ab.crit||20,dtype:ab.dtype||'arcane',spell:true,dice:ab.dmg+sign(add+bsum('dmg')),dmg:c=>rollDice(ab.dmg,c).total+add+bsum('dmg')}}
-    const w=wpn(),thrown=S.cls==='rogue'&&u.row==='back';   // 도적은 뒷열에서 단검을 던진다
+    const w=wpn(),thrown=S.cls==='rogue'&&u.row==='back',sm=tfx('hero').smite;   // 도적은 뒷열에서 단검을 던진다. sm: 세트의 별빛 피해
     return {name:ab?ab.name:thrown?'단검 던지기':'공격',hit:weaponHit(ab&&ab.hit)-wk,ranged:thrown,crit:Math.min(w.crit||20,(ab&&ab.crit)||20),dtype:'phys',weapon:true,
-      dice:w.dice+sign(weaponDmgBonus())+(ab&&ab.extra?'+'+ab.extra:''),dmg:c=>rollDice(w.dice,c).total+weaponDmgBonus()+(ab&&ab.extra?rollDice(ab.extra,c).total:0)};
+      dice:w.dice+sign(weaponDmgBonus())+(ab&&ab.extra?'+'+ab.extra:'')+(sm?'+'+sm:''),dmg:c=>rollDice(w.dice,c).total+weaponDmgBonus()+(ab&&ab.extra?rollDice(ab.extra,c).total:0)+(sm?rollDice(sm,c).total:0)};
   }
   const A=COMP(u.id).attack,b=A.dmgB+lvB()+bsumU(u,'dmg')+compMod(u.id,'dmg')+(A.dtype==='fire'?tfx(u.id).fire||0:0);
   return {name:ab?ab.name:A.name,hit:A.hit+lvB()+((ab&&ab.hit)||0)+bsumU(u,'atk')+compMod(u.id,'hit')-wk,ranged:!!A.ranged,reach:!!A.reach,crit:(ab&&ab.crit)||20,dtype:A.dtype||'phys',burn:!!A.burn,weapon:true,
@@ -756,7 +813,7 @@ function mult(t,dt){
   if(t.side==='foe'){const E=E_(t);if(arr(E.vuln).includes(dt)){m*=2;why.push('약점')}if(arr(E.resist).includes(dt)){m/=2;why.push('저항')}}
   if(dt==='fire'&&t.st.wet){m/=2;why.push('젖음')}
   if(dt==='poison'&&t.kind==='hero'&&race()&&race().poisonResist){m/=2;why.push('드워프')}
-  if(t.side==='pc'&&arr(ufx(t).resist).includes(dt)){m/=2;why.push('장신구')}
+  if(t.side==='pc'&&arr(ufx(t).resist).includes(dt)){m/=2;why.push(t.kind==='hero'?'장비':'장신구')}
   return {m,why};
 }
 // 피해를 준다. 쓰러진 아군을 때리면 죽음 내성 실패가 쌓인다. 실제로 준 피해를 돌려준다
@@ -1342,12 +1399,18 @@ function winBattle(){
     const E=E_(e);
     let x=E.xp;if(e.lv<=h.level-3)x=Math.max(1,Math.floor(x/2));
     xp+=x;gold+=rint(E.gold[0],E.gold[1]);
-    arr(E.drops).forEach(dr=>{if(dr.once&&S.flags[dr.once])return;if(Math.random()<dr.p){got.push(dr.item);if(dr.once)S.flags[dr.once]=true}});
+    // uniq: 이미 가진 것은 다시 나오지 않는다. pity: 그만큼 못 얻으면 다음에는 반드시 나온다
+    arr(E.drops).forEach(dr=>{
+      const item=tpl(dr.item);if(!SC.items[item]||(dr.once&&S.flags[dr.once])||(dr.uniq&&(countItem(item)>0||got.includes(item))))return;
+      let hit=Math.random()<dr.p;
+      if(!hit&&dr.pity){S.pity[item]=(S.pity[item]||0)+1;if(S.pity[item]>=dr.pity)hit=true}
+      if(hit){got.push(item);delete S.pity[item];if(dr.once)S.flags[dr.once]=true}
+    });
   });
   // 경험치는 파티가 나눠 갖는다 (동료는 그대의 레벨을 따라 자란다)
   const n=pcs().length;if(n>1)xp=Math.max(1,Math.round(xp/n));
-  h.xp+=xp;S.gold+=gold;got.forEach(i=>S.items.push(i));if(got.length){autoEquip();newTrinkets(got)}
-  out.unshift('경험치 +'+xp+(n>1?' ('+n+'명이 나눔)':''),'금화 +'+gold);got.forEach(i=>out.push('획득: '+i));
+  h.xp+=xp;S.gold+=gold;got.forEach(i=>S.items.push(i));if(got.length){markNew(got);autoEquip(got);newTrinkets(got)}
+  out.unshift('경험치 +'+xp+(n>1?' ('+n+'명이 나눔)':''),'금화 +'+gold);got.forEach(i=>out.push(gotLine(i)));
   settle(out);
   B.over='win';B.res={title:'승리!',lines:out};
   logB('승리!','sys');
@@ -1491,6 +1554,11 @@ function renderHud(){
   const meta=el('div','mini hudmeta');
   const ins=el('span','insp','영감 '+'✦'.repeat(S.insp||0)+'·'.repeat(Math.max(0,max-(S.insp||0))));ins.title='배경다운 선택을 하면 쌓이고, 실패한 판정을 다시 굴릴 때 쓴다';meta.appendChild(ins);
   meta.appendChild(document.createTextNode(' · 짧은 휴식 '+((S.rest&&S.rest.short)||0)+'/2 · 야영 물자 '+countItem('야영 물자')));
+  // 지도에서는 HP·마력이 모자라면 물약을 바로 마실 수 있다
+  if(S.mode==='world')[['hp',h.hp<h.hpMax],['mp',h.mp<h.mpMax]].forEach(([k,need])=>{
+    if(!need)return;const n=[...new Set(S.items)].find(x=>{const it=SC.items[x];return it&&it.use&&it.use[k]});if(!n)return;
+    const b=el('button','qbtn',n+' ×'+countItem(n));b.title=n+'을 마신다 ('+SC.items[n].desc+')';b.onclick=()=>useItem(n);meta.appendChild(b);
+  });
   box.appendChild(meta);
   const pt=party();
   if(pt.length){
@@ -1510,7 +1578,7 @@ function statsBlock(){
   const d0=el('div'),st=el('div','stats');
   S.stats.forEach(s=>{const dv=el('div','stat');if(s.note)dv.title=s.note;dv.appendChild(el('span','sub',s.n));dv.appendChild(el('b',null,sign(s.v)));st.appendChild(dv)});
   d0.appendChild(st);
-  const w=wpn();d0.appendChild(el('div','mini atkline','공격 명중 '+sign(weaponHit())+' · 피해 '+w.dice+sign(weaponDmgBonus())+(w.crit?' ('+w.crit+'~20 치명타)':'')+' · 방어 '+heroAC()+' · 숙련 +'+profBonus()));
+  const w=wpn(),sm=tfx('hero').smite;d0.appendChild(el('div','mini atkline','공격 명중 '+sign(weaponHit())+' · 피해 '+w.dice+sign(weaponDmgBonus())+(sm?'+'+sm:'')+(w.crit?' ('+w.crit+'~20 치명타)':'')+' · 방어 '+heroAC()+' · 숙련 +'+profBonus()));
   return d0;
 }
 function questBlock(){
@@ -1537,7 +1605,7 @@ function actBtn(box,label,small,fn,opts){
 // 탐험 화면은 탭으로 나눈다: 지금 할 일과 지도가 먼저, 나머지는 한 번 눌러서 본다
 const WTABS=[['explore','탐험'],['party','동료'],['bag','소지품'],['abil','능력'],['log','기록']];
 let wtab=(()=>{try{const t=localStorage.getItem(KEY+':tab');return WTABS.some(x=>x[0]===t)?t:'explore'}catch(e){return 'explore'}})();
-function setTab(t){wtab=t;try{localStorage.setItem(KEY+':tab',t)}catch(e){}render()}
+function setTab(t){if(wtab==='bag'&&t!=='bag'){S.newItems=[];gearPick=null;save()}wtab=t;try{localStorage.setItem(KEY+':tab',t)}catch(e){}render()}
 function campHint(id){return arr(SC.camp).some(t=>!S.flags['done_'+t]&&ok(SC.events[t].if)&&(!id||arr(SC.events[t].if.party).includes(id)))}
 function renderWorld(){
   const box=$('world');box.innerHTML='';
@@ -1546,6 +1614,7 @@ function renderWorld(){
     const b=el('button',wtab===id?'on':'',n);b.setAttribute('role','tab');b.setAttribute('aria-selected',String(wtab===id));
     if(id==='party'&&party().length)b.appendChild(el('span','cnt',String(party().length)));
     if(id==='party'&&campHint())b.appendChild(el('span','cnt star','✦'));
+    if(id==='bag'&&wtab!=='bag'&&S.newItems.length)b.appendChild(el('span','cnt new','새것 '+S.newItems.length));
     b.onclick=()=>setTab(id);tb.appendChild(b);
   });
   box.appendChild(tb);
@@ -1571,6 +1640,8 @@ function paneExplore(box){
       const owned=it.slot&&S.items.includes(n);
       const row=el('div','item'),info=el('div');
       info.appendChild(rarName(n));info.appendChild(el('span','sub',' ['+kindName(n)+'] '+itemInfo(n)));
+      if(it.slot&&it.slot!=='trinket'&&!owned){const ch=el('div','dls');deltaChips(ch,gearDelta(n));info.appendChild(ch)}
+      if(!it.slot&&countItem(n))info.appendChild(el('span','mini',' (가진 것 '+countItem(n)+')'));
       row.appendChild(info);
       const b=el('button',null,owned?'보유':'금화 '+it.price);b.disabled=owned||S.gold<it.price;b.onclick=()=>buy(n);row.appendChild(b);
       sh.appendChild(row);
@@ -1591,42 +1662,128 @@ function paneExplore(box){
   const qs=questBlock();
   if(qs){const s3=el('section','narrow-only');xg.appendChild(s3);s3.appendChild(el('h2',null,'퀘스트'));const q=el('div','card');q.appendChild(qs);s3.appendChild(q)}
 }
+// 바꿔 끼면 무엇이 달라지는지: 잠깐 바꿔 낀 셈 치고 계산한 뒤 되돌린다
+function avgDice(e){const p=parseDice(e);return p.n*(p.s+1)/2+p.z}
+function gearSnap(){
+  const f=heroFx(),w=wpn();
+  return [['방어',gearAC()+(f.ac||0)],['명중',(w.bonus||0)+(f.hit||0)],['피해',avgDice(w.dice)+(w.bonus||0)+(f.dmg||0)+(f.smite?avgDice(f.smite):0)],
+    ['HP',f.hp||0],['마력',f.mp||0],['주도권',f.init||0],['내성',f.save||0],['판정',f.check||0]];
+}
+function gearDelta(n,slot){
+  slot=slot||SC.items[n].slot;const was=S.equip[slot],a=gearSnap();S.equip[slot]=n;const b=gearSnap();S.equip[slot]=was;
+  return a.map((x,i)=>[x[0],Math.round((b[i][1]-x[1])*10)/10]).filter(x=>x[1]);
+}
+function deltaChips(box,ds){
+  if(!ds.length){box.appendChild(el('span','dl','변화 없음'));return}
+  ds.forEach(([k,v])=>box.appendChild(el('span','dl '+(v>0?'up':'down'),(v>0?'▲ ':'▼ ')+k+' '+(v>0?'+':'−')+Math.abs(v))));
+}
+function shortInfo(n){const it=SC.items[n]||{},p=[];if(it.slot==='weapon')p.push(it.dice+(it.bonus?'+'+it.bonus:''));if(it.ac)p.push('방어 +'+it.ac);const t=trinketText(it.fx||{});if(t)p.push(t);return p.join(' · ')||'효과 없음'}
+// 어디서 얻는가: 그 물건을 떨어뜨리는 적과 그 적이 나오는 곳 (못 얻을수록 보장까지 남은 횟수가 준다)
+function dropSources(n){
+  const out=[];
+  for(const id in SC.enemies){
+    const E=SC.enemies[id],dr=arr(E.drops).find(x=>tpl(x.item)===n);if(!dr)continue;
+    const locs=Object.keys(SC.locations).filter(l=>arr(SC.locations[l].encounters).some(x=>x.e.includes(id))).map(l=>SC.locations[l].name);
+    out.push(E.name+' ('+(locs.length?locs.join('·'):E.where||'?')+') · '+Math.round(dr.p*100)+'%'+(dr.pity?' · 보장까지 '+Math.max(1,dr.pity-(S.pity[n]||0))+'번':''));
+  }
+  return out;
+}
+function bagFor(k){return [...new Set(S.items)].filter(n=>wearable(n,k)&&n!==S.equip[k])}
 function paneBag(box){
-  const h=S.hero,known=Object.keys(S.comp||{}).filter(compKnown);
-  box.appendChild(el('h2',null,'장비'));
+  const h=S.hero,known=Object.keys(S.comp||{}).filter(compKnown),shop=!!L().shop,isNew=n=>S.newItems.includes(n);
+  // ── 장비 부위: 누르면 그 부위에 낄 것을 고른다
+  box.appendChild(el('h2',null,'장비 — 부위를 눌러 바꿔 끼기'));
   const eq=el('div','card');box.appendChild(eq);
-  [['weapon','무기'],['armor','방어구'],['trinket','장신구']].forEach(([slot,lab])=>{
-    const n=S.equip[slot],d1=el('div','slot');d1.appendChild(el('span','sub',lab));
-    const v=el('div');if(n){v.appendChild(rarName(n));v.appendChild(el('div','mini',itemInfo(n)))}else v.appendChild(el('span','sub','없음'));d1.appendChild(v);
-    // 그대가 찬 장신구는 여기서 바로 동료에게 넘기거나 벗는다
-    if(slot==='trinket'&&n){const bx=el('div','row');known.forEach(id=>{const b2=el('button',null,COMP(id).name);b2.title=COMP(id).name+'에게 넘긴다';b2.onclick=()=>equipTrinket(n,id);bx.appendChild(b2)});const b3=el('button',null,'벗기');b3.onclick=()=>unequipTrinket(n,'hero');bx.appendChild(b3);d1.appendChild(bx)}
-    eq.appendChild(d1);
+  const f=heroFx(),tot=trinketText(f);
+  const sum=el('div','gearsum');
+  [['방어',heroAC()],['명중',sign(weaponHit())],['피해',wpn().dice+sign(weaponDmgBonus())+(f.smite?'+'+f.smite:'')]].forEach(([k,v])=>{const c=el('div');c.appendChild(el('span','sub',k));c.appendChild(el('b',null,String(v)));sum.appendChild(c)});
+  eq.appendChild(sum);
+  if(tot)eq.appendChild(el('div','mini gearfx','장비 효과: '+tot));
+  const grid=el('div','slots');eq.appendChild(grid);
+  SLOTS.forEach(([k,lab])=>{
+    const n=S.equip[k],cand=bagFor(k),b=el('button','slotbtn'+(gearPick===k?' on':'')+(n?'':' empty'));
+    const top=el('span','sl',lab);if(cand.length)top.appendChild(el('span','cnt'+(cand.some(isNew)?' new':''),cand.some(isNew)?' 새것':' '+cand.length));b.appendChild(top);
+    if(n){b.appendChild(rarName(n));b.appendChild(el('small',null,shortInfo(n)))}else b.appendChild(el('small',null,'비어 있음'));
+    b.setAttribute('aria-expanded',String(gearPick===k));b.onclick=()=>{gearPick=gearPick===k?null:k;render()};
+    grid.appendChild(b);
   });
-  box.appendChild(el('h2',null,'소지품 · 금화 '+S.gold));
+  if(gearPick){
+    const k=gearPick,pk=el('div','picker'),cur=S.equip[k];eq.appendChild(pk);
+    pk.appendChild(el('div','sub',slotName(k)+' — '+(cur?'지금 '+cur:'비어 있다')));
+    if(cur){const r=el('div','item'),info=el('div');info.appendChild(el('b',null,'벗는다'));const ch=el('div','dls');deltaChips(ch,gearDelta(null,k));info.appendChild(ch);r.appendChild(info);
+      const b=el('button',null,'벗기');b.onclick=()=>unequipSlot(k);r.appendChild(b);pk.appendChild(r)}
+    const cand=bagFor(k).sort((x,y)=>gearScore(y)-gearScore(x));
+    cand.forEach(n=>{
+      const it=SC.items[n],r=el('div','item'),info=el('div');
+      info.appendChild(rarName(n));if(isNew(n))info.appendChild(el('span','newtag','새것'));
+      info.appendChild(el('div','mini',shortInfo(n)+(it.set?' · '+SC.sets[it.set].name+' 세트':'')));
+      const ws=it.slot==='trinket'?wearers(n).filter(x=>x!=='hero'):[];if(ws.length&&spareOf(n)<=0)info.appendChild(el('div','mini',ws.map(whoName).join('·')+'에게서 가져온다'));
+      const ch=el('div','dls');deltaChips(ch,gearDelta(n,k));info.appendChild(ch);r.appendChild(info);
+      const b=el('button','go',it.slot==='weapon'?'쥐기':'착용');b.onclick=()=>equipGear(n);r.appendChild(b);pk.appendChild(r);
+    });
+    if(!cand.length)pk.appendChild(el('div','sub','가방에 이 부위에 낄 것이 없다.'+(k!=='weapon'&&k!=='trinket'?' 마을의 행상인이나 사냥에서 구할 수 있다.':'')));
+  }
+
+  // ── 세트: 모은 부위, 입은 부위, 단계별 효과, 못 모은 부위를 어디서 얻는지
+  box.appendChild(el('h2',null,'세트'));
+  for(const id in (SC.sets||{})){
+    const st=SC.sets[id],worn=setCount(id),have=st.pieces.filter(n=>countItem(n)>0).length;
+    const dt=el('details','card setcard');if(have)dt.open=true;box.appendChild(dt);
+    const sm=el('summary');sm.appendChild(el('b','rar-set',st.name));sm.appendChild(el('span','mini',' 입은 부위 '+worn+'/'+st.pieces.length+' · 모은 부위 '+have+'/'+st.pieces.length));dt.appendChild(sm);
+    st.pieces.forEach(n=>{
+      const it=SC.items[n],on=SLOTS.some(([k])=>S.equip[k]===n),got=countItem(n)>0,r=el('div','piece'+(on?' on':got?' got':''));
+      r.appendChild(el('span','pm',on?'●':got?'◎':'○'));
+      const info=el('div');const nm=el('b',got?'rar-set':'',n);info.appendChild(nm);info.appendChild(el('span','mini',' '+slotName(it.slot)+(on?' · 입었다':got?' · 가지고 있다':'')));
+      if(!got)dropSources(n).forEach(t=>info.appendChild(el('div','mini',t)));
+      r.appendChild(info);
+      if(got&&!on){const b=el('button',null,'착용');b.onclick=()=>equipGear(n);r.appendChild(b)}
+      dt.appendChild(r);
+    });
+    const bl=el('div','tiers');
+    st.bonus.forEach(b=>bl.appendChild(el('div','tier'+(worn>=b.n?' on':''),b.n+'부위 — '+trinketText(b.fx))));
+    dt.appendChild(bl);
+    if(st.where)dt.appendChild(el('div','mini',st.where));
+  }
+
+  // ── 소지품
+  box.appendChild(el('h2',null,'소지품 · 금화 '+S.gold+(shop?' · 행상인에게 팔 수 있다':'')));
   const inv=el('div','card');box.appendChild(inv);
-  // 그대가 쥐고 입고 찬 것은 한 개씩만 빼고 센다 (같은 물건이 여러 개일 수 있다)
+  const FILT=[['all','전체'],['gear','장비'],['use','물약·투척'],['etc','기타']];
+  const grp=n=>{const it=SC.items[n]||{};return it.slot?'gear':it.use||it.throw?'use':'etc'};
+  const fs=el('div','filters');FILT.forEach(([k,n])=>{const b=el('button',bagFilter===k?'on':'',n);b.onclick=()=>{bagFilter=k;render()};fs.appendChild(b)});inv.appendChild(fs);
+  // 그대가 입고 찬 것은 빼고 센다 (장신구는 동료가 찬 것도 보여 준다 — 돌려받거나 옮길 수 있게)
   const counts={};S.items.forEach(n=>counts[n]=(counts[n]||0)+1);
-  [S.equip.weapon,S.equip.armor,S.equip.trinket].forEach(n=>{if(n&&counts[n]&&--counts[n]<=0)delete counts[n]});
-  Object.keys(counts).forEach(n=>{
-    const it=SC.items[n]||{};
-    const row=el('div','item'),info=el('div');
-    info.appendChild(rarName(n));if(counts[n]>1)info.appendChild(document.createTextNode(' ×'+counts[n]));
+  SLOTS.forEach(([k])=>{const n=S.equip[k];if(n&&counts[n]&&--counts[n]<=0)delete counts[n]});
+  const SL=SLOTS.map(x=>x[0]),order=n=>{const it=SC.items[n]||{};return (it.slot?SL.indexOf(it.slot):it.use?10:it.throw?11:12)*10-(RANK[it.rar]||0)};
+  const names=Object.keys(counts).filter(n=>bagFilter==='all'||grp(n)===bagFilter).sort((a,b)=>order(a)-order(b));
+  names.forEach(n=>{
+    const it=SC.items[n]||{},row=el('div','item'),info=el('div');
+    info.appendChild(rarName(n));if(counts[n]>1)info.appendChild(document.createTextNode(' ×'+counts[n]));if(isNew(n))info.appendChild(el('span','newtag','새것'));
     const ws=it.slot==='trinket'?wearers(n).filter(x=>x!=='hero'):[];
-    info.appendChild(el('span','sub',' ['+kindName(n)+(ws.length?' · '+ws.map(whoName).join('·')+' 착용':'')+'] '+itemInfo(n)));row.appendChild(info);
-    const bx=el('div','row');bx.style.flex='none';bx.style.gap='4px';
+    info.appendChild(el('span','sub',' ['+kindName(n)+(ws.length?' · '+ws.map(whoName).join('·')+' 착용':'')+'] '+itemInfo(n)));
+    if(it.slot&&it.slot!=='trinket'){const ch=el('div','dls');deltaChips(ch,gearDelta(n));info.appendChild(ch)}
+    row.appendChild(info);
+    const bx=el('div','row acts2');
     if(it.use){
       const b=el('button',null,known.length&&it.use.hp?'그대':'사용');b.disabled=(it.use.hp&&h.hp>=h.hpMax&&!it.use.mp)||(it.use.mp&&h.mp>=h.mpMax&&!it.use.hp);b.onclick=()=>useItem(n);bx.appendChild(b);
       if(it.use.hp)known.forEach(id=>{const c=S.comp[id],b2=el('button',null,COMP(id).name);b2.disabled=c.hp>=c.hpMax;b2.onclick=()=>useItem(n,id);bx.appendChild(b2)});
     }
+    if(it.slot&&it.slot!=='trinket'){const b=el('button','go',it.slot==='weapon'?'쥐기':'착용');b.onclick=()=>equipGear(n);bx.appendChild(b)}
     // 장신구: 누구에게 채울지 고른다
     if(it.slot==='trinket'){
       ['hero'].concat(known).forEach(who=>{const b2=el('button',null,whoName(who));b2.disabled=trinketOn(who)===n;b2.title=whoName(who)+'에게 채운다';b2.onclick=()=>equipTrinket(n,who);bx.appendChild(b2)});
       if(ws.length){const b3=el('button',null,'벗기');b3.onclick=()=>unequipTrinket(n,ws[0]);bx.appendChild(b3)}
     }
+    const sp=sellPrice(n);
+    if(shop&&sp&&countItem(n)-wornCount(n)>0){const b=el('button','sellb','팔기 '+sp);b.title='금화 '+sp+'에 판다';b.onclick=()=>sell(n);bx.appendChild(b)}
     if(bx.children.length)row.appendChild(bx);
     inv.appendChild(row);
   });
-  if(!inv.children.length)inv.appendChild(el('div','sub','가진 것이 없다.'));
+  if(!names.length)inv.appendChild(el('div','sub',bagFilter==='all'?'가진 것이 없다.':'이 종류는 가진 것이 없다.'));
+  // 그대가 찬 장신구를 동료에게 넘기기
+  const tn=S.equip.trinket;
+  if(tn&&known.length){const row=el('div','item'),info=el('div');info.appendChild(el('span','sub','그대가 찬 장신구 '));info.appendChild(rarName(tn));info.appendChild(el('span','sub',' — 동료에게 넘기기'));row.appendChild(info);
+    const bx=el('div','row acts2');known.forEach(id=>{const b2=el('button',null,COMP(id).name);b2.onclick=()=>equipTrinket(tn,id);bx.appendChild(b2)});row.appendChild(bx);inv.appendChild(row)}
 }
 function abl(box,name,cost,desc,off){
   const d1=el('div','abl'+(off?' off':''));d1.appendChild(el('b',null,name));if(cost)d1.appendChild(el('span','cost',cost));
@@ -1676,6 +1833,10 @@ function paneLog(box){
   const la=el('label','sub setrow'),ca=el('input');ca.type='checkbox';ca.id='autocomp';ca.checked=!!S.opt.autoComp;
   ca.onchange=()=>{S.opt.autoComp=ca.checked;save()};
   la.appendChild(ca);la.appendChild(document.createTextNode(' 동료 자동 전투 — 동료의 차례를 알아서 진행한다 (그대의 차례만 고른다)'));so.appendChild(la);
+  const lg=el('label','sub setrow'),cg=el('input');cg.type='checkbox';cg.id='autogear';cg.checked=S.opt.autoGear!==false;
+  cg.onchange=()=>{S.opt.autoGear=cg.checked;save()};
+  lg.appendChild(cg);lg.appendChild(document.createTextNode(' 좋은 장비 저절로 끼기 — 새로 얻은 장비가 지금 것보다 좋으면 바꿔 낀다 (빈 부위는 늘 채운다, 세트 효과를 받는 부위는 그대로 둔다)'));so.appendChild(lg);
+  so.appendChild(el('div','kbd','단축키 — 지도: 1~5 탭 · 이야기: 숫자로 선택지, Enter로 굴리기·계속 · 전투: 숫자로 행동, E 턴 끝, Enter 계속'));
 }
 // 동료와 전투 시작 위치
 function renderParty(box){
@@ -1710,13 +1871,15 @@ function renderParty(box){
   Object.keys(SC.companions||{}).filter(id=>S.flags[id+'_left']).forEach(id=>box.appendChild(el('div','sub',COMP(id).name+' — 그대 곁을 떠났다')));
   box.appendChild(el('div','sub','동료는 곁에 있을 때 그대의 선택에 반응한다. 호감이 높으면 더 잘 싸우고, 바닥나면 떠난다. 동료가 능한 기술의 이야기 판정은 곁에 있으면 유리하다.')).style.marginTop='8px';
 }
-function kindName(n){const it=SC.items[n]||{};return (it.rar?RAR[it.rar]+' ':'')+(it.kind||'소지품')}
+// 등급 + 종류 (+ 종류와 이름이 다른 부위: 방어구 · 몸)
+function kindName(n){const it=SC.items[n]||{},k=it.kind||'소지품';return (it.rar?RAR[it.rar]+' ':'')+k+(it.slot&&slotName(it.slot)!==k&&it.slot!=='trinket'?' · '+slotName(it.slot):'')}
 function itemInfo(n){
-  const it=SC.items[n]||{};
-  if(it.slot==='trinket')return trinketText(it.fx||{})+(it.desc?' · '+it.desc:'');
-  if(it.slot==='weapon')return it.dice+(it.bonus?' +'+it.bonus:'')+(it.crit?' · '+it.crit+'~20 치명타':'')+(it.desc?' · '+it.desc:'');
-  if(it.slot==='armor')return '방어 +'+it.ac+(it.desc?' · '+it.desc:'');
-  return it.desc||'';
+  const it=SC.items[n]||{},p=[];
+  if(it.slot==='weapon')p.push(it.dice+(it.bonus?' +'+it.bonus:'')+(it.crit&&!/치명타/.test(it.desc||'')?' · '+it.crit+'~20 치명타':''));
+  if(it.ac)p.push('방어 +'+it.ac);
+  const t=trinketText(it.fx||{});if(t)p.push(t);
+  if(it.desc)p.push(it.desc);
+  return p.join(' · ');
 }
 function mapSvg(){
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
@@ -1818,7 +1981,7 @@ function renderCombat(){
   if(B.over){
     const r=el('div','result '+(B.over==='lose'?'bad':B.over==='fled'?'neu':'ok'));r.style.marginTop='10px';
     r.appendChild(el('b',null,B.res.title));
-    if(B.res.lines.length){const cs=el('div','chips');B.res.lines.forEach(l=>cs.appendChild(el('span','chip',l)));r.appendChild(cs)}
+    if(B.res.lines.length){const cs=el('div','chips');B.res.lines.forEach(l=>cs.appendChild(chipEl(l)));r.appendChild(cs)}
     card.appendChild(r);
     const nb=el('button','next','계속 →');nb.onclick=endBattle;card.appendChild(nb);
   }else if(mine){
@@ -1850,6 +2013,7 @@ function renderCombat(){
     const fin=el('div','acts fin');card.appendChild(fin);
     add('자동','이 차례는 알아서 싸운다',autoNow,{ok:true},'',fin);
     add('턴 끝 →',spent()?'':'남은 행동을 버린다',endTurn,{ok:true},'go',fin);
+    card.appendChild(el('div','kbd','단축키 — 숫자: 행동·메뉴 고르기 · E: 턴 끝 · Esc: 메뉴 닫기'));
     const sub=el('div');sub.style.marginTop='8px';
     if(cmenu==='skill')ks.forEach(k=>{
       const ab=abOf(k),c=canDo(u,'skill',k);let s=ab.desc+' · '+abCost(ab)+(ab.uses?' (남은 '+usesLeft(u,k)+')':'');
@@ -1887,6 +2051,11 @@ function renderCombat(){
   if(window.Art)Art.redraw();
 }
 
+// 결과 꼬리표: 영감·호감은 색으로, 얻은 물건은 등급 색으로
+function chipEl(f){
+  const m=/^획득: (.+?)(?: \(.+\))?$/.exec(f),it=m&&SC.items[m[1]];
+  return el('span','chip'+(/^영감/.test(f)?' gold':/(호감|유대) \+/.test(f)?' up':/(호감|유대) -|떠났다/.test(f)?' down':it&&it.rar?' loot rar-'+it.rar:''),f);
+}
 // ── 사건 화면 (선택지 · 판정 · 결과)
 function choiceInfo(c){
   const note=txt(c.note);
@@ -1973,7 +2142,7 @@ function renderResult(){
   rb.appendChild(head);
   const story=el('div','card prose story');p.text.forEach(t=>story.appendChild(el('p',null,t)));rb.appendChild(story);
   if(p.down)rb.appendChild(el('div','downbox',SC.downText));
-  if(p.fx.length){const cs=el('div','chips');p.fx.forEach(f=>cs.appendChild(el('span','chip'+(/^영감/.test(f)?' gold':/(호감|유대) \+/.test(f)?' up':/(호감|유대) -|떠났다/.test(f)?' down':''),f)));rb.appendChild(cs)}
+  if(p.fx.length){const cs=el('div','chips');p.fx.forEach(f=>cs.appendChild(chipEl(f)));rb.appendChild(cs)}
   const label=p.battle?'전투 시작 →':p.next==='end'?'기록 보기 →':!p.next||p.next==='map'?'지도로 →':'다음 장면으로 →';
   const b=el('button','next',label);b.onclick=advance;rb.appendChild(b);
 }
@@ -2027,7 +2196,7 @@ function summaryRows(){
   const h=S.hero,rows=[],r=race(),b=bg();
   rows.push([h.name,'레벨 '+h.level+' '+(r?r.name+' ':'')+h.cls+(b?' · '+b.name:'')+' · HP '+h.hp+'/'+h.hpMax+' · 마력 '+h.mp+'/'+h.mpMax+' · 금화 '+S.gold]);
   rows.push(['능력치',S.stats.map(s=>s.n+' '+sign(s.v)).join(' · ')]);
-  rows.push(['장비',[S.equip.weapon,S.equip.armor].filter(Boolean).join(', ')]);
+  rows.push(['장비',SLOTS.map(([k])=>S.equip[k]).filter(Boolean).join(', ')||'없음']);
   rows.push(['재능',S.skills.filter(id=>SC.talents.includes(id)).map(id=>SC.skillDefs[id].name).join(', ')||'없음']);
   (SC.summary||[]).forEach(x=>{const hit=x.cases.find(c=>ok(c.if));rows.push([x.label,tpl(hit?hit.t:(x.else||'-'))])});
   for(const k in (SC.counterNames||{}))rows.push([SC.counterNames[k],String(S.counters[k]||0)]);
@@ -2066,9 +2235,26 @@ let ftype=20,fhist=[];
 $('froll').onclick=()=>{const r=d(ftype);$('fres').textContent='d'+ftype+' = '+r;fhist.unshift('d'+ftype+':'+r);fhist=fhist.slice(0,8);$('fhist').textContent='최근: '+fhist.join(' / ')};
 $('freset').onclick=()=>{fhist=[];ftype=20;$('fres').textContent='';$('fhist').textContent='';document.querySelectorAll('#ftypes button').forEach(x=>x.classList.toggle('on',+x.dataset.n===20))};
 
+// ── 단축키: 숫자로 선택지·행동, Enter로 굴리기·계속 (글자를 입력하는 중에는 쓰지 않는다)
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test((e.target&&e.target.tagName)||'')||rolling)return;
+  const vis=sel=>[...document.querySelectorAll(sel)].filter(b=>!b.disabled&&b.offsetParent!==null);
+  const n=/^[1-9]$/.test(e.key)?+e.key:0;let b=null;
+  if(S.mode==='event'){
+    if(n)b=vis('#choices button')[n-1];
+    else if(e.key==='Enter')b=vis('#resbox .next')[0]||(!$('die').disabled&&$('die').offsetParent?$('die'):null);
+  }else if(S.mode==='combat'){
+    if(n)b=vis('#combat .sub .opt').length?vis('#combat .sub .opt')[n-1]:vis('#combat .acts button')[n-1];
+    else if(e.key==='Enter')b=vis('#combat .next')[0];
+    else if(e.key==='e'||e.key==='E')b=vis('#combat .acts.fin .go')[0];
+    else if(e.key==='Escape'&&cmenu){cmenu=null;renderCombat();e.preventDefault();return}
+  }else if(S.mode==='world'&&n&&n<=WTABS.length){setTab(WTABS[n-1][0]);e.preventDefault();return}
+  if(b){e.preventDefault();b.click()}
+});
+
 // ── 시작
 S=restore()||fresh();
-if(S.hero)syncComps();
+if(S.hero){fixGear();syncComps()}
 if(S.mode==='combat'&&S.battle&&!S.battle.over&&!myTurn()){runTurns();save()}
 if(window.Art){
   Art.mount($('art'),artInfo);
