@@ -1435,14 +1435,16 @@ function bar(color,v,max){const b=el('div','bar'),i=el('i');i.style.background=c
 function render(){
   const m=S.mode;
   document.body.classList.toggle('combat',m==='combat');
+  document.body.classList.toggle('solo',m==='create');
   $('make').hidden=m!=='create';
-  $('hud').hidden=m==='create';
+  $('hud').hidden=m==='create'||m==='combat';
+  $('cside').hidden=m!=='combat';
   $('world').hidden=m!=='world';
   $('event').hidden=m!=='event';
   $('combat').hidden=m!=='combat';
   $('endwrap').hidden=m!=='end';
-  $('logwrap').hidden=m!=='world'&&m!=='end';
-  $('freedice').hidden=m!=='world';
+  $('logwrap').hidden=m!=='end';
+  $('freedice').hidden=!(m==='world'&&wtab==='log');
   $('lvwrap').hidden=m==='create'||m==='combat'||!needLevel();
   const nt=$('notice');nt.hidden=!S.notice||!(m==='world'||(m==='event'&&ev()&&ev().camp&&!S.pending));nt.textContent=S.notice||'';
   $('saga').textContent=SC.title+' · '+SC.chapterTitle;
@@ -1463,7 +1465,8 @@ function render(){
     renderChoices();renderMods();updateRollBtn();renderResult();
   }else if(m==='combat'){
     const B=S.battle;$('stitle').textContent='전투';
-    const seen={};foes().forEach(e=>{const ds=SC.enemies[e.id].desc;if(ds&&!seen[e.id]){seen[e.id]=1;sc.appendChild(el('p',null,ds))}});
+    // 적의 묘사는 첫 라운드에만 — 그 뒤로는 장면 카드를 짧게 두어 행동판이 위로 올라오게 한다
+    const seen={};if(B.round<=1)foes().forEach(e=>{const ds=SC.enemies[e.id].desc;if(ds&&!seen[e.id]){seen[e.id]=1;sc.appendChild(el('p',null,ds))}});
     const f=B.field,fl=[];if(f.high)fl.push('고지대');if(f.cover)fl.push('엄폐물 (숨기 유리)');if(f.water)fl.push('물');if(f.rain)fl.push('비 (불이 빨리 꺼짐)');
     $('clock').textContent=L().name+' · 라운드 '+B.round+(fl.length?' · 지형: '+fl.join(', '):'')+' · 그림을 눌러 대상을 고를 수 있다';renderCombat();
   }else if(m==='end'){
@@ -1471,34 +1474,50 @@ function render(){
     para(['그대의 선택과 주사위가 새긴 이야기는 이렇게 기록되었다.','이 기록은 제2장으로 그대로 이어진다. 그때까지 세상은 열려 있다 — 계속 사냥하며 힘을 기를 수 있다.']);
     $('clock').textContent='';renderSummary();
   }
-  if(m==='world'||m==='end'){const lg=$('log');lg.innerHTML='';S.log.slice(-25).reverse().forEach(t=>lg.appendChild(el('li',null,t)))}
+  if(m==='end'){const lg=$('log');lg.innerHTML='';S.log.slice(-25).reverse().forEach(t=>lg.appendChild(el('li',null,t)))}
 }
 
+// 상태: 좁은 화면에서는 맨 위의 요약 띠, 넓은 화면에서는 오른쪽에 붙는 상태판
 function renderHud(){
   const h=S.hero,box=$('hud');box.innerHTML='';
-  box.appendChild(el('h2',null,'상태'));
-  const c=el('div','card');box.appendChild(c);
-  const r=race(),b=bg();
-  const t=el('div','hudtop');t.appendChild(el('b',null,h.name+' ('+(r?r.name+' ':'')+h.cls+(b?' · '+b.name:'')+')'));t.appendChild(el('span','mini','레벨 '+h.level+' · 금화 '+S.gold));c.appendChild(t);
-  const g=el('div','hudnums');
+  const r=race(),b=bg(),max=SC.inspMax||4;
+  const t=el('div','who');t.appendChild(el('b',null,h.name));t.appendChild(el('span','mini',(r?r.name+' ':'')+h.cls+(b?' · '+b.name:'')));
+  t.appendChild(el('span','mini lv','레벨 '+h.level+' · 금화 '+S.gold));box.appendChild(t);
+  const g=el('div','meters');
   [['HP',h.hp,h.hpMax,'var(--hp)'],['마력',h.mp,h.mpMax,'var(--mp)'],['경험치',h.xp,h.xpMax,'var(--xp)']].forEach(([n,v,mx,col])=>{
-    const d1=el('div');d1.appendChild(el('div','mini',n+' '+v+'/'+mx));d1.appendChild(bar(col,v,mx));g.appendChild(d1);
+    const d1=el('div'),l=el('div','ml');l.appendChild(el('span',null,n));l.appendChild(el('span',null,v+'/'+mx));d1.appendChild(l);d1.appendChild(bar(col,v,mx));g.appendChild(d1);
   });
-  c.appendChild(g);
-  const w=wpn(),max=SC.inspMax||4;
-  const line=el('div','mini');
-  line.appendChild(document.createTextNode('공격 명중 '+sign(weaponHit())+' · 피해 '+w.dice+sign(weaponDmgBonus())+(w.crit?' ('+w.crit+'~20 치명타)':'')+' · 방어 '+heroAC()+' · 숙련 +'+profBonus()+' · '));
-  const ins=el('span','insp','영감 '+'✦'.repeat(S.insp||0)+'·'.repeat(Math.max(0,max-(S.insp||0))));ins.title='배경다운 선택을 하면 쌓이고, 실패한 판정을 다시 굴릴 때 쓴다';line.appendChild(ins);
-  c.appendChild(line);
+  box.appendChild(g);
+  const meta=el('div','mini hudmeta');
+  const ins=el('span','insp','영감 '+'✦'.repeat(S.insp||0)+'·'.repeat(Math.max(0,max-(S.insp||0))));ins.title='배경다운 선택을 하면 쌓이고, 실패한 판정을 다시 굴릴 때 쓴다';meta.appendChild(ins);
+  meta.appendChild(document.createTextNode(' · 짧은 휴식 '+((S.rest&&S.rest.short)||0)+'/2 · 야영 물자 '+countItem('야영 물자')));
+  box.appendChild(meta);
   const pt=party();
-  if(pt.length||S.mode==='world'){
-    const pl=el('div','mini');
-    pl.textContent=(pt.length?'동료: '+pt.map(id=>COMP(id).name+' '+S.comp[id].hp+'/'+S.comp[id].hpMax).join(' · ')+' · ':'')+'짧은 휴식 '+((S.rest&&S.rest.short)||0)+'/2 · 야영 물자 '+countItem('야영 물자');
-    c.appendChild(pl);
+  if(pt.length){
+    const pm=el('div','pmini');
+    pt.forEach(id=>{
+      const c=S.comp[id],v=apVal(id),tr=apTier(v),d1=el('div'),l=el('div','ml'),nmS=el('span',null,COMP(id).name);
+      if(v>=3||v<=-3){const ap=el('span','ap '+(v>=3?'up':'down'),' '+(v>=6?'♥♥':v>=3?'♥':'✕'));ap.title=tr.n;nmS.appendChild(ap)}
+      l.appendChild(nmS);l.appendChild(el('span',null,c.hp+'/'+c.hpMax));d1.appendChild(l);d1.appendChild(bar('var(--hp)',c.hp,c.hpMax));
+      d1.title=COMP(id).name+' — '+(COMP(id).apName||'호감')+' '+sign(v)+' · '+tr.n;pm.appendChild(d1);
+    });
+    box.appendChild(pm);
   }
-  const st=el('div','stats');
+  const ws=el('div','hudsec wide-only');ws.appendChild(statsBlock());box.appendChild(ws);
+  const qs=questBlock();if(qs){const q=el('div','hudsec wide-only');q.appendChild(el('h3',null,'퀘스트'));q.appendChild(qs);box.appendChild(q)}
+}
+function statsBlock(){
+  const d0=el('div'),st=el('div','stats');
   S.stats.forEach(s=>{const dv=el('div','stat');if(s.note)dv.title=s.note;dv.appendChild(el('span','sub',s.n));dv.appendChild(el('b',null,sign(s.v)));st.appendChild(dv)});
-  c.appendChild(st);
+  d0.appendChild(st);
+  const w=wpn();d0.appendChild(el('div','mini atkline','공격 명중 '+sign(weaponHit())+' · 피해 '+w.dice+sign(weaponDmgBonus())+(w.crit?' ('+w.crit+'~20 치명타)':'')+' · 방어 '+heroAC()+' · 숙련 +'+profBonus()));
+  return d0;
+}
+function questBlock(){
+  const qs=arr(SC.quests).filter(x=>ok(x.if));if(!qs.length)return null;
+  const q=el('div');
+  qs.forEach(x=>{const d1=el('div','qrow');d1.appendChild(el('b',null,x.name+' '));d1.appendChild(el('span','sub',tpl(x.t)));q.appendChild(d1)});
+  return q;
 }
 
 function renderLevelup(){
@@ -1515,10 +1534,29 @@ function actBtn(box,label,small,fn,opts){
   b.appendChild(el('b',null,(opts.star?'★ ':'')+label));if(small)b.appendChild(el('small',null,small));
   b.disabled=!!opts.disabled;b.onclick=fn;box.appendChild(b);return b;
 }
+// 탐험 화면은 탭으로 나눈다: 지금 할 일과 지도가 먼저, 나머지는 한 번 눌러서 본다
+const WTABS=[['explore','탐험'],['party','동료'],['bag','소지품'],['abil','능력'],['log','기록']];
+let wtab=(()=>{try{const t=localStorage.getItem(KEY+':tab');return WTABS.some(x=>x[0]===t)?t:'explore'}catch(e){return 'explore'}})();
+function setTab(t){wtab=t;try{localStorage.setItem(KEY+':tab',t)}catch(e){}render()}
+function campHint(id){return arr(SC.camp).some(t=>!S.flags['done_'+t]&&ok(SC.events[t].if)&&(!id||arr(SC.events[t].if.party).includes(id)))}
 function renderWorld(){
-  const box=$('world'),l=L(),h=S.hero;box.innerHTML='';
-  box.appendChild(el('h2',null,'할 수 있는 일'));
-  const acts=el('div','card');box.appendChild(acts);
+  const box=$('world');box.innerHTML='';
+  const tb=el('div','tabs');tb.setAttribute('role','tablist');
+  WTABS.forEach(([id,n])=>{
+    const b=el('button',wtab===id?'on':'',n);b.setAttribute('role','tab');b.setAttribute('aria-selected',String(wtab===id));
+    if(id==='party'&&party().length)b.appendChild(el('span','cnt',String(party().length)));
+    if(id==='party'&&campHint())b.appendChild(el('span','cnt star','✦'));
+    b.onclick=()=>setTab(id);tb.appendChild(b);
+  });
+  box.appendChild(tb);
+  const pane=el('div','pane');box.appendChild(pane);
+  ({explore:paneExplore,party:renderParty,bag:paneBag,abil:paneAbil,log:paneLog})[wtab](pane);
+}
+function paneExplore(box){
+  const l=L(),xg=el('div','xgrid');box.appendChild(xg);
+  const s1=el('section');xg.appendChild(s1);
+  s1.appendChild(el('h2',null,'할 수 있는 일'));
+  const acts=el('div','card');s1.appendChild(acts);
   arr(l.actions).filter(a=>ok(a.if)).forEach(a=>actBtn(acts,a.label,null,()=>startEvent(a.event),{star:a.star}));
   if(l.encounters)actBtn(acts,'사냥한다','전투를 벌여 경험치와 금화를 얻는다 · 이곳의 적 레벨 '+l.lv,()=>{S.notice=null;startRandomBattle(false)});
   if(l.encounters||arr(l.explore).length)actBtn(acts,'탐색한다','무언가를 찾아내거나, 무언가와 마주친다',explore);
@@ -1540,8 +1578,9 @@ function renderWorld(){
   }
   if(!acts.children.length)acts.appendChild(el('div','sub','이곳에서는 할 일이 없다. 다른 곳으로 이동하자.'));
 
-  box.appendChild(el('h2',null,'지도'));
-  const mc=el('div','card');box.appendChild(mc);
+  const s2=el('section');xg.appendChild(s2);
+  s2.appendChild(el('h2',null,'지도 · 이동'));
+  const mc=el('div','card');s2.appendChild(mc);
   mc.appendChild(mapSvg());
   const tl=el('div');tl.style.marginTop='8px';mc.appendChild(tl);
   linksOf(S.loc).forEach(k=>{
@@ -1549,28 +1588,22 @@ function renderWorld(){
     actBtn(tl,'→ '+t.name,(t.lv==='안전'?'안전':'레벨 '+t.lv)+(storyAt(k.to)?' · ★ 이야기가 기다린다':''),()=>travel(k.to),{star:storyAt(k.to)});
   });
 
-  box.appendChild(el('h2',null,'퀘스트'));
-  const q=el('div','card');box.appendChild(q);
-  const gl=el('div');gl.appendChild(el('b',null,'★ '));gl.appendChild(document.createTextNode(goalText()));q.appendChild(gl);
-  arr(SC.quests).filter(x=>ok(x.if)).forEach(x=>{const d1=el('div');d1.style.marginTop='6px';d1.appendChild(el('b',null,x.name+' '));d1.appendChild(el('span','sub',tpl(x.t)));q.appendChild(d1)});
-
-  renderParty(box);
-
-  box.appendChild(el('h2',null,'기술 판정'));
-  const skc=el('div','card');box.appendChild(skc);
-  skc.appendChild(el('div','sub','d20 + 능력치 + 숙련(●, 전문 ●●) 보너스. 이야기 선택지의 [기술] 판정에 쓰인다.'));
-  const sg=el('div','skills');
-  Object.keys(SC.skillList).forEach(sk=>{
-    const n=profCount(sk),row=el('div','skrow'+(n?' prof':''));
-    row.appendChild(el('span',null,sk+' '+'●'.repeat(n)));row.appendChild(el('span','mini',SC.skillList[sk]));row.appendChild(el('b',null,sign(skillMod(sk))));
-    sg.appendChild(row);
+  const qs=questBlock();
+  if(qs){const s3=el('section','narrow-only');xg.appendChild(s3);s3.appendChild(el('h2',null,'퀘스트'));const q=el('div','card');q.appendChild(qs);s3.appendChild(q)}
+}
+function paneBag(box){
+  const h=S.hero,known=Object.keys(S.comp||{}).filter(compKnown);
+  box.appendChild(el('h2',null,'장비'));
+  const eq=el('div','card');box.appendChild(eq);
+  [['weapon','무기'],['armor','방어구'],['trinket','장신구']].forEach(([slot,lab])=>{
+    const n=S.equip[slot],d1=el('div','slot');d1.appendChild(el('span','sub',lab));
+    const v=el('div');if(n){v.appendChild(rarName(n));v.appendChild(el('div','mini',itemInfo(n)))}else v.appendChild(el('span','sub','없음'));d1.appendChild(v);
+    // 그대가 찬 장신구는 여기서 바로 동료에게 넘기거나 벗는다
+    if(slot==='trinket'&&n){const bx=el('div','row');known.forEach(id=>{const b2=el('button',null,COMP(id).name);b2.title=COMP(id).name+'에게 넘긴다';b2.onclick=()=>equipTrinket(n,id);bx.appendChild(b2)});const b3=el('button',null,'벗기');b3.onclick=()=>unequipTrinket(n,'hero');bx.appendChild(b3);d1.appendChild(bx)}
+    eq.appendChild(d1);
   });
-  skc.appendChild(sg);
-
-  box.appendChild(el('h2',null,'장비와 소지품'));
+  box.appendChild(el('h2',null,'소지품 · 금화 '+S.gold));
   const inv=el('div','card');box.appendChild(inv);
-  [['weapon','무기'],['armor','방어구'],['trinket','장신구']].forEach(([slot,lab])=>{const n=S.equip[slot];const d1=el('div');d1.appendChild(el('b',null,lab+': '));if(n){d1.appendChild(rarName(n));d1.appendChild(el('span','sub',' '+itemInfo(n)))}else d1.appendChild(el('span','sub','없음'));inv.appendChild(d1)});
-  const known=Object.keys(S.comp||{}).filter(compKnown);
   // 그대가 쥐고 입고 찬 것은 한 개씩만 빼고 센다 (같은 물건이 여러 개일 수 있다)
   const counts={};S.items.forEach(n=>counts[n]=(counts[n]||0)+1);
   [S.equip.weapon,S.equip.armor,S.equip.trinket].forEach(n=>{if(n&&counts[n]&&--counts[n]<=0)delete counts[n]});
@@ -1593,63 +1626,89 @@ function renderWorld(){
     if(bx.children.length)row.appendChild(bx);
     inv.appendChild(row);
   });
-  if(S.equip.trinket){const n=S.equip.trinket,row=el('div','item'),info=el('div');info.appendChild(el('span','sub','그대가 찬 장신구를 동료에게 넘기려면: '));info.appendChild(rarName(n));row.appendChild(info);
-    const bx=el('div','row');bx.style.flex='none';bx.style.gap='4px';known.forEach(id=>{const b2=el('button',null,COMP(id).name);b2.onclick=()=>equipTrinket(n,id);bx.appendChild(b2)});const b3=el('button',null,'벗기');b3.onclick=()=>unequipTrinket(n,'hero');bx.appendChild(b3);row.appendChild(bx);inv.appendChild(row)}
+  if(!inv.children.length)inv.appendChild(el('div','sub','가진 것이 없다.'));
+}
+function abl(box,name,cost,desc,off){
+  const d1=el('div','abl'+(off?' off':''));d1.appendChild(el('b',null,name));if(cost)d1.appendChild(el('span','cost',cost));
+  d1.appendChild(el('div','sub',desc));box.appendChild(d1);
+}
+function paneAbil(box){
+  const h=S.hero;
+  const s0=el('section','narrow-only');box.appendChild(s0);s0.appendChild(el('h2',null,'능력치'));const c0=el('div','card');c0.appendChild(statsBlock());s0.appendChild(c0);
 
-  box.appendChild(el('h2',null,'전투 기술과 재능'));
+  box.appendChild(el('h2',null,'전투 기술'));
   const sk=el('div','card');box.appendChild(sk);
   clsSkills().forEach(k=>{
     const s=SC.combatSkills[k],known=s.lv<=h.level;
-    const d1=el('div');if(!known)d1.style.opacity='.5';
-    d1.appendChild(el('b',null,s.name+' '));d1.appendChild(el('span','sub','['+abCost(s)+(s.uses&&known?', 남은 '+usesLeft({kind:'hero'},k):'')+'] '+s.desc+(known?'':' · 레벨 '+s.lv+'에 익힌다')));sk.appendChild(d1);
+    abl(sk,s.name,abCost(s)+(s.uses&&known?' · 남은 '+usesLeft({kind:'hero'},k):''),s.desc+(known?'':' · 레벨 '+s.lv+'에 익힌다'),!known);
   });
+
+  box.appendChild(el('h2',null,'재능과 출신'));
+  const tc=el('div','card');box.appendChild(tc);
   S.skills.forEach(id=>{
     const s=SC.skillDefs[id];if(!s)return;
-    const d1=el('div');
-    const name=id==='amp'?S.amp.name:s.name;
-    const desc=id==='amp'?'마력 '+ampCost()+'. 이야기 판정에 d'+S.amp.die+' 추가 ('+S.amp.source+')':tpl(s.desc);
-    d1.appendChild(el('b',null,name+' '));d1.appendChild(el('span','sub','['+s.kind+'] '+desc));sk.appendChild(d1);
+    abl(tc,id==='amp'?S.amp.name:s.name,s.kind,id==='amp'?'마력 '+ampCost()+'. 이야기 판정에 d'+S.amp.die+' 추가 ('+S.amp.source+')':tpl(s.desc));
   });
-  const r=race();if(r){const d1=el('div');d1.appendChild(el('b',null,r.name+' '));d1.appendChild(el('span','sub','[종족] '+r.trait));sk.appendChild(d1)}
-  const b=bg();if(b){const d1=el('div');d1.appendChild(el('b',null,b.name+' '));d1.appendChild(el('span','sub','[배경] 숙련 '+b.skills.join(', ')+' · 영감: '+b.inspText));sk.appendChild(d1)}
+  const r=race();if(r)abl(tc,r.name,'종족',r.trait);
+  const b=bg();if(b)abl(tc,b.name,'배경','숙련 '+b.skills.join(', ')+' · 영감: '+b.inspText);
 
+  box.appendChild(el('h2',null,'기술 판정'));
+  const skc=el('div','card');box.appendChild(skc);
+  skc.appendChild(el('div','sub','d20 + 능력치 + 숙련(●, 전문 ●●) 보너스. 이야기 선택지의 [기술] 판정에 쓰인다.'));
+  const sg=el('div','skills');
+  Object.keys(SC.skillList).forEach(sk2=>{
+    const n=profCount(sk2),row=el('div','skrow'+(n?' prof':''));
+    row.appendChild(el('span',null,sk2+' '+'●'.repeat(n)));row.appendChild(el('span','mini',SC.skillList[sk2]));row.appendChild(el('b',null,sign(skillMod(sk2))));
+    sg.appendChild(row);
+  });
+  skc.appendChild(sg);
+}
+function paneLog(box){
+  box.appendChild(el('h2',null,'진행 기록 (최근)'));
+  const lc=el('div','card');box.appendChild(lc);
+  const ul=el('ul');S.log.slice(-25).reverse().forEach(t=>ul.appendChild(el('li',null,t)));lc.appendChild(ul);
+  if(!ul.children.length)lc.appendChild(el('div','sub','아직 기록이 없다.'));
   box.appendChild(el('h2',null,'설정'));
   const so=el('div','card');box.appendChild(so);
-  const lb=el('label','sub'),cb=el('input');cb.type='checkbox';cb.id='karmic';cb.checked=!!(S.opt&&S.opt.karmic);
+  const lb=el('label','sub setrow'),cb=el('input');cb.type='checkbox';cb.id='karmic';cb.checked=!!(S.opt&&S.opt.karmic);
   cb.onchange=()=>{S.opt.karmic=cb.checked;save()};
   lb.appendChild(cb);lb.appendChild(document.createTextNode(' 업보 주사위 — 이야기 판정에서 두 번 연달아 실패하면 다음 판정이 유리해진다'));so.appendChild(lb);
-  const la=el('label','sub'),ca=el('input');ca.type='checkbox';ca.id='autocomp';ca.checked=!!S.opt.autoComp;
+  const la=el('label','sub setrow'),ca=el('input');ca.type='checkbox';ca.id='autocomp';ca.checked=!!S.opt.autoComp;
   ca.onchange=()=>{S.opt.autoComp=ca.checked;save()};
-  la.appendChild(ca);la.appendChild(document.createTextNode(' 동료 자동 전투 — 동료의 차례를 알아서 진행한다 (그대의 차례만 고른다)'));la.style.display='block';la.style.marginTop='6px';so.appendChild(la);
+  la.appendChild(ca);la.appendChild(document.createTextNode(' 동료 자동 전투 — 동료의 차례를 알아서 진행한다 (그대의 차례만 고른다)'));so.appendChild(la);
 }
 // 동료와 전투 시작 위치
 function renderParty(box){
   const ids=Object.keys(SC.companions||{}).filter(compKnown);
-  box.appendChild(el('h2',null,'동료와 진형'));
-  const pc=el('div','card');box.appendChild(pc);
-  pc.appendChild(el('div','sub','전투는 앞열·뒷열로 나뉜다. 근접 공격은 앞열에서만 하고, 적의 근접 공격은 앞열에 선 자가 있는 한 뒷열에 닿지 않는다. 시작 위치를 정해 두자.'));
-  const rowSeg=id=>{const sg=el('div','seg');sg.style.marginTop='4px';['front','back'].forEach(r=>{const b=el('button',rowPref(id)===r?'on':'',ROWN[r]);b.onclick=()=>{S.rows[id]=r;save();render()};sg.appendChild(b)});return sg};
-  const me=el('div');me.style.marginTop='8px';me.appendChild(el('b',null,S.hero.name+' '));me.appendChild(el('span','sub','시작 위치'));me.appendChild(rowSeg('hero'));pc.appendChild(me);
-  pc.appendChild(el('div','sub','동료는 곁에 있을 때 그대의 선택에 반응한다. 호감이 높으면 더 잘 싸우고, 바닥나면 떠난다. 동료가 능한 기술의 이야기 판정은 곁에 있으면 유리하다.'));
-  Object.keys(SC.companions||{}).filter(id=>S.flags[id+'_left']).forEach(id=>pc.appendChild(el('div','sub',COMP(id).name+' — 그대 곁을 떠났다')));
-  if(!ids.length){pc.appendChild(el('div','sub','아직 함께하는 동료가 없다. 숲과 계단에서 누군가를 만날지도 모른다.'));return}
+  box.appendChild(el('h2',null,'진형'));
+  const fc=el('div','card');box.appendChild(fc);
+  fc.appendChild(el('div','sub','전투 시작 위치 — 근접 공격은 앞열에서만 한다. 앞열에 누가 서 있는 한, 적의 근접 공격은 뒷열에 닿지 않는다.'));
+  const rowSeg=id=>{const sg=el('div','seg');['front','back'].forEach(r=>{const b=el('button',rowPref(id)===r?'on':'',ROWN[r]);b.onclick=()=>{S.rows[id]=r;save();render()};sg.appendChild(b)});return sg};
+  ['hero'].concat(ids).forEach(id=>{const fr=el('div','formrow'),nb=el('div');nb.appendChild(el('b',null,id==='hero'?S.hero.name:COMP(id).name));if(id!=='hero'&&!compHere(id))nb.appendChild(el('span','mini',' 떨어져 있다'));fr.appendChild(nb);fr.appendChild(rowSeg(id));fc.appendChild(fr)});
+
+  box.appendChild(el('h2',null,'동료'));
+  if(!ids.length)box.appendChild(el('div','card sub','아직 함께하는 동료가 없다. 숲과 계단에서 누군가를 만날지도 모른다.'));
   ids.forEach(id=>{
-    const C=COMP(id),r=S.comp[id],here=compHere(id),d1=el('div');d1.style.marginTop='10px';
-    const t=el('div','hudtop');t.appendChild(el('b',null,C.name+' · '+C.title));t.appendChild(el('span','mini',here?'함께 있다':'지금은 떨어져 있다'));d1.appendChild(t);
-    if(r){d1.appendChild(el('div','mini','HP '+r.hp+'/'+r.hpMax+' · 방어 '+(C.ac+compMod(id,'ac'))+' · '+C.attack.name+' 명중 '+sign(C.attack.hit+lvB()+compMod(id,'hit'))+' 피해 '+C.attack.dice+sign(C.attack.dmgB+lvB()+compMod(id,'dmg')+(C.attack.dtype==='fire'?tfx(id).fire||0:0))+(C.attack.ranged?' (원거리)':C.attack.reach?' (긴 창)':'')));d1.appendChild(bar('var(--hp)',r.hp,r.hpMax))}
+    const C=COMP(id),r=S.comp[id],here=compHere(id),d1=el('div','card comp');
+    const t=el('div','hudtop'),nb=el('div');nb.appendChild(el('b',null,C.name));nb.appendChild(el('span','mini',' · '+C.title));t.appendChild(nb);t.appendChild(el('span','mini',here?'함께 있다':'지금은 떨어져 있다'));d1.appendChild(t);
+    if(r){d1.appendChild(bar('var(--hp)',r.hp,r.hpMax));d1.appendChild(el('div','mini','HP '+r.hp+'/'+r.hpMax+' · 방어 '+(C.ac+compMod(id,'ac'))+' · '+C.attack.name+' 명중 '+sign(C.attack.hit+lvB()+compMod(id,'hit'))+' 피해 '+C.attack.dice+sign(C.attack.dmgB+lvB()+compMod(id,'dmg')+(C.attack.dtype==='fire'?tfx(id).fire||0:0))+(C.attack.ranged?' (원거리)':C.attack.reach?' (긴 창)':'')))}
     // 호감
     const v=apVal(id),tr=apTier(v),ef=[];if(tr.hit)ef.push('명중 '+sign(tr.hit));if(tr.ac)ef.push('방어 +'+tr.ac);
     const apl=el('div','mini');apl.appendChild(el('span','ap '+(v>=3?'up':v<=-3?'down':''),(C.apName||'호감')+' '+sign(v)+' · '+tr.n));apl.appendChild(document.createTextNode((ef.length?' ('+ef.join(', ')+')':'')+(C.leaveAt!=null&&v<=C.leaveAt+2?' · 이대로라면 떠날지도 모른다':'')));d1.appendChild(apl);
     const pk=arr(C.perks).filter(p=>ok(p.if));if(pk.length)d1.appendChild(el('div','mini','보상: '+pk.map(p=>p.name+' ('+['hit','ac','dmg'].filter(k=>p[k]).map(k=>({hit:'명중',ac:'방어',dmg:'피해'})[k]+' +'+p[k]).join(', ')+')').join(', ')));
     const tn=trinketOn(id);if(tn){const tl=el('div','mini','장신구: ');tl.appendChild(rarName(tn));tl.appendChild(document.createTextNode(' — '+trinketText(SC.items[tn].fx)));d1.appendChild(tl)}
-    if(arr(SC.camp).some(t=>!S.flags['done_'+t]&&ok(SC.events[t].if)&&arr(SC.events[t].if.party).includes(id)))d1.appendChild(el('div','sub','✦ 쉼터에서 긴 휴식을 하면 할 말이 있는 것 같다'));
-    d1.appendChild(el('div','sub',C.blurb));
+    if(campHint(id))d1.appendChild(el('div','sub','✦ 쉼터에서 긴 휴식을 하면 할 말이 있는 것 같다'));
     if(!here&&C.awayText)d1.appendChild(el('div','sub',C.awayText));
-    d1.appendChild(el('div','sub','도와주는 판정: '+arr(C.profs).join(', ')));
-    (C.skills||[]).forEach(k=>{const ab=SC.combatSkills[k],kn=ab.lv<=S.hero.level;const x=el('div','sub');if(!kn)x.style.opacity='.6';x.textContent='· '+ab.name+' ['+abCost(ab)+(ab.uses&&kn&&r?', 남은 '+usesLeft({kind:'comp',id},k):'')+'] '+ab.desc+(kn?'':' · 레벨 '+ab.lv);d1.appendChild(x)});
-    const rl=el('div','sub','시작 위치');rl.style.marginTop='4px';d1.appendChild(rl);d1.appendChild(rowSeg(id));
-    pc.appendChild(d1);
+    // 자세한 이야기와 기술은 접어 둔다
+    const dt=el('details');dt.appendChild(el('summary',null,'이야기 · 도와주는 판정 · 기술'));
+    dt.appendChild(el('div','sub',C.blurb));
+    dt.appendChild(el('div','sub','도와주는 판정: '+arr(C.profs).join(', ')));
+    (C.skills||[]).forEach(k=>{const ab=SC.combatSkills[k],kn=ab.lv<=S.hero.level;const x=el('div','sub');if(!kn)x.style.opacity='.6';x.textContent='· '+ab.name+' ['+abCost(ab)+(ab.uses&&kn&&r?', 남은 '+usesLeft({kind:'comp',id},k):'')+'] '+ab.desc+(kn?'':' · 레벨 '+ab.lv);dt.appendChild(x)});
+    d1.appendChild(dt);
+    box.appendChild(d1);
   });
+  Object.keys(SC.companions||{}).filter(id=>S.flags[id+'_left']).forEach(id=>box.appendChild(el('div','sub',COMP(id).name+' — 그대 곁을 떠났다')));
+  box.appendChild(el('div','sub','동료는 곁에 있을 때 그대의 선택에 반응한다. 호감이 높으면 더 잘 싸우고, 바닥나면 떠난다. 동료가 능한 기술의 이야기 판정은 곁에 있으면 유리하다.')).style.marginTop='8px';
 }
 function kindName(n){const it=SC.items[n]||{};return (it.rar?RAR[it.rar]+' ':'')+(it.kind||'소지품')}
 function itemInfo(n){
@@ -1724,25 +1783,25 @@ function pcCard(p){
   return c;
 }
 function renderCombat(){
-  const B=S.battle,box=$('combat');box.innerHTML='';
+  const B=S.battle,box=$('combat'),side=$('cside');box.innerHTML='';side.innerHTML='';
   const u=curU(),mine=myTurn();
   // 주도권 순서
   const ib=el('div','initbar');
   B.order.forEach((id,i)=>{const x=U(id);if(!x||(x.side==='foe'&&!up(x))||x.out)return;
     ib.appendChild(el('span','ini s-'+x.side+(i===B.turn&&!B.over?' cur':'')+(up(x)?'':' down'),x.name.replace(' (불려 옴)','')))});
   box.appendChild(ib);
-  // 적과 아군, 열마다
-  box.appendChild(el('h2',null,'적'+(alive().length>1?' — 눌러서 대상 고르기':'')));
+  // 적과 아군, 열마다 — 좁은 화면에서는 행동판 아래, 넓은 화면에서는 오른쪽에 놓인다
+  side.appendChild(el('h2',null,'적'+(alive().length>1?' — 눌러서 대상 고르기':'')));
   ['front','back'].forEach(row=>{
     const z='foe-'+row,list=foes().filter(e=>e.row===row);if(!list.length&&!B.surf[z])return;
-    box.appendChild(zoneHead('적 '+ROWN[row],z));
-    const g=el('div','foes two');list.forEach(e=>g.appendChild(foeCard(e,mine?u:null)));box.appendChild(g);
+    side.appendChild(zoneHead('적 '+ROWN[row],z));
+    const g=el('div','foes two');list.forEach(e=>g.appendChild(foeCard(e,mine?u:null)));side.appendChild(g);
   });
-  box.appendChild(el('h2',null,'아군'));
+  side.appendChild(el('h2',null,'아군'));
   ['front','back'].forEach(row=>{
     const z='pc-'+row,list=pcs().filter(p=>p.row===row);if(!list.length&&!B.surf[z])return;
-    box.appendChild(zoneHead('아군 '+ROWN[row],z));
-    const g=el('div','foes two');list.forEach(p=>g.appendChild(pcCard(p)));box.appendChild(g);
+    side.appendChild(zoneHead('아군 '+ROWN[row],z));
+    const g=el('div','foes two');list.forEach(p=>g.appendChild(pcCard(p)));side.appendChild(g);
   });
 
   box.appendChild(el('h2',null,B.over?'전투 끝':mine?josa(u.name,'의')+' 차례 · 라운드 '+B.round:'라운드 '+B.round));
@@ -1767,7 +1826,7 @@ function renderCombat(){
     [['act','행동'],['bonus','보조 행동'],['move','이동']].forEach(([k,n])=>pp.appendChild(el('span',tr[k]?'on':'',(tr[k]?'● ':'○ ')+n)));
     card.appendChild(pp);
     const grid=el('div','acts');card.appendChild(grid);
-    const add=(label,small,fn,c,cl)=>{const b=el('button',cl||'');b.appendChild(el('b',null,label));if(small)b.appendChild(el('small',null,small));b.disabled=!(c.ok||c.pick)||rolling;b.onclick=fn;grid.appendChild(b);return b};
+    const add=(label,small,fn,c,cl,to)=>{const b=el('button',cl||'');b.appendChild(el('b',null,label));if(small)b.appendChild(el('small',null,small));b.disabled=!(c.ok||c.pick)||rolling;b.onclick=fn;(to||grid).appendChild(b);return b};
     const tog=m=>()=>{cmenu=cmenu===m?null:m;renderCombat()};
     const P=profile(u,null);let c=canDo(u,'attack');
     add(P.name,c.ok?'행동 · 명중 '+pct(hitP(u,t,P))+' · '+P.dice:c.why,()=>pcAct('attack'),c);
@@ -1783,12 +1842,14 @@ function renderCombat(){
     c=canDo(u,'dodge');add('회피',c.ok?'행동 · 받는 공격 불리'+(u.kind==='hero'?', 마력 +1':''):c.why,()=>pcAct('dodge'),c);
     if(rogue(u)){c=canDo(u,'dis');add('물러서기',c.ok?'보조 · 기회 공격 없이 물러남':'쓸 수 없다',()=>pcAct('dis'),c)}
     if(u.kind==='hero'){const fi=fleeInfo();c=canDo(u,'flee');add('도망',c.ok?'행동 · 민첩 '+sign(fi.bonus)+' vs '+fi.dc+' · '+pct(chance(fi.bonus,fi.dc,'normal',0,{})):c.why,()=>pcAct('flee'),c)}
-    add('자동','이 차례는 알아서 싸운다',autoNow,{ok:true});
-    add('턴 끝 →',spent()?'':'남은 행동을 버린다',endTurn,{ok:true},'go');
     if(u.kind==='hero')arr(B.def.special).filter(sp=>ok(sp.if)).forEach(sp=>{
       const {dc,why}=specialDC(sp),bonus=statVal(sp.stat)+profBonus();c=canDo(u,'special',sp.id);
       add('✦ '+sp.label,sp.stat+' '+sign(bonus)+' vs DC '+dc+(why.length?' ('+why.join(', ')+')':'')+' · 성공 '+pct(chance(bonus,dc,'normal',0,{lucky:race()&&race().lucky}))+' · 마력 '+sp.mp+' · '+sp.note,()=>pcAct('special',sp.id),c,'wide');
     });
+    // 차례를 넘기는 두 버튼은 늘 같은 자리(행동판 맨 아래)에 둔다
+    const fin=el('div','acts fin');card.appendChild(fin);
+    add('자동','이 차례는 알아서 싸운다',autoNow,{ok:true},'',fin);
+    add('턴 끝 →',spent()?'':'남은 행동을 버린다',endTurn,{ok:true},'go',fin);
     const sub=el('div');sub.style.marginTop='8px';
     if(cmenu==='skill')ks.forEach(k=>{
       const ab=abOf(k),c=canDo(u,'skill',k);let s=ab.desc+' · '+abCost(ab)+(ab.uses?' (남은 '+usesLeft(u,k)+')':'');
@@ -1816,11 +1877,11 @@ function renderCombat(){
       pcs().forEach(p=>{const c=canDo(u,cmenu.pick,cmenu.arg,p.uid);if(!c.ok)return;actBtn(sub,p.name,'HP '+R(p).hp+'/'+R(p).hpMax+(up(p)?'':' · 쓰러짐'),()=>pcAct(cmenu.pick,cmenu.arg,p.uid),{disabled:rolling})});
       actBtn(sub,'취소',null,()=>{cmenu=null;renderCombat()});
     }
-    if(sub.children.length)card.appendChild(sub);
+    if(sub.children.length)card.insertBefore(sub,fin);
   }
 
-  box.appendChild(el('h2',null,'전투 기록'));
-  const lc=el('div','card');box.appendChild(lc);
+  side.appendChild(el('h2',null,'전투 기록'));
+  const lc=el('div','card');side.appendChild(lc);
   const ul=el('ul','clog');lc.appendChild(ul);
   B.log.slice(-14).reverse().forEach(x=>ul.appendChild(el('li',x.k+(x.r<B.round-1?' old':''),x.t)));
   if(window.Art)Art.redraw();
@@ -1911,7 +1972,7 @@ function renderResult(){
   else if(p.battleEnd)head.appendChild(el('div','sub','전투: '+p.label));
   rb.appendChild(head);
   const story=el('div','card prose story');p.text.forEach(t=>story.appendChild(el('p',null,t)));rb.appendChild(story);
-  if(p.down)rb.appendChild(el('div','down',SC.downText));
+  if(p.down)rb.appendChild(el('div','downbox',SC.downText));
   if(p.fx.length){const cs=el('div','chips');p.fx.forEach(f=>cs.appendChild(el('span','chip'+(/^영감/.test(f)?' gold':/(호감|유대) \+/.test(f)?' up':/(호감|유대) -|떠났다/.test(f)?' down':''),f)));rb.appendChild(cs)}
   const label=p.battle?'전투 시작 →':p.next==='end'?'기록 보기 →':!p.next||p.next==='map'?'지도로 →':'다음 장면으로 →';
   const b=el('button','next',label);b.onclick=advance;rb.appendChild(b);
@@ -1996,7 +2057,7 @@ $('restart').onclick=()=>{
   armed=0;b.textContent='처음부터 다시';
   try{localStorage.removeItem(KEY)}catch(e){}
   gen++;rolling=false;mkRolling=false;
-  S=fresh();ampOn=foOn=false;cmenu=null;shopOpen=false;save();render();toTop();
+  S=fresh();ampOn=foOn=false;cmenu=null;shopOpen=false;wtab='explore';try{localStorage.removeItem(KEY+':tab')}catch(e){}save();render();toTop();
 };
 
 // ── 자유 주사위

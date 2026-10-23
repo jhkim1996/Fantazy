@@ -45,13 +45,12 @@ details{margin-top:18px}
 summary{cursor:pointer;color:var(--sub);font-size:13px}
 .saga{font-size:12px;color:var(--sub)}
 #stitle{font-size:20px;font-weight:600;margin:2px 0 10px}
-.wrap{max-width:640px;margin-inline:auto}
 .prose p{margin:0 0 10px;font-family:"Noto Serif KR","Nanum Myeongjo","AppleMyungjo","Batang",serif;font-size:15px;line-height:1.8;word-break:keep-all}
 .prose p:last-child{margin-bottom:0}
 .story{margin-top:8px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;background:var(--bg)}
-.down{margin-top:8px;padding:10px 12px;border-radius:8px;border:1px dashed var(--bad);color:var(--bad);font-size:13px}
+.downbox{margin-top:8px;padding:10px 12px;border-radius:8px;border:1px dashed var(--bad);color:var(--bad);font-size:13px}
 .next{display:block;width:100%;margin-top:12px;padding:10px;font-weight:500;background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text)}
 .item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0}
 .item>div{min-width:0}
@@ -112,6 +111,7 @@ input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--
 .acts button{padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:2px}
 .acts button small{font-size:11px;color:var(--sub);text-align:center}
 .acts .wide{grid-column:1/-1}
+.acts.fin{grid-template-columns:minmax(0,1fr) minmax(0,2fr);margin-top:8px}
 .foe.pc{cursor:default}
 .foe.pc.on{border-color:var(--acc-line)}
 .foe.down{opacity:.7;border-style:dashed}
@@ -141,7 +141,6 @@ input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--
 .clog li.old{opacity:.55}
 .art{display:block;width:100%;height:auto;aspect-ratio:640/280;border-radius:12px;margin-bottom:10px;background:#1b1f27}
 body.combat .art{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35)}
-body.combat #hud{display:none}
 .foes.two{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .foes.two .foe{padding:7px 9px}
 .foes.two .hudtop{flex-direction:column;align-items:flex-start;gap:0}
@@ -165,23 +164,86 @@ body.combat #hud{display:none}
 .rar-legendary{color:var(--r-leg)}
 .lvopt{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .lvopt .opt{margin:0}
+/* 배치: 좁은 화면은 한 줄(상태 → 장면 → 할 일 → 전장), 넓은 화면은 오른쪽에 상태나 전장을 붙인다 */
+.wrap{max-width:640px;margin-inline:auto}
+.main{display:contents}
+#clock{margin-top:10px}
+.foot{margin-top:18px}
+.hud{margin-bottom:10px}
+@media (min-width:960px){
+  .wrap{max-width:1060px;display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"main side" "foot side";grid-template-rows:auto 1fr;column-gap:24px;align-items:start}
+  .main{display:block;grid-area:main;min-width:0}
+  #hud,#cside{grid-area:side;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto}
+  #hud{margin:0}
+  .cside>h2:first-child{margin-top:0}
+  .foot{grid-area:foot}
+  body.solo .wrap{max-width:680px;grid-template-columns:minmax(0,1fr);grid-template-areas:"main" "foot"}
+  body.combat .art{position:static;box-shadow:none}
+  .narrow-only{display:none!important}
+}
+@media (max-width:959.98px){.wide-only{display:none!important}}
+/* 상태 */
+.who{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.who b{font-size:15px;font-weight:600}
+.who .lv{margin-left:auto}
+.meters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 10px;margin-top:6px}
+.meters .bar,.pmini .bar{margin:3px 0 0}
+.pmini .bar{height:5px}
+.ml{display:flex;justify-content:space-between;gap:4px;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ml>span:first-child{overflow:hidden;text-overflow:ellipsis}
+.hudmeta{margin-top:6px}
+.pmini{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px 10px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.pmini .ap{font-size:11px}
+.hudsec{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.hudsec .stats{margin-top:0}
+h3{font-size:12px;font-weight:500;color:var(--sub);margin:0 0 6px}
+.atkline{margin-top:6px}
+.qrow+.qrow{margin-top:6px}
+/* 탐험 화면 탭 */
+.tabs{display:flex;margin:14px 0 2px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:1 0 auto;border:0;border-bottom:2px solid transparent;border-radius:0;margin-bottom:-1px;padding:9px 8px;color:var(--sub);white-space:nowrap}
+.tabs button.on{background:transparent;border-color:transparent;border-bottom-color:var(--acc-line);color:var(--acc-text);font-weight:500}
+.tabs .cnt{font-size:11px;margin-left:3px;color:var(--sub);font-weight:400}
+.tabs .cnt.star{color:var(--star)}
+.xgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:0 14px;align-items:start}
+.formrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,170px);gap:8px;align-items:center;margin-top:8px}
+.formrow .seg{margin:0}
+.formrow .seg button{padding:6px}
+.comp+.comp{margin-top:8px}
+.comp .bar{margin:6px 0 2px}
+.comp details{margin-top:8px}
+.comp summary{font-size:12px}
+.comp details .sub{margin-top:4px}
+.slot{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:8px;align-items:start;padding:5px 0}
+.slot+.slot{border-top:1px solid var(--line)}
+.slot>.sub{padding-top:1px}
+.slot .row{gap:4px}
+.slot button{padding:2px 10px;font-size:12px}
+.abl{padding:4px 0}
+.abl+.abl{border-top:1px solid var(--line)}
+.abl.off{opacity:.5}
+.abl .cost{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-left:4px;white-space:nowrap}
+.setrow{display:block}
+.setrow+.setrow{margin-top:8px}
 </style>
 </head>
 <body>
 <div class="wrap">
 
+<div id="hud" class="hud card" hidden></div>
+
+<div class="main">
 <canvas id="art" class="art" aria-hidden="true"></canvas>
-<div class="card">
+<div class="card scene">
   <div class="saga" id="saga"></div>
   <div id="stitle"></div>
   <div class="prose" id="scene"></div>
-  <div class="sub" id="clock" style="margin-top:10px"></div>
+  <div class="sub" id="clock"></div>
 </div>
 <div class="notice" id="notice" hidden></div>
 
 <div id="make" hidden></div>
-
-<div id="hud" hidden></div>
 
 <div id="lvwrap" hidden>
   <h2>레벨 업! 하나를 고르세요</h2>
@@ -249,8 +311,11 @@ body.combat #hud{display:none}
     <div class="sub" id="fhist" style="margin-top:6px"></div>
   </div>
 </details>
+</div>
 
-<div class="row" style="margin-top:18px"><button id="restart">처음부터 다시</button></div>
+<div id="cside" class="cside" hidden></div>
+
+<div class="foot row"><button id="restart">처음부터 다시</button></div>
 </div>
 
 <script src="chapter1.js"></script>
