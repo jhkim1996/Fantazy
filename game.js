@@ -233,7 +233,7 @@ function sell(n){
 
 // ── 장신구와 아이템 등급
 const RAR={uncommon:'고급',rare:'희귀',legendary:'전설',set:'세트'},RANK={uncommon:1,rare:2,set:2,legendary:3};
-const DTN={fire:'불',cold:'냉기',arcane:'비전',radiant:'별빛',thunder:'천둥',psychic:'정신',poison:'독',phys:'물리'};
+const DTN={fire:'불',cold:'냉기',arcane:'비전',radiant:'별빛',thunder:'천둥',lightning:'번개',psychic:'정신',poison:'독',phys:'물리'};
 function trinketOn(who){return who==='hero'?S.equip.trinket||null:(S.comp&&S.comp[who]&&S.comp[who].trinket)||null}
 // 그대는 모든 장비와 세트 효과, 동료는 찬 장신구 하나
 function tfx(who){if(who==='hero')return heroFx();const n=trinketOn(who),it=n&&SC.items[n];return (it&&it.fx)||{}}
@@ -323,6 +323,7 @@ function settle(out){
     if(h.level===5)out.push('숙련 보너스 +3');
     const qn=n=>'「'+n+'」'+josa(n,'을').slice(n.length);
     clsSkills().filter(k=>SC.combatSkills[k].lv===h.level).forEach(k=>{out.push('새 기술: '+SC.combatSkills[k].name);logp('새 기술 '+qn(SC.combatSkills[k].name)+' 익혔다.')});
+    clsSkills().forEach(k=>arr(SC.combatSkills[k].up).filter(x=>x.lv===h.level).forEach(x=>{out.push('기술 강화: '+SC.combatSkills[k].name+' — '+x.note);logp(SC.combatSkills[k].name+' 강화: '+x.note+'.')}));
     mates.forEach(id=>(COMP(id).skills||[]).filter(k=>SC.combatSkills[k].lv===h.level).forEach(k=>{out.push(COMP(id).name+' 새 기술: '+SC.combatSkills[k].name);logp(josa(COMP(id).name,'이')+' 새 기술 '+qn(SC.combatSkills[k].name)+' 익혔다.')}));
   }
   return down;
@@ -708,9 +709,9 @@ function syncComps(full){
 function rowPref(id){S.rows=S.rows||{};return S.rows[id]||(id==='hero'?cls().row:COMP(id).row)||'front'}
 // 기술 사용 횟수 (uses가 있는 기술만). 짧은 휴식은 per:'short'를, 긴 휴식은 모두를 채운다
 function chOf(u){return u.kind==='hero'?(S.ch=S.ch||{}):S.comp[u.id].ch}
-function usesLeft(u,k){const ab=SC.combatSkills[k];if(!ab.uses)return Infinity;const c=chOf(u);return c[k]==null?ab.uses:c[k]}
+function usesLeft(u,k){const ab=abOf(k);if(!ab.uses)return Infinity;const c=chOf(u);return c[k]==null?ab.uses:c[k]}
 function recharge(per){const f=c=>{for(const k in c){const ab=SC.combatSkills[k];if(!ab||per==='long'||ab.per==='short')delete c[k]}};f(S.ch=S.ch||{});for(const id in (S.comp||{}))f(S.comp[id].ch)}
-function abCost(ab){return (ab.cost==='bonus'?'보조 행동':'행동')+(ab.mp?' · 마력 '+ab.mp:ab.mp===0?' · 마력 없음':'')+(ab.uses?' · '+(ab.per==='long'?'긴':'짧은')+' 휴식마다 '+ab.uses+'번':'')}
+function abCost(ab){if(typeof ab==='string')ab=abOf(ab);return (ab.cost==='bonus'?'보조 행동':'행동')+(ab.mp?' · 마력 '+ab.mp:ab.mp===0?' · 마력 없음':'')+(ab.uses?' · '+(ab.per==='long'?'긴':'짧은')+' 휴식마다 '+ab.uses+'번':'')}
 
 // ── 전투
 // 주도권 순서대로 한 명씩 움직인다. 한 턴 = 행동 1 + 보조 행동 1 + 이동 1. 반응(기회 공격·수호)은 라운드마다 한 번.
@@ -719,7 +720,7 @@ function abCost(ab){return (ab.cost==='bonus'?'보조 행동':'행동')+(ab.mp?'
 const ROWN={front:'앞열',back:'뒷열'};
 const SURF={oil:{n:'기름',r:5},water:{n:'물',r:4},fire:{n:'불',r:3},ice:{n:'얼음',r:3}};
 const ZONES=['pc-front','pc-back','foe-front','foe-back'];
-const ST_N={stun:'얼어붙음',poison:'중독',weak:'명중 -2',blind:'연막',burn:'불붙음',prone:'넘어짐',restrain:'속박',wet:'젖음',taunt:'도발당함',insp:'격려'};
+const ST_N={stun:'얼어붙음',poison:'중독',weak:'명중 -2',blind:'연막',burn:'불붙음',prone:'넘어짐',restrain:'속박',wet:'젖음',taunt:'도발당함',insp:'격려',mark:'약점 노출'};
 
 function afx(o){if(window.Art)Art.fx(Object.assign({delay:fxDelay},o))}
 function logB(t,k){const B=S.battle;B.log.push({t,k:k||'',r:B.round});if(B.log.length>80)B.log.splice(0,B.log.length-80)}
@@ -763,9 +764,9 @@ function profile(u,ab){
   const wk=u.st&&u.st.weak?2:0;   // 기가 꺾이면 명중 -2
   if(u.kind==='hero'){
     if(ab&&ab.attack==='spell'){const st=ab.stat||atkStat(),add=ab.addStat?statVal(st):0;
-      return {name:ab.name,hit:spellHit(ab)-wk,ranged:true,crit:ab.crit||20,dtype:ab.dtype||'arcane',spell:true,dice:ab.dmg+sign(add+bsum('dmg')),dmg:c=>rollDice(ab.dmg,c).total+add+bsum('dmg')}}
+      return {name:ab.name,hit:spellHit(ab)-wk,ranged:true,crit:ab.crit||20,dtype:ab.dtype||'arcane',spell:true,critAdv:!!ab.critAdv,dice:ab.dmg+sign(add+bsum('dmg')),dmg:c=>rollDice(ab.dmg,c).total+add+bsum('dmg')}}
     const w=wpn(),thrown=S.cls==='rogue'&&u.row==='back',sm=tfx('hero').smite;   // 도적은 뒷열에서 단검을 던진다. sm: 세트의 별빛 피해
-    return {name:ab?ab.name:thrown?'단검 던지기':'공격',hit:weaponHit(ab&&ab.hit)-wk,ranged:thrown,crit:Math.min(w.crit||20,(ab&&ab.crit)||20),dtype:'phys',weapon:true,
+    return {name:ab?ab.name:thrown?'단검 던지기':'공격',hit:weaponHit(ab&&ab.hit)-wk,ranged:thrown,crit:Math.min(w.crit||20,(ab&&ab.crit)||20),dtype:'phys',weapon:true,critAdv:!!(ab&&ab.critAdv),execute:ab&&ab.execute,
       dice:w.dice+sign(weaponDmgBonus())+(ab&&ab.extra?'+'+ab.extra:'')+(sm?'+'+sm:''),dmg:c=>rollDice(w.dice,c).total+weaponDmgBonus()+(ab&&ab.extra?rollDice(ab.extra,c).total:0)+(sm?rollDice(sm,c).total:0)};
   }
   const A=COMP(u.id).attack,b=A.dmgB+lvB()+bsumU(u,'dmg')+compMod(u.id,'dmg')+(A.dtype==='fire'?tfx(u.id).fire||0:0);
@@ -793,6 +794,7 @@ function atkMode(a,t,P,extra){
   if(t.st.stun)adv.push('얼어붙은 대상');
   if(t.st.restrain)adv.push('속박된 대상');
   if(t.st.blind)adv.push('연막 속의 대상');
+  if(t.st.mark)adv.push('약점이 드러난 대상');
   if(t.st.prone){if(P.ranged)dis.push('넘어진 대상(원거리)');else adv.push('넘어진 대상')}
   if(a.st.poison)dis.push('중독');
   if(a.st.blind)dis.push('연막');
@@ -1012,7 +1014,7 @@ function runTurns(){
 }
 // 차례를 마칠 때: 명중 감소·연막·도발과 버프가 한 턴 줄어든다 (걸린 쪽의 차례로 센다)
 function endTurnFx(u){
-  ['weak','blind','taunt'].forEach(k=>{if(u.st[k]&&--u.st[k]<=0){delete u.st[k];if(k==='taunt')delete u.st.tauntBy}});
+  ['weak','blind','taunt','mark'].forEach(k=>{if(u.st[k]&&--u.st[k]<=0){delete u.st[k];if(k==='taunt')delete u.st.tauntBy}});
   u.buffs=(u.buffs||[]).filter(b=>--b.t>0);
 }
 function checkEnd(){const B=S.battle;if(B.over)return true;if(!alive().length){winBattle();return true}if(!upPCs().length){loseBattle();return true}return false}
@@ -1078,11 +1080,17 @@ function foeTurn(e){
   }
 }
 function foeAttack(e,t,sk){
+  if(!up(e))return;   // 받아치기에 쓰러졌으면 휩쓸기를 마저 하지 못한다
   const E=E_(e),P=foeProfile(e,sk),extra=[];
   // 오르덴의 수호: 앞열에 선 오르덴이 다른 아군을 노린 근접 공격을 막아선다 (라운드마다 한 번)
   const g=!P.ranged&&pcs().find(u=>u.kind==='comp'&&COMP(u.id).guard&&u!==t&&up(u)&&u.row==='front'&&u.react&&!u.st.stun&&!u.st.prone);
   if(g){g.react=false;extra.push(nm(g)+'의 수호');afx({type:'text',target:g.uid,text:'수호',color:'#8fb6ff',delay:fxDelay+100})}
   const r=attack(e,t,P,{extraDis:extra});
+  // 반격 자세: 근접 공격이 빗나가면 곧바로 받아친다 (라운드마다 한 번)
+  if(!r.hit&&!P.ranged&&t.side==='pc'&&up(t)&&up(e)&&bsumU(t,'riposte')>0&&t.riposteR!==S.battle.round&&!t.st.stun){
+    t.riposteR=S.battle.round;fxDelay+=200;logB(nm(t)+' — 받아친다!','me');afx({type:'text',target:t.uid,text:'반격',color:'#f0c75e',delay:fxDelay});
+    attack(t,e,profile(t,null));
+  }
   if(!r.hit)return;
   if(E.drain&&r.dm){const v=Math.max(1,Math.floor(r.dm*E.drain));e.hp=Math.min(e.hpMax,e.hp+v);logB(josa(nm(e),'이')+' 피를 빨아 HP '+v+' 회복','foe')}
   if(E.poison&&up(t)&&Math.random()<E.poison.p)applyOn(t,{poison:E.poison.turns,pdmg:E.poison.dmg});
@@ -1094,7 +1102,8 @@ function attack(a,t,P,o){
   const m=atkMode(a,t,P,o.extraDis),hm=heightMod(a,t,P),rr=d20(a,m.mode),r=rr.r;
   let bonus=P.hit+hm,ins=0;
   if(a.st.insp){ins=d(6);bonus+=ins;delete a.st.insp}
-  const tot=r+bonus,ac=acOf(t),crit=r>=P.crit,hit=r!==1&&(crit||tot>=ac),wasDown=t.side==='pc'&&!up(t);
+  const tot=r+bonus,ac=acOf(t),hit=r!==1&&(r>=P.crit||tot>=ac),wasDown=t.side==='pc'&&!up(t);
+  const crit=hit&&(r>=P.crit||(P.critAdv&&m.mode==='adv'));   // 암살: 유리한 채로 맞히면 치명타
   if(P.spell||P.ranged)afx({type:'cast',from:a.uid,to:t.uid,color:P.dtype==='fire'?'#ffa95e':P.dtype==='cold'?'#bfe6ff':P.spell?'#9fc8ff':'#e8e2d2'});
   else afx({type:'lunge',who:a.uid,dir:a.side==='pc'?1:-1});
   const dt=(rr.dice.length>1?'d20['+rr.dice.join(', ')+'] '+(m.mode==='adv'?'유리':'불리')+'→'+r:'d20('+r+')')+(rr.notes.length?' ('+rr.notes.join(', ')+')':'')+' '+sign(P.hit)+(hm?' 고지대 '+sign(hm):'')+(ins?' 격려 +'+ins:'')+' = '+tot+' vs 방어 '+ac;
@@ -1104,6 +1113,7 @@ function attack(a,t,P,o){
   if(!hit){logB(nm(a)+'의 '+P.name+' — '+nm(t)+'에게 빗나갔다'+(a.side==='foe'?' ('+tot+' vs 방어 '+ac+')':''),lk(a));afx({type:'miss',target:t.uid,delay:fxDelay+260});return {hit:false}}
   let v=P.dmg(crit),sn='';
   if(o.sneak){const sv=rollDice(Math.ceil(S.hero.level/2)+'d6',crit).total;v+=sv;sn=' (기습 +'+sv+')'}
+  if(P.execute&&t.hp<=t.hpMax/2){const ex=rollDice(P.execute,crit).total;v+=ex;sn+=' (처형 +'+ex+')'}
   const dm=hurt(t,v,P.dtype,{crit});
   if(wasDown)return {hit:true,dm:0,crit};
   if(a.side==='pc')B.last.txt+=' · 피해 '+dm+sn;
@@ -1112,7 +1122,19 @@ function attack(a,t,P,o){
 }
 
 // ── 아군의 행동
-function abOf(k){return SC.combatSkills[k]}
+// 지금 레벨의 기술: up에 적힌 레벨에 이르면 그 값으로 바뀐다 (lv는 처음 익히는 레벨 그대로)
+function abOf(k){
+  const ab=SC.combatSkills[k];if(!ab||!ab.up||!S.hero)return ab;
+  const r=Object.assign({},ab);ab.up.forEach(x=>{if(S.hero.level>=x.lv)for(const f in x)if(f!=='lv'&&f!=='note')r[f]=x[f]});return r;
+}
+// 설명: 지금 값으로 채우고, 아직 오지 않은 강화를 덧붙인다
+function abDesc(k){
+  const ab=abOf(k),base=SC.combatSkills[k];
+  let t=ab.desc.replace(/\{(dmg|heal|extra|darts|turns)\}/g,(m,f)=>ab[f]!=null?String(ab[f]):m);
+  const next=arr(base.up).filter(x=>!S.hero||S.hero.level<x.lv);
+  if(next.length)t+=' · '+next.map(x=>'레벨 '+x.lv+'부터 '+x.note).join(', ');
+  return t;
+}
 function costKey(ab){return ab.cost==='bonus'?'bonus':'act'}
 function unitSkills(u){
   if(u.kind==='hero')return knownSkills();
@@ -1194,6 +1216,10 @@ function canDo(u,kind,arg,au){
     if(ab.kind==='save'||ab.kind==='surface'||ab.kind==='darts')return tok(t)?{ok:true,roll:ab.kind==='save'}:no('대상을 고른다');
     if(ab.kind==='heal'){if(!au)return pcs().some(p=>!p.out&&R(p).hp<R(p).hpMax)?{ok:true,pick:true}:no('다친 아군이 없다');const a=U(au);return a&&!a.out&&R(a).hp<R(a).hpMax?{ok:true}:no('회복할 수 없다')}
     if(ab.kind==='self')return R(u).hp<R(u).hpMax?{ok:true}:no('HP가 가득하다');
+    if(ab.kind==='surge')return B.tr.act?no('행동을 먼저 쓴다'):{ok:true};
+    if(ab.kind==='step'){if(u.st.restrain)return no('속박되어 움직일 수 없다');if(u.hid)return no('이미 숨어 있다');return {ok:true}}
+    if(ab.kind==='mark')return tok(t)?{ok:true}:no('대상을 고른다');
+    if(ab.kind==='rally')return upPCs().some(p=>R(p).hp<R(p).hpMax||['stun','weak','restrain','poison'].some(x=>p.st[x]))?{ok:true}:no('도울 이가 없다');
     return {ok:true};
   }
   if(kind==='shove'){if(!B.tr.act)return no('행동을 이미 썼다');if(!t||!canMelee(u,t,false))return no('앞열에서, 닿는 적에게만');if(big(t))return no('너무 거대하다');return {ok:true,roll:true}}
@@ -1289,10 +1315,18 @@ function useAb(u,k,t,au){
   if(ab.uses){const c=chOf(u);c[k]=usesLeft(u,k)-1}
   const fx_=(x,txt,col)=>afx({type:'text',target:x.uid,text:txt,color:col||'#f0c75e'});
   // 적을 겨누는 기술은 숨은 자리를 드러낸다 (명중 굴림 공격은 attack()이 유리를 준 뒤 드러낸다)
-  if(['darts','save','surface','debuffAll','taunt'].includes(ab.kind))delete u.hid;
+  if(['darts','save','surface','debuffAll','taunt','mark'].includes(ab.kind))delete u.hid;
+  // 감전: 젖은 적은 번개에 얼어붙는다
+  const shock=x=>{if(ab.shock&&up(x)&&x.st.wet){logB(josa(nm(x),'이')+' 감전되었다!','me');applyOn(x,{stun:1})}};
   if(ab.kind==='attack'){
     const P=profile(u,ab),sn=sneakOK(u,t,P),r=attack(u,t,P,{sneak:sn});
-    if(r.hit){if(sn)B.tr.sneak=true;applyOn(t,ab.onHit);if(ab.surface)setSurf(zk(t),ab.surface)}
+    if(r.hit){if(sn)B.tr.sneak=true;applyOn(t,ab.onHit);if(ab.surface)setSurf(zk(t),ab.surface);shock(t)}
+    // 번개 사슬: 맞힌 피해의 절반이 다른 적에게 튄다
+    if(r.hit&&ab.chain){
+      const half=Math.max(1,Math.floor((r.dm||0)/2)),hops=[];
+      alive().filter(x=>x!==t&&!x.hid).slice(0,ab.chain).forEach((x,i)=>{fxDelay+=180;afx({type:'cast',from:t.uid,to:x.uid,color:'#cfe3ff'});const dm=hurt(x,half,ab.dtype,{d:300+i*120});hops.push(nm(x)+' '+wtxt(dm,x)+(up(x)?'':' 쓰러짐'));shock(x)});
+      if(hops.length){logB('번개가 튄다 — '+hops.join(', '),'me');B.last.txt+=' · 튐 '+hops.length+'명'}
+    }
     if(P.dtype==='fire')fireTouch(zk(t));return;
   }
   if(ab.kind==='darts'){
@@ -1303,9 +1337,13 @@ function useAb(u,k,t,au){
   }
   if(ab.kind==='save'){
     const tg=ab.area==='all'?alive():ab.area==='row'?zoneUnits(zk(t)):[t];
-    const dc=spellDC(u,ab),base=rollDice(ab.dmg).total+(u.kind==='hero'?(ab.addStat?statVal(ab.stat):0)+bsum('dmg'):bsumU(u,'dmg'))+(ab.dtype==='fire'?ufx(u).fire||0:0),parts=[];
+    const dc=spellDC(u,ab),base=ab.dmg?rollDice(ab.dmg).total+(u.kind==='hero'?(ab.addStat?statVal(ab.stat):0)+bsum('dmg'):bsumU(u,'dmg'))+(ab.dtype==='fire'?ufx(u).fire||0:0):0,parts=[];
     tg.forEach((x,i)=>{
-      const sv=d(20)+saveMod(x,ab.save),okS=sv>=dc,v=okS?(ab.half?Math.floor(base/2):0):base;
+      // 자장가처럼 우두머리·정예에게는 듣지 않는 노래
+      if(ab.noBoss&&(E_(x).boss||E_(x).elite)){parts.push(nm(x)+' 듣지 않는다');afx({type:'miss',target:x.uid,delay:fxDelay+300});return}
+      const sv=d(20)+saveMod(x,ab.save),okS=sv>=dc;
+      if(!ab.dmg){afx({type:'cast',from:u.uid,to:x.uid,color:'#c9b8ff'});parts.push(nm(x)+(okS?' 내성 성공':' 내성 실패'));if(!okS)applyOn(x,ab.onFail);else afx({type:'miss',target:x.uid,delay:fxDelay+300});return}
+      const v=okS?(ab.half?Math.floor(base/2):0):base;
       afx({type:'cast',from:u.uid,to:x.uid,color:ab.dtype==='fire'?'#ffa95e':ab.dtype==='radiant'?'#ffe6a0':ab.dtype==='thunder'?'#d8c8ff':'#f0a8ff'});
       if(v>0){const dm=hurt(x,v,ab.dtype,{d:300+i*90});parts.push(nm(x)+' '+(okS?'(내성 성공) ':'')+wtxt(dm,x)+(up(x)?'':' 쓰러짐'))}
       else{parts.push(nm(x)+' 내성 성공');afx({type:'miss',target:x.uid,delay:fxDelay+300})}
@@ -1314,7 +1352,7 @@ function useAb(u,k,t,au){
     if(ab.surface&&t)setSurf(zk(t),ab.surface);
     if(ab.dtype==='fire')[...new Set(tg.map(zk))].forEach(fireTouch);
     if(ab.partyHeal)pcs().filter(p=>!p.out).forEach(p=>{const v=heal(p,rollDice(ab.partyHeal).total);if(v)parts.push(nm(p)+' HP +'+v)});
-    B.last={r:null,txt:ab.name+' — 내성 DC '+dc+' · 피해 '+base};
+    B.last={r:null,txt:ab.name+' — 내성 DC '+dc+(ab.dmg?' · 피해 '+base:'')};
     logB(lab+' — '+parts.join(' · '),'me');return;
   }
   if(ab.kind==='sweep'){const P=profile(u,ab);alive().filter(x=>canMelee(u,x,false)).forEach(x=>{attack(u,x,P);fxDelay+=220});return}
@@ -1328,8 +1366,32 @@ function useAb(u,k,t,au){
     B.last={r:null,txt:ab.name+' → '+nm(a)+' HP +'+v};logB(lab+' — '+nm(a)+' HP +'+v,'me');return;
   }
   if(ab.kind==='self'){const v=heal(u,rollDice(ab.heal).total+(ab.healLv?h.level:0));B.last={r:null,txt:ab.name+' → HP +'+v};logB(lab+' — HP +'+v,'me');return}
-  if(ab.kind==='buff'){upPCs().forEach(p=>{p.buffs.push(Object.assign({t:ab.turns,name:ab.name},ab.buff));fx_(p,ab.name)});B.last={r:null,txt:ab.name+' — '+ab.desc};logB(lab+'! '+ab.desc,'me');return}
-  if(ab.kind==='debuffAll'){alive().forEach(e=>{for(const s in ab.status)e.st[s]=Math.max(e.st[s]||0,ab.status[s]);fx_(e,ab.name,'#c8ccd4')});B.last={r:null,txt:ab.name+' — '+ab.desc};logB(lab+'! '+ab.desc,'me');return}
+  if(ab.kind==='buff'){(ab.self?[u]:upPCs()).forEach(p=>{p.buffs=(p.buffs||[]).filter(b=>b.name!==ab.name);p.buffs.push(Object.assign({t:ab.turns,name:ab.name},ab.buff));fx_(p,ab.name)});B.last={r:null,txt:ab.name+' — '+abDesc(k)};logB(lab+'! '+abDesc(k),'me');return}
+  if(ab.kind==='debuffAll'){alive().forEach(e=>{for(const s in ab.status)e.st[s]=Math.max(e.st[s]||0,ab.status[s]);fx_(e,ab.name,'#c8ccd4')});B.last={r:null,txt:ab.name+' — '+abDesc(k)};logB(lab+'! '+abDesc(k),'me');return}
+  // 몰아치기: 행동을 하나 더
+  if(ab.kind==='surge'){B.tr.act=1;fx_(u,ab.name);B.last={r:null,txt:ab.name+' — 행동을 하나 더 얻었다'};logB(lab+'! 숨 돌릴 틈 없이 몰아친다 (행동 +1)','me');return}
+  // 어둠 속으로: 기회 공격 없이 뒷열로, 반드시 숨는다
+  if(ab.kind==='step'){
+    if(u.row==='front'){u.row='back';u.high=false;logB(josa(nm(u),'이')+' 그림자를 밟고 뒷열로 물러났다','me');surfHit(u)}
+    if(up(u)){u.hid=true;fx_(u,'숨음','#c8ccd4');logB(josa(nm(u),'이')+' 그림자 속으로 사라졌다','me')}
+    B.last={r:null,txt:ab.name+' — 숨었다 (다음 공격 유리)'};return;
+  }
+  // 약점 노리기: 그 적을 향한 공격이 모두 유리
+  if(ab.kind==='mark'){t.st.mark=Math.max(t.st.mark||0,ab.turns);fx_(t,'약점 노출','#ffb38a');B.last={r:null,txt:ab.name+' → '+nm(t)+' ('+ab.turns+'턴 동안 공격 유리)'};logB(lab+' — '+josa(nm(t),'의')+' 약점이 드러났다! ('+ab.turns+'턴)','me');return}
+  // 용기의 노래: 모두 조금 회복하고, 나쁜 상태를 씻는다
+  if(ab.kind==='rally'){
+    const add=ab.stat?statVal(ab.stat):0,parts=[];
+    upPCs().forEach(p=>{const v=heal(p,rollDice(ab.heal).total+add),cl=['stun','weak','restrain','poison'].filter(x=>p.st[x]);cl.forEach(x=>delete p.st[x]);if(v||cl.length)parts.push(nm(p)+(v?' HP +'+v:'')+(cl.length?' ('+cl.map(x=>ST_N[x]).join('·')+' 풀림)':''))});
+    B.last={r:null,txt:ab.name+' — '+(parts.join(', ')||'모두 멀쩡하다')};logB(lab+' — '+(parts.join(', ')||'모두 멀쩡하다'),'me');return;
+  }
+  // 마지막 노래: 쓰러진 아군을 모두 일으키고 모두를 북돋운다
+  if(ab.kind==='finale'){
+    const add=ab.stat?statVal(ab.stat):0,ups=[];
+    pcs().filter(p=>!up(p)&&!p.out).forEach(p=>{const v=heal(p,rollDice(ab.heal).total+add);if(v)ups.push(nm(p)+' HP '+v)});
+    upPCs().forEach(p=>{p.buffs=(p.buffs||[]).filter(b=>b.name!==ab.name);p.buffs.push(Object.assign({t:ab.turns,name:ab.name},ab.buff));fx_(p,ab.name)});
+    const txt=(ups.length?'일어났다: '+ups.join(', ')+' · ':'')+'모두 '+ab.turns+'턴 동안 명중·피해 +'+ab.buff.atk;
+    B.last={r:null,txt:ab.name+' — '+txt};logB(lab+'! '+txt,'me');return;
+  }
   if(ab.kind==='taunt'){alive().forEach(e=>{e.st.taunt=ab.turns;e.st.tauntBy=u.uid;fx_(e,'도발당함','#ff9a8a')});B.last={r:null,txt:ab.name};logB(lab+'! 적들이 '+josa(nm(u),'을')+' 노려본다','me');return}
   if(ab.kind==='surface'){afx({type:'cast',from:u.uid,to:t.uid,color:'#8a7a5a'});logB(lab+' — '+zoneName(zk(t))+' 쪽으로 던졌다','me');setSurf(zk(t),ab.surface);B.last={r:null,txt:ab.name+' → '+zoneName(zk(t))};return}
 }
@@ -1342,8 +1404,9 @@ function aiTurn(u){
   // 1) 쓰러진 동료를 살린다
   const downed=pcs().find(p=>p!==u&&!up(p)&&!p.out);
   if(downed){
-    const hk_=sk.find(k=>abOf(k).kind==='heal'&&can(k));
-    if(hk_)useAb(u,hk_,null,downed.uid);
+    const hk_=sk.find(k=>abOf(k).kind==='heal'&&can(k)),fin=sk.find(k=>abOf(k).kind==='finale'&&can(k));
+    if(fin&&(pcs().filter(p=>!up(p)&&!p.out).length>=2||!hk_))useAb(u,fin);
+    else if(hk_)useAb(u,hk_,null,downed.uid);
     else if(B.tr.act&&hpPotions().length)doIt(u,'give',hpPotions()[0],downed.uid);
     else if(B.tr.act)doIt(u,'help',null,downed.uid);
     if(dead())return;
@@ -1355,9 +1418,15 @@ function aiTurn(u){
   if(dead())return;
   // 3) 보조 행동: 도발, 함성·찬가, 기름
   const n=alive().length;
+  const has=nmB=>(u.buffs||[]).some(b=>b.name===nmB),reachMe=u.row==='front'||!frontWall('pc')||alive().some(e=>e.fly||E_(e).ranged);
   sk.forEach(k=>{const ab=abOf(k);if(B.over||!can(k)||ab.cost!=='bonus')return;
     if(ab.kind==='taunt'&&n>=2&&u.row==='front'&&r.hp>r.hpMax*0.5&&!alive().some(e=>e.st.taunt))useAb(u,k);
-    else if(ab.kind==='buff'&&upPCs().length+n>=4&&!(u.buffs||[]).some(b=>!b.neg))useAb(u,k);
+    else if(ab.kind==='buff'&&ab.buff.riposte){if(u.row==='front'&&alive().some(e=>!E_(e).ranged)&&!has(ab.name)&&!sk.some(x=>abOf(x).kind==='surge'&&can(x)))useAb(u,k)}   // 몰아치기를 쓸 수 있으면 보조 행동을 아낀다
+    else if(ab.kind==='buff'&&ab.self){if(reachMe&&r.hp<r.hpMax*0.6&&!has(ab.name))useAb(u,k)}
+    else if(ab.kind==='buff'&&upPCs().length+n>=4&&!has(ab.name)&&!(n<=2&&sk.some(x=>abOf(x).kind==='surge'&&can(x))))useAb(u,k);
+    else if(ab.kind==='mark'&&B.tr.act){const x=bestFoe(u,profile(u,null))||alive().find(y=>!y.hid);if(x&&!x.st.mark&&atkMode(u,x,profile(u,null)).mode!=='adv'){setT(x);useAb(u,k,x)}}
+    else if(ab.kind==='step'){if((u.row==='front'&&r.hp<r.hpMax*0.45)||(u.row==='back'&&!u.hid&&B.tr.act))useAb(u,k)}
+    else if(ab.kind==='rally'){const hurtN=upPCs().filter(p=>R(p).hp<R(p).hpMax*0.6).length;if(hurtN>=2||upPCs().some(p=>['stun','weak','restrain','poison'].some(x=>p.st[x])))useAb(u,k)}
     else if(ab.kind==='surface'&&B.tr.act){const rows=['front','back'].map(rw=>({z:'foe-'+rw,c:standing('foe',rw).length})).filter(x=>x.c>=2&&!(B.surf[x.z]&&B.surf[x.z].t==='oil'));
       if(rows.length){const x=zoneUnits(rows[0].z)[0];setT(x);useAb(u,k,x)}}
   });
@@ -1367,27 +1436,43 @@ function aiTurn(u){
   if(B.tr.move&&!P0.ranged&&!P0.reach&&u.row==='back'&&!u.st.restrain&&!(u.kind==='hero'&&cls().row==='back'))doIt(u,'move','front');
   else if(B.tr.move&&P0.ranged&&u.row==='front'&&frontWall('foe')&&!oaFoes(u).length&&u.kind!=='hero')doIt(u,'move','back');
   if(dead())return;
-  // 5) 행동: 가장 좋은 공격을 고른다
-  if(B.tr.act){
+  // 5) 행동: 가장 좋은 공격을 고른다. 몰아치기가 있으면 한 번 더
+  act();
+  const sg=sk.find(k=>abOf(k).kind==='surge'&&can(k));
+  if(sg&&!dead()&&alive().length){useAb(u,sg);act()}
+  function act(){
+  if(B.tr.act&&!dead()){
     const opts=[];const P=profile(u,null),bt=bestFoe(u,P);
     if(bt)opts.push({s:1,go:()=>{setT(bt);doIt(u,'attack')}});
     // 불을 다루면 기름이 깔린 열을 노린다
     const oilT=P.dtype==='fire'&&alive().find(x=>canHit(u,x,P)&&surfOf(x)==='oil');
     if(oilT)opts.push({s:5,go:()=>{setT(oilT);doIt(u,'attack')}});
     sk.forEach(k=>{const ab=abOf(k);if(!can(k)||ab.cost==='bonus')return;
-      if(ab.kind==='attack'){const Q=profile(u,ab),x=bestFoe(u,Q);if(x)opts.push({s:ab.mp===0?1.4:ab.uses?3:2.2,go:()=>{setT(x);useAb(u,k,x)}})}
+      if(ab.kind==='attack'){
+        const Q=profile(u,ab);let x=bestFoe(u,Q),sc=ab.mp===0?1.4:ab.uses?3:2.2;
+        if(ab.execute){const lo=alive().find(y=>canHit(u,y,Q)&&y.hp<=y.hpMax/2);if(lo){x=lo;sc=5}else sc=1.5}
+        if(ab.critAdv&&x)sc=atkMode(u,x,Q).mode==='adv'?5:2;
+        if(ab.chain)sc=2.2+0.8*Math.min(ab.chain,n-1)+alive().filter(y=>y.st.wet).length*0.6;
+        if(x)opts.push({s:sc,go:()=>{setT(x);useAb(u,k,x)}});
+      }
       else if(ab.kind==='darts'){const x=alive().find(y=>!y.hid);if(x)opts.push({s:2.4,go:()=>{setT(x);useAb(u,k,x)}})}
       else if(ab.kind==='save'){
         if(ab.area==='all'){if(n>=2)opts.push({s:1.4*n,go:()=>useAb(u,k,null)})}
-        else if(ab.area==='row'){const z=['front','back'].map(rw=>'foe-'+rw).sort((a,b)=>zoneUnits(b).length-zoneUnits(a).length)[0],c=zoneUnits(z).length;if(c>=2){const x=zoneUnits(z)[0];opts.push({s:1.6*c,go:()=>{setT(x);useAb(u,k,x)}})}}
+        else if(ab.area==='row'){
+          const fit=z=>zoneUnits(z).filter(y=>!y.hid&&!(ab.noBoss&&(E_(y).boss||E_(y).elite)));
+          const z=['front','back'].map(rw=>'foe-'+rw).sort((a,b)=>fit(b).length-fit(a).length)[0],c=fit(z).length,big_=ab.dmg&&avgDice(ab.dmg)>=15;
+          if(c>=2||(c>=1&&big_)){const x=fit(z)[0];opts.push({s:(big_?3:1.6)*c,go:()=>{setT(x);useAb(u,k,x)}})}
+        }
         else{const x=alive().filter(y=>!y.hid).sort((a,b)=>a.hp-b.hp)[0];if(x)opts.push({s:1.3,go:()=>{setT(x);useAb(u,k,x)}})}
       }
       else if(ab.kind==='sweep'){const c=alive().filter(x=>canMelee(u,x,false)).length;if(c>=2)opts.push({s:1.6*c,go:()=>useAb(u,k)})}
       else if(ab.kind==='pierce'){const x=bestFoe(u,profile(u,ab));if(x)opts.push({s:x.row==='front'&&alive().some(y=>y.row==='back')?4:2.5,go:()=>{setT(x);useAb(u,k,x)}})}
       else if(ab.kind==='debuffAll'&&n>=3)opts.push({s:3,go:()=>useAb(u,k)});
+      else if(ab.kind==='finale'&&n>=3&&!has(ab.name))opts.push({s:2.6,go:()=>useAb(u,k)});
     });
     if(opts.length){opts.sort((a,b)=>b.s-a.s);opts[0].go()}
     else if(!bt&&!P0.ranged&&B.tr.act){const x=alive().find(y=>!y.hid);if(x){setT(x);doIt(u,'throw','돌')}else doIt(u,'dodge')}
+  }
   }
 }
 
@@ -1796,8 +1881,8 @@ function paneAbil(box){
   box.appendChild(el('h2',null,'전투 기술'));
   const sk=el('div','card');box.appendChild(sk);
   clsSkills().forEach(k=>{
-    const s=SC.combatSkills[k],known=s.lv<=h.level;
-    abl(sk,s.name,abCost(s)+(s.uses&&known?' · 남은 '+usesLeft({kind:'hero'},k):''),s.desc+(known?'':' · 레벨 '+s.lv+'에 익힌다'),!known);
+    const s=abOf(k),known=s.lv<=h.level;
+    abl(sk,(known?'':'Lv '+s.lv+' · ')+s.name,abCost(s)+(s.uses&&known?' · 남은 '+usesLeft({kind:'hero'},k):''),abDesc(k),!known);
   });
 
   box.appendChild(el('h2',null,'재능과 출신'));
@@ -1864,7 +1949,7 @@ function renderParty(box){
     const dt=el('details');dt.appendChild(el('summary',null,'이야기 · 도와주는 판정 · 기술'));
     dt.appendChild(el('div','sub',C.blurb));
     dt.appendChild(el('div','sub','도와주는 판정: '+arr(C.profs).join(', ')));
-    (C.skills||[]).forEach(k=>{const ab=SC.combatSkills[k],kn=ab.lv<=S.hero.level;const x=el('div','sub');if(!kn)x.style.opacity='.6';x.textContent='· '+ab.name+' ['+abCost(ab)+(ab.uses&&kn&&r?', 남은 '+usesLeft({kind:'comp',id},k):'')+'] '+ab.desc+(kn?'':' · 레벨 '+ab.lv);dt.appendChild(x)});
+    (C.skills||[]).forEach(k=>{const ab=abOf(k),kn=ab.lv<=S.hero.level;const x=el('div','sub');if(!kn)x.style.opacity='.6';x.textContent='· '+ab.name+' ['+abCost(ab)+(ab.uses&&kn&&r?', 남은 '+usesLeft({kind:'comp',id},k):'')+'] '+abDesc(k)+(kn?'':' · 레벨 '+ab.lv);dt.appendChild(x)});
     d1.appendChild(dt);
     box.appendChild(d1);
   });
@@ -1908,9 +1993,9 @@ function mapSvg(){
 function stTags(u){
   const t=[],st=u.st||{};
   if(st.stun)t.push('얼어붙음');if(st.poison)t.push('독 '+st.poison.t);if(st.weak)t.push('명중 -2');if(st.blind)t.push('연막');if(st.burn)t.push('불붙음');
-  if(st.prone)t.push('넘어짐');if(st.restrain)t.push('속박');if(st.wet)t.push('젖음');if(st.taunt)t.push('도발당함');
+  if(st.prone)t.push('넘어짐');if(st.restrain)t.push('속박');if(st.wet)t.push('젖음');if(st.taunt)t.push('도발당함');if(st.mark)t.push('약점 노출');
   if(u.hid)t.push('숨음');if(u.high)t.push('고지대');if(u.dodge)t.push('회피');
-  (u.buffs||[]).forEach(b=>t.push(b.name+' '+['atk','dmg','ac'].filter(k=>b[k]).map(k=>({atk:'명중',dmg:'피해',ac:'방어'})[k]+sign(b[k])).join(' ')+' ('+b.t+')'));
+  (u.buffs||[]).forEach(b=>t.push(b.name+' '+['atk','dmg','ac'].filter(k=>b[k]).map(k=>({atk:'명중',dmg:'피해',ac:'방어'})[k]+sign(b[k])).join(' ')+(b.riposte?' 반격':'')+' ('+b.t+')'));
   return t;
 }
 function zoneHead(label,z){
@@ -2016,11 +2101,12 @@ function renderCombat(){
     card.appendChild(el('div','kbd','단축키 — 숫자: 행동·메뉴 고르기 · E: 턴 끝 · Esc: 메뉴 닫기'));
     const sub=el('div');sub.style.marginTop='8px';
     if(cmenu==='skill')ks.forEach(k=>{
-      const ab=abOf(k),c=canDo(u,'skill',k);let s=ab.desc+' · '+abCost(ab)+(ab.uses?' (남은 '+usesLeft(u,k)+')':'');
+      const ab=abOf(k),c=canDo(u,'skill',k);let s=abDesc(k)+' · '+abCost(ab)+(ab.uses?' (남은 '+usesLeft(u,k)+')':'');
       if(t&&up(t)){
         if(ab.kind==='attack'||ab.kind==='pierce'){const Q=profile(u,ab);s+=canHit(u,t,Q)?' · 명중 '+pct(hitP(u,t,Q)):''}
         else if(ab.kind==='save'&&ab.area!=='all')s+=' · '+(ab.area==='row'?zoneName(zk(t))+' '+zoneUnits(zk(t)).length+'명 · ':'')+'내성 실패 '+pct(failP(t,ab.save,spellDC(u,ab)));
         else if(ab.kind==='surface')s+=' · '+zoneName(zk(t));
+        else if(ab.kind==='mark')s+=' · 대상: '+t.name;
       }
       if(!(c.ok||c.pick))s=c.why+' · '+s;
       actBtn(sub,ab.name,s,()=>pcAct('skill',k),{disabled:!(c.ok||c.pick)||rolling});
