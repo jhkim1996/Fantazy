@@ -579,7 +579,7 @@ window.SCENARIO = {
         '마을 어귀에는 빗속의 행상인이 낡은 수레를 세워 두었다.',
         { if: { flag: 'done_n10' }, t: '천 년 만에 비가 그친 지붕 위로 햇살이 내려앉았다.' }
       ],
-      rest: [{ if: { flag: 'done_n1' }, t: '노파의 오두막에서 쉰다' }, { t: '마을 어귀의 빈 헛간에서 쉰다' }], restFree: true,
+      rest: [{ if: { flag: 'done_n1' }, t: '노파의 오두막에서 쉰다' }, { t: '마을 어귀의 빈 헛간에서 쉰다' }], restFree: true, noCamp: true,
       shop: { name: '빗속의 행상인', items: ['은빛 물약', '푸른 물약', '야영 물자', '기름 병', '불꽃 병', '{fine}', '가죽 갑옷', '사슬 갑옷', '가죽 두건', '철 투구', '가죽 장갑', '여행자의 장화', '여행자의 행운 부적'] },
       actions: [
         { label: '등불이 켜진 오두막의 문을 두드린다', event: 'n1', if: { not: 'done_n1' }, star: true },
@@ -2300,3 +2300,7 @@ window.SCENARIO = {
       ], else: '없음' }
   ]
 };
+
+// 장 목록과 지역: 다음 장 파일(chapter2.js …)이 여기에 이어 붙인다
+window.SCENARIO.chapters = [{ n: 1, title: '비 내리는 관문', summary: window.SCENARIO.summary, after: 'gate', endArt: window.SCENARIO.endArt }];
+window.SCENARIO.regions = { west: { name: '관문 서쪽' } };

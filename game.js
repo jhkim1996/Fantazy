@@ -56,7 +56,7 @@ function josa(w,f){
   if(p[0]==='으로')return w+(b&&b!==8?'으로':'로');
   return w+(b?p[0]:p[1]);
 }
-function tokens(){const c=cls(),h=S.hero||{};return {name:h.name||'떠돌이',cls:c.name,weapon:c.weapon,item:c.item,fine:c.fine,relic:c.relic,oath:c.oath,amp:(S.amp&&S.amp.name)||c.amp}}
+function tokens(){const c=cls(),h=S.hero||{};return Object.assign({pup:'새끼'},S.names,{name:h.name||'떠돌이',cls:c.name,weapon:c.weapon,item:c.item,fine:c.fine,relic:c.relic,oath:c.oath,amp:(S.amp&&S.amp.name)||c.amp})}
 function countItem(n){return S.items.filter(i=>i===n).length}
 function tpl(s){
   if(typeof s!=='string')return s;const T=tokens();
@@ -282,12 +282,13 @@ function checkLeave(out,text){
     }
   }
 }
-function campTalk(){if(S.loc==='village')return null;return arr(SC.camp).find(id=>{const e=SC.events[id];return e&&!S.flags['done_'+id]&&ok(e.if)})}
+function campTalk(){if(L().noCamp)return null;return arr(SC.camp).find(id=>{const e=SC.events[id];return e&&!S.flags['done_'+id]&&ok(e.if)})}
 
 // ── 결과 적용
 function applyFx(fx,out){
   if(!fx)return;const h=S.hero;
   if(fx.hpFull){h.hp=h.hpMax;out.push('HP 모두 회복')}
+  if(fx.partyFull){syncComps();party().forEach(id=>{S.comp[id].hp=S.comp[id].hpMax});out.push('동료들도 모두 회복')}
   if(fx.hp){
     if(fx.hp<0&&S.flags.shield&&S.mode==='combat'){delete S.flags.shield;out.push('별빛 방벽이 피해를 막음')}
     else{h.hp=Math.min(h.hpMax,h.hp+fx.hp);out.push('HP '+sign(fx.hp))}
@@ -306,6 +307,8 @@ function applyFx(fx,out){
   arr(fx.unset).forEach(f=>{delete S.flags[f]});
   if(fx.add)for(const k in fx.add){S.counters[k]=(S.counters[k]||0)+fx.add[k];const nm=(SC.counterNames||{})[k];if(nm)out.push(nm+' '+sign(fx.add[k]))}
   if(fx.xp){h.xp+=fx.xp;out.push('경험치 '+sign(fx.xp))}
+  if(fx.goto&&SC.locations[fx.goto])S.loc=fx.goto;   // 이야기가 그대를 다른 곳으로 데려간다
+  if(fx.names)S.names=Object.assign({},S.names,fx.names);   // 이야기 속에서 붙인 이름 ({pup} 등)
 }
 // 쓰러져도 이야기는 끝나지 않는다. 경험치가 차면 레벨이 오른다.
 function settle(out){
@@ -545,6 +548,11 @@ function startAdventure(){
 }
 
 // ── 세계
+// ── 장과 지역: 장이 시작되면 ch2 같은 플래그가 켜진다. 장소는 지역(region)에 속하고, 지도는 지금 지역만 그린다
+function chapterNo(){let n=1;arr(SC.chapters).forEach(c=>{if(c.n>n&&S.flags['ch'+c.n])n=c.n});return n}
+function CH(n){n=n||chapterNo();return arr(SC.chapters).find(c=>c.n===n)||{n,title:'',summary:[]}}
+function regionOf(id){return (SC.locations[id]&&SC.locations[id].region)||'west'}
+function regionName(r){return ((SC.regions||{})[r]||{}).name||''}
 function L(){return SC.locations[S.loc]}
 function visible(id){const l=SC.locations[id];return !!l&&(!l.if||ok(l.if))}
 function linksOf(id){return SC.locations[id].links.filter(k=>visible(k.to)&&(!k.if||ok(k.if)))}
@@ -623,6 +631,7 @@ function useItem(name,who){
 // ── 이야기·탐색 사건
 function ev(){return SC.events[S.ev]}
 function startEvent(id){
+  const E=SC.events[id];if(E.chapter&&!S.flags['ch'+E.chapter]){S.flags['ch'+E.chapter]=true;logp('제'+E.chapter+'장 「'+CH(E.chapter).title+'」을 시작했다.')}
   S.mode='event';S.ev=id;S.pending=null;S.sel=null;S.reroll=null;S.notice=null;
   S.sceneText=texts(SC.events[id].text);
   save();render();toTop();
@@ -687,7 +696,7 @@ function advance(){
 }
 function goNext(next){
   if(!next||next==='map'){S.mode='world';S.ev=null;save();render();toTop();return}
-  if(next==='end'){S.mode='end';S.ev=null;S.done=true;save();render();toTop();return}
+  if(next==='end'){S.mode='end';S.ev=null;S.done=true;S.ended=chapterNo();save();render();toTop();return}
   startEvent(next);
 }
 
@@ -1202,6 +1211,7 @@ function fleeInfo(){return {bonus:statVal('민첩')+(S.cls==='rogue'?3:0),dc:10+
 function bossU(){return foes().find(e=>E_(e).boss)||foes()[0]}
 function specialOf(id){return arr(S.battle.def.special).find(x=>x.id===id)}
 function specialReady(sp){const b=bossU();return ok(sp.if)&&up(b)&&b.hp<=b.hpMax*(sp.below||1)&&S.hero.mp>=(sp.mp||0)}
+function spStat(sp){return sp.stat==='class'?cls().key:sp.stat}
 function specialDC(sp){let dc=sp.dc;const why=[];arr(sp.dcMod).forEach(m=>{if(ok(m.if)){dc+=m.v;why.push(m.why+' '+sign(m.v))}});return {dc,why}}
 function tgtU(){const t=U(S.battle.target);return t&&t.side==='foe'?t:null}
 // 지금 고른 대상이 이 아군의 기본 공격에 닿지 않으면 닿는 대상으로 바꾼다
@@ -1309,12 +1319,12 @@ function doIt(u,kind,arg,au){
     return;
   }
   if(kind==='special'){
-    B.tr.act=0;const sp=specialOf(arg),{dc}=specialDC(sp),rr=rollD20('normal'),r=rr.r,bonus=statVal(sp.stat)+profBonus(),tot=r+bonus,b=bossU();
+    B.tr.act=0;const sp=specialOf(arg),{dc}=specialDC(sp),rr=rollD20('normal'),r=rr.r,bonus=statVal(spStat(sp))+profBonus(),tot=r+bonus,b=bossU();
     h.mp-=sp.mp||0;
     const okS=r!==1&&(r===20||tot>=dc);
     B.last={r,txt:sp.label+' d20('+r+') '+sign(bonus)+' = '+tot+' vs DC '+dc+(okS?' → 성공!':' → 실패')};
     afx({type:'cast',from:'hero',to:b.uid,color:'#e6ebf2'});
-    if(okS){B.over=sp.outcome;B.res={title:sp.label+' — 성공!',lines:[]};logB(sp.label+' — 성공했다!','me');afx({type:'text',target:b.uid,text:'낙인이 부서진다',color:'#ffffff',delay:300})}
+    if(okS){B.over=sp.outcome;B.res={title:sp.label+' — 성공!',lines:[]};logB(sp.label+' — 성공했다!','me');afx({type:'text',target:b.uid,text:sp.fxText||'낙인이 부서진다',color:'#ffffff',delay:300})}
     else{logB(sp.label+' — '+sp.failText,'foe');if(sp.failHp){const dm=hurt(u,-sp.failHp,'psychic');if(dm)logB('HP -'+dm,'foe')}}
   }
 }
@@ -1524,7 +1534,8 @@ function loseBattle(){
 function knockout(){
   const h=S.hero,k=SC.knockout||{};
   const toGate=k.gate&&ok(k.gate.if)&&k.gate.locs.includes(S.loc);
-  const dest=toGate?'gate':SC.startLoc;
+  const rg=(SC.regions||{})[regionOf(S.loc)];
+  const dest=rg&&rg.wake?(ok(rg.wakeIf)?rg.wake:rg.wakeElse||SC.startLoc):toGate?'gate':SC.startLoc;
   S.loc=dest;h.hp=Math.ceil(h.hpMax/2);h.mp=Math.ceil(h.mpMax/2);
   for(const id in (S.comp||{}))S.comp[id].hp=Math.max(S.comp[id].hp,Math.ceil(S.comp[id].hpMax/2));
   const lost=Math.floor(S.gold*0.25);S.gold-=lost;
@@ -1575,7 +1586,7 @@ function pickArt(a){if(!a)return null;if(Array.isArray(a))return a.find(x=>!x.if
 function artSpec(){
   const m=S.mode;
   if(m==='create'){const c=S.mk&&S.mk.cls;return {sky:'dusk',bg:'mountains',fx:['rain'],actors:c?[{k:'hero',x:.5,cls:c}]:[]}}
-  if(m==='end')return SC.endArt||{sky:'dawn',bg:'mountains'};
+  if(m==='end')return CH(S.ended||1).endArt||SC.endArt||{sky:'dawn',bg:'mountains'};
   const loc=pickArt(L().art)||{sky:'rain',bg:'mountains'};
   if(m==='combat'){const b=pickArt(S.battle.def.art)||{sky:loc.sky,bg:loc.bg,fx:loc.fx};return {sky:b.sky,bg:b.bg,fx:b.fx,props:b.props,battle:true}}
   if(m==='event')return ev().art==='camp'?campArt():pickArt(ev().art)||loc;
@@ -1610,7 +1621,7 @@ function render(){
   $('freedice').hidden=!(m==='world'&&wtab==='log');
   $('lvwrap').hidden=m==='create'||m==='combat'||!needLevel();
   const nt=$('notice');nt.hidden=!S.notice||!(m==='world'||(m==='event'&&ev()&&ev().camp&&!S.pending));nt.textContent=S.notice||'';
-  $('saga').textContent=SC.title+' · '+SC.chapterTitle;
+  $('saga').textContent=SC.title+' · 제'+chapterNo()+'장 · '+CH().title;
   const sc=$('scene');sc.innerHTML='';
   const para=list=>list.forEach(t=>sc.appendChild(el('p',null,t)));
   if(window.Art)Art.scene(artSpec());
@@ -1633,8 +1644,11 @@ function render(){
     const f=B.field,fl=[];if(f.high)fl.push('고지대');if(f.cover)fl.push('엄폐물 (숨기 유리)');if(f.water)fl.push('물');if(f.rain)fl.push('비 (불이 빨리 꺼짐)');
     $('clock').textContent=L().name+' · 라운드 '+B.round+(fl.length?' · 지형: '+fl.join(', '):'')+' · 그림을 눌러 대상을 고를 수 있다';renderCombat();
   }else if(m==='end'){
-    $('stitle').textContent='제1장 끝';
-    para(['그대의 선택과 주사위가 새긴 이야기는 이렇게 기록되었다.','이 기록은 제2장으로 그대로 이어진다. 그때까지 세상은 열려 있다 — 계속 사냥하며 힘을 기를 수 있다.']);
+    const n=S.ended||1,nx=CH(n+1),has=arr(SC.chapters).some(c=>c.n===n+1);
+    $('stitle').textContent='제'+n+'장 「'+CH(n).title+'」 끝';
+    para(['그대의 선택과 주사위가 새긴 이야기는 이렇게 기록되었다.',has?'이 기록은 제'+(n+1)+'장 「'+nx.title+'」으로 그대로 이어진다. 곧바로 떠나도 되고, 지금 있는 곳에서 사냥하며 힘을 더 길러도 된다.':'이 기록은 다음 장으로 그대로 이어진다. 그때까지 세상은 열려 있다 — 계속 사냥하며 힘을 기를 수 있다.']);
+    $('endh').textContent=(n+1)+'장으로 이어지는 기록';
+    const nb=$('nextch');nb.hidden=!has||!!S.flags['ch'+(n+1)];nb.textContent='제'+(n+1)+'장 「'+nx.title+'」 시작 →';
     $('clock').textContent='';renderSummary();
   }
   if(m==='end'){const lg=$('log');lg.innerHTML='';S.log.slice(-25).reverse().forEach(t=>lg.appendChild(el('li',null,t)))}
@@ -1750,13 +1764,14 @@ function paneExplore(box){
   if(!acts.children.length)acts.appendChild(el('div','sub','이곳에서는 할 일이 없다. 다른 곳으로 이동하자.'));
 
   const s2=el('section');xg.appendChild(s2);
-  s2.appendChild(el('h2',null,'지도 · 이동'));
+  s2.appendChild(el('h2',null,'지도 · 이동'+(regionName(regionOf(S.loc))?' — '+regionName(regionOf(S.loc)):'')));
   const mc=el('div','card');s2.appendChild(mc);
   mc.appendChild(mapSvg());
   const tl=el('div');tl.style.marginTop='8px';mc.appendChild(tl);
   linksOf(S.loc).forEach(k=>{
     const t=SC.locations[k.to];
-    actBtn(tl,'→ '+t.name,(t.lv==='안전'?'안전':'레벨 '+t.lv)+(storyAt(k.to)?' · ★ 이야기가 기다린다':''),()=>travel(k.to),{star:storyAt(k.to)});
+    const far_=regionOf(k.to)!==regionOf(S.loc);
+    actBtn(tl,'→ '+t.name+(far_?' ('+regionName(regionOf(k.to))+')':''),(t.lv==='안전'?'안전':'레벨 '+t.lv)+(far_?' · 다른 지역으로 넘어간다':'')+(storyAt(k.to)?' · ★ 이야기가 기다린다':''),()=>travel(k.to),{star:storyAt(k.to)});
   });
 
   const qs=questBlock();
@@ -1985,10 +2000,11 @@ function itemInfo(n){
 function mapSvg(){
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
   svg.setAttribute('viewBox','0 0 320 240');svg.setAttribute('class','map');svg.setAttribute('role','img');svg.setAttribute('aria-label','지도');
-  const ids=Object.keys(SC.locations).filter(visible);
+  const here=regionOf(S.loc),ids=Object.keys(SC.locations).filter(id=>visible(id)&&regionOf(id)===here);
   const adj=linksOf(S.loc).map(k=>k.to);
   const drawn={};
   ids.forEach(a=>linksOf(a).forEach(k=>{
+    if(regionOf(k.to)!==here)return;   // 다른 지역으로 가는 길은 지도 가장자리 표시로 대신한다
     const key=[a,k.to].sort().join('|');if(drawn[key])return;drawn[key]=1;
     const A=SC.locations[a],B=SC.locations[k.to],ln=document.createElementNS(ns,'line');
     ln.setAttribute('x1',A.x);ln.setAttribute('y1',A.y);ln.setAttribute('x2',B.x);ln.setAttribute('y2',B.y);ln.setAttribute('class','link');svg.appendChild(ln);
@@ -2001,6 +2017,8 @@ function mapSvg(){
     const t=document.createElementNS(ns,'text');t.setAttribute('x',l.x);t.setAttribute('y',l.y+(l.y>200?-14:20));t.setAttribute('text-anchor','middle');t.textContent=l.name;g.appendChild(t);
     const lv=document.createElementNS(ns,'text');lv.setAttribute('x',l.x);lv.setAttribute('y',l.y+(l.y>200?-26:31));lv.setAttribute('text-anchor','middle');lv.setAttribute('class','lv');lv.textContent=l.lv==='안전'?'안전':'Lv '+l.lv;g.appendChild(lv);
     if(storyAt(id)){const s=document.createElementNS(ns,'text');s.setAttribute('x',l.x+11);s.setAttribute('y',l.y-6);s.setAttribute('class','starmark');s.textContent='★';g.appendChild(s)}
+    const out=linksOf(id).filter(k=>regionOf(k.to)!==here);
+    if(out.length){const ex=document.createElementNS(ns,'text');ex.setAttribute('x',l.x);ex.setAttribute('y',l.y+(l.y>190?-24:43));ex.setAttribute('text-anchor','middle');ex.setAttribute('class','exit');ex.textContent='⇢ '+out.map(k=>regionName(regionOf(k.to))).join(', ');g.appendChild(ex)}
     svg.appendChild(g);
   });
   return svg;
@@ -2107,8 +2125,8 @@ function renderCombat(){
     if(rogue(u)){c=canDo(u,'dis');add('물러서기',c.ok?'보조 · 기회 공격 없이 물러남':'쓸 수 없다',()=>pcAct('dis'),c)}
     if(u.kind==='hero'){const fi=fleeInfo();c=canDo(u,'flee');add('도망',c.ok?'행동 · 민첩 '+sign(fi.bonus)+' vs '+fi.dc+' · '+pct(chance(fi.bonus,fi.dc,'normal',0,{})):c.why,()=>pcAct('flee'),c)}
     if(u.kind==='hero')arr(B.def.special).filter(sp=>ok(sp.if)).forEach(sp=>{
-      const {dc,why}=specialDC(sp),bonus=statVal(sp.stat)+profBonus();c=canDo(u,'special',sp.id);
-      add('✦ '+sp.label,sp.stat+' '+sign(bonus)+' vs DC '+dc+(why.length?' ('+why.join(', ')+')':'')+' · 성공 '+pct(chance(bonus,dc,'normal',0,{lucky:race()&&race().lucky}))+' · 마력 '+sp.mp+' · '+sp.note,()=>pcAct('special',sp.id),c,'wide');
+      const {dc,why}=specialDC(sp),bonus=statVal(spStat(sp))+profBonus();c=canDo(u,'special',sp.id);
+      add('✦ '+sp.label,spStat(sp)+' '+sign(bonus)+' vs DC '+dc+(why.length?' ('+why.join(', ')+')':'')+' · 성공 '+pct(chance(bonus,dc,'normal',0,{lucky:race()&&race().lucky}))+' · 마력 '+sp.mp+' · '+sp.note,()=>pcAct('special',sp.id),c,'wide');
     });
     // 차례를 넘기는 두 버튼은 늘 같은 자리(행동판 맨 아래)에 둔다
     const fin=el('div','acts fin');card.appendChild(fin);
@@ -2300,7 +2318,7 @@ function summaryRows(){
   rows.push(['능력치',S.stats.map(s=>s.n+' '+sign(s.v)).join(' · ')]);
   rows.push(['장비',SLOTS.map(([k])=>S.equip[k]).filter(Boolean).join(', ')||'없음']);
   rows.push(['재능',S.skills.filter(id=>SC.talents.includes(id)).map(id=>SC.skillDefs[id].name).join(', ')||'없음']);
-  (SC.summary||[]).forEach(x=>{const hit=x.cases.find(c=>ok(c.if));rows.push([x.label,tpl(hit?hit.t:(x.else||'-'))])});
+  (CH(S.ended||chapterNo()).summary||SC.summary||[]).forEach(x=>{const hit=x.cases.find(c=>ok(c.if));rows.push([x.label,tpl(hit?hit.t:(x.else||'-'))])});
   for(const k in (SC.counterNames||{}))rows.push([SC.counterNames[k],String(S.counters[k]||0)]);
   const kills=Object.keys(S.counters).filter(k=>k.startsWith('kill_')).reduce((a,k)=>a+S.counters[k],0);
   rows.push(['쓰러뜨린 적',String(kills)]);
@@ -2312,13 +2330,14 @@ function renderSummary(){
   summaryRows().forEach(([k,v])=>{const dv=el('div','sumrow');dv.appendChild(el('b',null,k));dv.appendChild(el('span',null,v));box.appendChild(dv)});
 }
 $('copy').onclick=()=>{
-  const t=SC.title+' · '+SC.chapterTitle+'\n'+summaryRows().map(r=>r[0]+': '+r[1]).join('\n')+'\n\n'+S.log.map(x=>'- '+x).join('\n');
+  const t=SC.title+' · 제'+(S.ended||chapterNo())+'장 · '+CH(S.ended||chapterNo()).title+'\n'+summaryRows().map(r=>r[0]+': '+r[1]).join('\n')+'\n\n'+S.log.map(x=>'- '+x).join('\n');
   const done=m=>{$('copied').textContent=m;setTimeout(()=>{$('copied').textContent=''},2000)};
   // 클립보드가 막힌 환경에서는 기록을 펼쳐 직접 복사하게 한다
   const manual=()=>{const b=$('copybox');b.value=t;b.hidden=false;b.focus();b.select();done('아래 글을 길게 눌러 복사하세요')};
   try{navigator.clipboard.writeText(t).then(()=>done('복사됨'),manual)}catch(e){manual()}
 };
-$('goon').onclick=()=>{S.mode='world';S.loc='gate';save();render();toTop()};
+$('goon').onclick=()=>{S.mode='world';S.loc=CH(S.ended||1).after||S.loc;save();render();toTop()};
+$('nextch').onclick=()=>{const c=CH((S.ended||1)+1);if(!c.start)return;S.loc=CH(S.ended||1).after||S.loc;startEvent(c.start)};
 
 // ── 처음부터 (두 번 눌러 확인)
 let armed=0;

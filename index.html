@@ -102,6 +102,8 @@ input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--
 .map text{fill:var(--text);font-size:11px;font-family:system-ui,sans-serif}
 .map text.lv{fill:var(--sub);font-size:9px}
 .map .starmark{fill:var(--star);font-size:13px}
+.map text.exit{fill:var(--acc-text);font-size:9px}
+.next.ghost{background:transparent;color:var(--text);border-color:var(--line);font-weight:400}
 .map g.adj{cursor:pointer}
 /* 전투 */
 .foes{display:grid;gap:8px}
@@ -333,11 +335,12 @@ h3{font-size:12px;font-weight:500;color:var(--sub);margin:0 0 6px}
 <div id="combat" hidden></div>
 
 <div id="endwrap" hidden>
-  <h2>2장으로 이어지는 기록</h2>
+  <h2 id="endh">2장으로 이어지는 기록</h2>
   <div class="card" id="summary"></div>
   <div class="row" style="margin-top:8px"><button id="copy">기록 복사</button><span class="sub" id="copied"></span></div>
   <textarea id="copybox" readonly hidden aria-label="복사할 기록"></textarea>
-  <button class="next" id="goon">계속 탐험하기 →</button>
+  <button class="next" id="nextch" hidden>다음 장 시작 →</button>
+  <button class="next ghost" id="goon">계속 탐험하기 →</button>
 </div>
 
 <div id="logwrap" hidden>
@@ -365,6 +368,7 @@ h3{font-size:12px;font-weight:500;color:var(--sub);margin:0 0 6px}
 </div>
 
 <script src="chapter1.js"></script>
+<script src="chapter2.js"></script>
 <script src="art.js"></script>
 <script src="game.js"></script>
 </body>
