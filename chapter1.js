@@ -135,18 +135,18 @@ function SENA_FIGHT(surprise, enemies) {
         '“세나예요. 마을 등불지기의 손녀.” 그녀가 쏟아진 약초를 주워 담았다. “할머니 눈에 바를 별꽃을 캐러 왔다가 이 꼴이 됐네요.”',
         '세나가 그대를 똑바로 바라보았다. “할머니가 그러더군요. 별 냄새가 나는 사람이 올 거라고. 관문으로 가는 거죠? 숲길이라면 나만큼 아는 사람도 없어요. 같이 가요.”'
       ],
-      fx: { xp: 4 }, log: '약초꾼 세나가 동료가 되었다.', next: 'map' },
+      fx: { xp: 4 }, log: '거미에게서 약초꾼 세나를 구했다.', next: 'c_sena_join' },
     lose: {
       text: [
         '거미의 독이 퍼져 무릎이 꺾였다. 흐려지는 시야 속에서, 화살 세 대가 연달아 날아가 거미의 눈을 꿰뚫는 것이 보였다.',
         '정신을 차렸을 때, 젊은 여자가 그대의 상처에 짓이긴 약초를 바르고 있었다. “세나예요. 등불지기의 손녀.” 그녀가 웃었다. “구하러 온 사람을 내가 구했네요.”',
         '“그래도 고마워요. 관문까지 같이 가요. 당신을 혼자 두면 안 될 것 같으니까.”'
       ],
-      log: '거미에게 쓰러졌지만 세나가 구해 냈다. 세나가 동료가 되었다.', next: 'map' }
+      log: '거미에게 쓰러졌지만 세나가 구해 냈다.', next: 'c_sena_join' }
   };
 }
 
-// 천 개의 계단 초소: 브란과 함께 사냥개와 싸운다 (어느 쪽이든 브란은 동료가 된다)
+// 천 개의 계단 초소: 브란과 함께 사냥개와 싸운다 (끝난 뒤 그를 데려갈지 정한다)
 function BRAN_FIGHT(surprise) {
   return {
     enemies: ['scout', 'scout'], noFlee: true, surprise: surprise ? 'foe' : null, scale: ['scout'], scaleFree: 1,
@@ -158,16 +158,35 @@ function BRAN_FIGHT(surprise) {
         '“브란이오. 한때는 회색 사냥꾼의 추종자였지.” 그가 지져진 손등을 내려다보았다. “낙인이 내 뜻을 갉아먹는 게 느껴져서, 불로 지져 냈소. 그 뒤로 개들이 나를 쫓고 있지.”',
         '“그대에게서 별 냄새가 나는군. 사냥꾼이 가장 두려워하는 냄새요.” 브란이 씁쓸하게 웃었다. “낙인에 대해서라면 내가 누구보다 잘 아오. 함께 가겠소. 어차피 혼자서는 오래 못 버틸 테니.”'
       ],
-      fx: { xp: 4 }, log: '낙인을 지진 자 브란이 동료가 되었다.', next: 'map' },
+      fx: { xp: 4 }, log: '낙인을 지진 자 브란과 함께 사냥개들을 물리쳤다.', next: 'c_bran_join' },
     lose: {
       text: [
         '사냥개의 이빨에 쓰러지는 순간, 초소 전체가 불길에 휩싸였다. 사내가 마지막 기름을 쏟아붓고 불을 지른 것이다.',
         '그을린 얼굴로 그대를 끌어낸 사내가 말했다. “브란이오. 한때는 회색 사냥꾼의 추종자였지. 이 손등을 보시오. 낙인을 불로 지져 냈소.”',
         '“빚을 졌으니 갚아야겠지. 그대와 함께 가겠소.”'
       ],
-      log: '사냥개에게 쓰러졌지만 브란이 불길로 구해 냈다. 브란이 동료가 되었다.', next: 'map' }
+      log: '사냥개에게 쓰러졌지만 브란이 불길로 구해 냈다.', next: 'c_bran_join' }
   };
 }
+
+// 천 개의 계단 초소: 브란과 싸운다 (이기면 그의 목숨을 정하고, 지면 그가 떠난다)
+const BRAN_FOE = {
+  enemies: ['foe_bran1'], noFlee: true, art: { sky: 'rain', bg: 'stairs', fx: ['rain'] },
+  intro: '사내가 지팡이를 휘둘렀다. 빗속에서 불씨가 터진다!',
+  win: { text: ['사내가 무너진 벽에 등을 기대고 주저앉았다. 지팡이가 빗물 웅덩이에 굴렀다.', '“끝을 내든, 보내 주든.” 그가 숨을 몰아쉬었다. “어느 쪽이든 사냥꾼보다는 낫겠지.”'],
+    log: '회색 두건의 사내를 쓰러뜨렸다.', next: 'c_bran_judge' },
+  lose: { text: ['불씨가 그대의 눈앞에서 터졌다. 정신을 차렸을 때 사내는 사라지고 없었다. 빗속에 그을린 발자국 몇 개, 그리고 그를 쫓는 사냥개들의 울음.', '그는 그대를 기억할 것이다.'],
+    fx: { comp: { bran: 'hostile' } }, log: '회색 두건의 사내에게 쓰러졌다. 그는 그대를 원망하며 사라졌다.', next: 'map' }
+};
+
+// 다시 찾아간 세나와 싸운다 (억지로 데려가려 했을 때)
+const SENA_FOE = {
+  enemies: ['foe_sena1'], noFlee: true, art: { sky: 'rain', bg: 'village', fx: ['rain'] },
+  intro: '세나가 활을 들었다. “다가오지 마요.”',
+  win: { text: ['화살통이 비고, 세나가 무릎을 꿇었다. 그녀는 그대를 올려다보지 않았다.'], log: '세나를 쓰러뜨렸다.', next: 'c_sena_judge' },
+  lose: { text: ['화살 하나가 그대의 어깨를 꿰었다. 세나는 활을 거두고 숲 쪽으로 걸어갔다. 돌아보지 않았다.'],
+    fx: { comp: { sena: 'hostile' } }, log: '세나에게 쓰러졌다. 그녀는 그대를 원망하며 숲으로 떠났다.', next: 'map' }
+};
 
 // 이끼 곰의 둥지: 늙은 이끼 곰과의 전투 (지면 꽃은 둥지에 남는다 — 다시 찾아갈 수 있다)
 function NEST_FIGHT(surprise) {
@@ -407,23 +426,26 @@ window.SCENARIO = {
     orden: { name: '오르덴', title: '맹세기사', art: 'orden', joinIf: { flag: 'done_n4', min: { bond: 1 } },
       locs: ['gate', 'tomb', 'hall', 'stairs', 'aqueduct'], anywhereIf: { flag: 'orden_joins' },
       awayText: '관문을 멀리 떠날 수 없다. 계단·관문·수로·무덤·회랑에서만 함께 싸운다',
+      gone: { parted: '울음의 관문으로 돌아가 문을 지킨다. 관문에서 다시 만날 수 있다', dead: '그대의 손에 쓰러졌다' },
       ap: 'bond', apName: '유대', profs: ['역사', '운동', '위협'],
       perks: [{ if: { flag: 'kairon_kept' }, ac: 1, name: '형제의 반지' }],
       hp: 30, hpGain: 7, ac: 17, init: 0, row: 'front', str: 4, dex: 0, wis: 2,
       attack: { name: '장창', hit: 5, dice: '1d10', dmgB: 3, reach: true },
       skills: ['pierce', 'taunt'], guard: true,
       blurb: '엘레우스의 마지막 맹세기사. 장창이 길어 뒷열에서도 적 앞열을 찌른다. 앞열에 서 있으면 다른 동료를 노린 근접 공격 하나를 라운드마다 불리하게 만든다 (수호).' },
-    sena: { name: '세나', title: '약초꾼 궁수', art: 'sena', joinIf: { flag: 'sena_met', not: 'sena_left' },
+    sena: { name: '세나', title: '약초꾼 궁수', art: 'sena', joinIf: { flag: 'sena_met' },
       ap: 'ap_sena', apName: '호감', profs: ['생존', '의학', '지각'], leaveAt: -5,
       leaveText: '“당신이랑은 더 못 가겠어요.” 세나가 활을 메고 돌아섰다. “할머니한테 돌아갈게요. 찾지 마세요.”',
+      gone: { parted: '할머니 곁, 마지막 마을로 돌아갔다. 마을에서 다시 만날 수 있다', left: '실망해서 마을로 돌아갔다. 마을에서 다시 찾아가 볼 수 있다', hostile: '그대를 원망하며 숲으로 사라졌다', dead: '그대의 손에 쓰러졌다' },
       perks: [{ if: { flag: 'sena_kept_arrow' }, hit: 1, name: '어머니의 화살촉' }],
       hp: 18, hpGain: 5, ac: 14, init: 3, row: 'back', str: 0, dex: 3, wis: 2,
       attack: { name: '사냥 활', hit: 5, dice: '1d8', dmgB: 3, ranged: true },
       skills: ['aimed', 'herb', 'net'],
       blurb: '등불지기 노파의 손녀. 뒷열에서 활을 쏘고, 약초로 쓰러진 동료를 일으킨다.' },
-    bran: { name: '브란', title: '낙인을 지진 자', art: 'bran', joinIf: { flag: 'bran_met', not: 'bran_left' },
+    bran: { name: '브란', title: '낙인을 지진 자', art: 'bran', joinIf: { flag: 'bran_met' },
       ap: 'ap_bran', apName: '호감', profs: ['비전', '기만', '은신'], leaveAt: -5,
       leaveText: '“사냥꾼이나 그대나, 결국 같은 부류였군.” 브란이 지팡이를 집어 들었다. 그 뒷모습은 금세 안개 속으로 사라졌다.',
+      gone: { parted: '제 길을 갔다. 천 개의 계단 초소나, 동쪽의 고향에서 다시 만날 수 있다', left: '그대에게 등을 돌리고 떠났다. 초소나 동쪽 고향에서 다시 찾아가 볼 수 있다', hostile: '그대를 저주하며 사냥개들 속으로 사라졌다', dead: '그대의 손에 쓰러졌다' },
       perks: [{ if: { flag: 'ledger_burned' }, hit: 1, name: '풀려난 손' }],
       hp: 16, hpGain: 4, ac: 12, init: 1, row: 'back', str: 0, dex: 1, wis: 3, dc: 3,
       attack: { name: '불씨', hit: 5, dice: '1d10', dmgB: 0, ranged: true, dtype: 'fire', burn: true },
@@ -558,6 +580,13 @@ window.SCENARIO = {
       ],
       drops: [{ item: '맹세기사의 흉갑', p: 0.2, pity: 6, uniq: true }, { item: '{oath}', p: 0.15, pity: 8, uniq: true }, { item: '푸른 물약', p: 0.5 }, { item: '은빛 물약', p: 0.6 }],
       desc: '수로 가장 깊은 묘실을 지키는 엘레우스의 기사단장. 녹슨 투구 속에서 금빛 불꽃이 탄다. 한 번에 두 번 베고, 동료가 둘 이상이면 한 라운드에 두 번 움직인다. 냉기와 독에 강하며 별빛에 약하다.' },
+    // 동료와 맞설 때 (그대가 고른 길에 따라)
+    foe_bran1: { art: 'bran', name: '브란', people: true, lv: 3, hp: 26, ac: 12, atk: 5, dmg: '1d10', dtype: 'fire', xp: 18, gold: [2, 8], row: 'back', ranged: true, init: 1,
+      skills: [{ name: '불씨 폭발', p: 0.3, ranged: true, dmg: '2d6', dtype: 'fire', onHit: { burn: 2 } }],
+      desc: '회색 두건의 주술사. 지팡이 끝의 불씨를 던진다. 맞으면 불붙는다.' },
+    foe_sena1: { art: 'sena', name: '세나', people: true, lv: 3, hp: 24, ac: 14, atk: 6, dmg: '1d8+2', xp: 18, gold: [0, 0], row: 'back', ranged: true, init: 3,
+      skills: [{ name: '조준 사격', p: 0.3, ranged: true, dmg: '2d8+2' }],
+      desc: '등불지기의 손녀. 백발백중의 궁수.' },
     alpha: { art: 'alpha', name: '잿빛 송곳니', lv: 6, hp: 90, ac: 15, atk: 7, dmg: '2d6+4', xp: 80, gold: [40, 60], boss: true, big: true, init: 3, multi: 2,
       skills: [
         { name: '포효', p: 0.2, debuff: { atk: -2, turns: 2 }, text: '잿빛 송곳니가 포효한다. 다리가 굳는다! (2턴 동안 모두 명중 -2)' },
@@ -700,7 +729,7 @@ window.SCENARIO = {
       explore: ['ex_corpse', 'ex_rune'],
       actions: [
         { label: '회랑 깊은 곳으로 잿빛 송곳니를 쫓는다 (권장 레벨 5)', event: 'n7', if: { not: 'done_n7' }, star: true },
-        { label: '추종자 우두머리의 은신처를 찾는다 (권장 레벨 5)', event: 'cult_den', if: { flag: 'q_ledger', not: ['ledger_got', 'bran_left'] }, star: true }
+        { label: '추종자 우두머리의 은신처를 찾는다 (권장 레벨 5)', event: 'cult_den', if: { flag: 'q_ledger', not: ['ledger_got', 'bran_gone'] }, star: true }
       ],
       links: [{ to: 'tomb' }]
     }
@@ -718,14 +747,14 @@ window.SCENARIO = {
     { name: '노파의 부탁', if: { flag: 'q_wolves', not: ['q_wolves_done', 'wolves_solved'] }, t: '굶주린 늑대를 다섯 마리 쫓거나 (지금까지 {#kill_wolf}마리), 안개 비탈의 늑대 굴을 찾아 무리를 떠나보낸다 → 마을의 노파에게' },
     { name: '노파의 부탁', if: { flag: ['q_wolves', 'wolves_solved'], not: 'q_wolves_done' }, t: '늑대들은 비탈을 떠났다 → 마을의 노파에게 알린다' },
     { name: '달빛 별꽃', if: { flag: 'q_moonflower', not: 'crone_cured' }, t: '검은 소나무 숲 가장 깊은 곳, 이끼 곰의 둥지에서 달빛 별꽃을 얻어 노파에게 (세나의 부탁)' },
-    { name: '회색 장부', if: { flag: 'q_ledger', not: ['ledger_got', 'bran_left'] }, t: '무너지는 회랑에 숨은 추종자 우두머리에게서 회색 장부를 빼앗는다 (브란의 부탁)' },
-    { name: '회색 장부', if: { item: '회색 장부', not: ['ledger_burned', 'ledger_kept', 'bran_left'] }, t: '장부를 손에 넣었다. 브란과 함께 관문에서 야영하면 어떻게 할지 정한다' },
+    { name: '회색 장부', if: { flag: 'q_ledger', not: ['ledger_got', 'bran_gone'] }, t: '무너지는 회랑에 숨은 추종자 우두머리에게서 회색 장부를 빼앗는다 (브란의 부탁)' },
+    { name: '회색 장부', if: { item: '회색 장부', not: ['ledger_burned', 'ledger_kept', 'bran_gone'] }, t: '장부를 손에 넣었다. 브란과 함께 관문에서 야영하면 어떻게 할지 정한다' },
     { name: '가라앉은 맹세', if: { flag: 'found_bones', not: ['q_ring_done', 'got_ring'] }, t: '옛 수로 깊은 곳의 물에 잠긴 기사에게서 반지를 찾는다. 싸우거나, 엘레우스 맹세의 구절로 잠재운다 (권장 레벨 5)' },
     { name: '가라앉은 맹세', if: { item: '기사의 반지' }, t: '기사의 반지를 관문의 오르덴에게 가져간다' },
     { name: '숲의 비명', if: { flag: 'done_n1', not: 'done_c_sena' }, t: '노파의 손녀 세나가 검은 소나무 숲에서 돌아오지 않았다' },
     { name: '초소의 울음', if: { flag: 'done_n2', not: 'done_c_bran' }, t: '천 개의 계단 옆 무너진 초소에서 사냥개들이 누군가를 몰아붙이고 있다' },
     { name: '회색 낙인', if: { not: 'mark_known' }, t: '회색 낙인 조각 {@회색 낙인 조각}/3을 모아 마을이나 관문에서 맞춰 보면 낙인의 비밀을 알 수 있다. 비밀을 알면 결전에서 낙인을 부수기 쉬워진다' },
-    { name: '회색 낙인', if: { flag: 'bran_met', not: ['mark_known', 'bran_left', 'done_camp_bran1'] }, t: '낙인을 지져 낸 브란이라면 그 비밀을 알지도 모른다 (관문에서 야영할 때)' }
+    { name: '회색 낙인', if: { flag: 'bran_met', not: ['mark_known', 'bran_gone', 'done_camp_bran1'] }, t: '낙인을 지져 낸 브란이라면 그 비밀을 알지도 모른다 (관문에서 야영할 때)' }
   ],
 
   counterNames: { bond: '오르덴과의 유대', ap_sena: '세나의 호감', ap_bran: '브란의 호감' },
@@ -1702,7 +1731,11 @@ window.SCENARIO = {
             fx: { set: ['bran_met'], xp: 3 }, battle: BRAN_FIGHT(true), log: '초소 지붕 위에서 사냥개들을 덮쳤다.', next: 'map' },
           fail: {
             text: ['젖은 기와가 미끄러졌다. 그대는 사냥개들 한가운데로 떨어졌다.'],
-            fx: { set: ['bran_met'], hp: -3 }, battle: BRAN_FIGHT(false), log: '지붕에서 떨어졌다 (HP -3).', next: 'map' } }
+            fx: { set: ['bran_met'], hp: -3 }, battle: BRAN_FIGHT(false), log: '지붕에서 떨어졌다 (HP -3).', next: 'map' } },
+        { id: 4, insp: 'brave', label: '사냥꾼의 추종자다 — 사냥개보다 그를 먼저 친다', roll: false, note: '전투 (브란과 싸운다)',
+          then: {
+            text: ['그대가 칼끝을 사내에게 겨누자, 사냥개들이 오히려 한 걸음 물러섰다. 구경이라도 하겠다는 듯이.', '사내가 쓴웃음을 지었다. “…역시. 별 냄새가 나도 사람은 사람이군.” 지팡이 끝에 불씨가 피어올랐다.'],
+            fx: { set: ['bran_fought'] }, battle: BRAN_FOE, next: 'map' } }
       ]
     },
 
@@ -2252,17 +2285,28 @@ window.SCENARIO = {
   // 1장 끝 화면에 보여 줄 기록
   summary: [
     { label: '오르덴', cases: [
+        { if: { flag: 'orden_dead' }, t: '그대의 손에 쓰러졌다' },
+        { if: { flag: 'orden_parted' }, t: '그대와 헤어져 관문을 지킨다' },
+        { if: { flag: 'orden_bench' }, t: '쉼터에서 그대를 기다린다' },
         { if: { flag: ['orden_joins', 'orden_cracked'] }, t: '갑주에 균열을 안은 채 그대와 동행한다' },
         { if: { flag: 'orden_joins' }, t: '맹세를 지켜 그대와 동행한다' },
         { if: { min: { bond: 1 } }, t: '그대를 믿지만, 관문을 지키기 위해 남았다' }
       ], else: '관문을 지키는 문지기로 남았다' },
     { label: '세나', cases: [
+        { if: { flag: 'sena_dead' }, t: '그대의 손에 쓰러졌다' },
+        { if: { flag: 'sena_hostile' }, t: '그대를 원망하며 숲으로 사라졌다' },
         { if: { flag: 'sena_left' }, t: '그대에게 실망해 마을로 돌아갔다' },
+        { if: { flag: 'sena_parted' }, t: '그대가 할머니 곁으로 돌려보냈다' },
+        { if: { flag: 'sena_bench' }, t: '쉼터에서 그대를 기다린다' },
         { if: { flag: 'sena_sworn' }, t: '할머니의 눈을 되찾아 준 그대를 끝까지 지키기로 했다' },
         { if: { flag: 'sena_met' }, t: '등불지기의 손녀. 그대와 함께 관문까지 왔다' }
       ], else: '검은 소나무 숲에서 만나지 못했다' },
     { label: '브란', cases: [
+        { if: { flag: 'bran_dead' }, t: '그대의 손에 쓰러졌다' },
+        { if: { flag: 'bran_hostile' }, t: '그대를 저주하며 사라졌다. 사냥꾼이 그를 다시 낙인으로 묶을지도 모른다' },
         { if: { flag: 'bran_left' }, t: '그대 곁을 떠나 안개 속으로 사라졌다' },
+        { if: { flag: 'bran_parted' }, t: '그대와 헤어져 제 길을 갔다' },
+        { if: { flag: 'bran_bench' }, t: '쉼터에서 그대를 기다린다' },
         { if: { flag: 'ledger_burned' }, t: '회색 장부를 불태우고 사냥꾼의 속삭임에서 풀려났다' },
         { if: { flag: 'bran_met' }, t: '낙인을 지져 낸 옛 추종자. 그대와 함께 사냥꾼에 맞선다' }
       ], else: '천 개의 계단 초소에서 만나지 못했다' },
@@ -2304,3 +2348,201 @@ window.SCENARIO = {
 // 장 목록과 지역: 다음 장 파일(chapter2.js …)이 여기에 이어 붙인다
 window.SCENARIO.chapters = [{ n: 1, title: '비 내리는 관문', summary: window.SCENARIO.summary, after: 'gate', endArt: window.SCENARIO.endArt }];
 window.SCENARIO.regions = { west: { name: '관문 서쪽' } };
+
+// ───────────────────────── 동료의 길: 데려갈지, 헤어질지, 맞설지 (1장)
+// 처지는 fx.comp로 바꾼다 (party · bench · parted · left · hostile · dead). 헤어진 동료는 머무는 곳에서 다시 찾을 수 있고,
+// 떠나거나 적이 된 동료는 다음 장에서 그 처지대로 다시 나타난다 (SAGA.md '동료의 처지').
+Object.assign(window.SCENARIO.events, {
+  c_sena_join: {
+    place: '검은 소나무 숲',
+    art: { sky: 'rain', bg: 'forest', actors: [{ k: 'hero', x: 0.32 }, { k: 'sena', x: 0.6, face: -1 }], fx: ['rain'] },
+    title: '거미줄 속의 약초꾼', clock: '동료 · 세나',
+    text: [
+      '세나가 활을 등에 메고 그대를 올려다보았다. “관문으로 가는 거죠? 같이 가요. 숲길이라면 내가 제일 잘 알아요.”',
+      '그녀의 바구니에는 할머니 눈에 바를 약초가 반쯤 남아 있었다.'
+    ],
+    choices: [
+      { id: 1, label: '“같이 가자. 길잡이가 필요했다.”', roll: false, approve: { sena: 1 },
+        then: { text: ['세나가 씩 웃었다. “그럼 내가 앞장설게요. 발밑 조심해요, 별 냄새 나는 사람.”'], fx: { comp: { sena: 'party' } }, log: '약초꾼 세나가 동료가 되었다.', next: 'map' } },
+      { id: 2, label: '“할머니 곁으로 돌아가라. 관문은 위험하다.”', roll: false, approve: { sena: -1 },
+        then: {
+          text: ['세나의 얼굴이 굳었다. “…나도 싸울 줄 알아요.” 그녀는 한참 그대를 노려보다가, 바구니를 고쳐 멨다.', '“알았어요. 할머니한테 약초부터 갖다 드릴게요. 마음 바뀌면 마을로 와요.”'],
+          fx: { comp: { sena: 'parted' } }, log: '세나를 할머니 곁으로 돌려보냈다.', next: 'map' } }
+    ]
+  },
+  c_bran_join: {
+    place: '천 개의 계단',
+    art: { sky: 'rain', bg: 'stairs', actors: [{ k: 'hero', x: 0.3 }, { k: 'bran', x: 0.58, face: -1 }], fx: ['rain'] },
+    title: '낙인을 지진 자', clock: '동료 · 브란',
+    text: [
+      '브란이 지팡이에 기대어 그대를 보았다. “빚을 졌군. 낙인에 대해서라면 내가 누구보다 잘 아오. 함께 가겠소?”',
+      '두건 아래, 지져진 손등이 빗물에 번들거렸다. 그는 대답을 재촉하지 않았다.'
+    ],
+    choices: [
+      { id: 1, label: '“함께 가자. 낙인을 아는 사람이 필요하다.”', roll: false, approve: { bran: 1 },
+        then: { text: ['브란이 짧게 고개를 끄덕였다. “불씨가 젖기 전에 갑시다.”'], fx: { comp: { bran: 'party' } }, log: '낙인을 지진 자 브란이 동료가 되었다.', next: 'map' } },
+      { id: 2, label: '“각자의 길을 가자. 몸조심해라.”', roll: false,
+        then: {
+          text: ['브란은 의외라는 듯 눈썹을 올렸다가, 이내 어깨를 으쓱했다. “그것도 좋소. 나는 동쪽으로 가겠소. 고향이 그쪽이라.”', '“다시 만나면 그땐 내가 빚을 갚지.” 그는 초소 그늘 속으로 사라졌다.'],
+          fx: { comp: { bran: 'parted' } }, log: '브란과 헤어졌다. 그는 동쪽 고향으로 간다고 했다.', next: 'map' } },
+      { id: 3, label: '“추종자를 곁에 둘 수는 없다. 꺼져라.”', roll: false, approve: { bran: -2 },
+        then: {
+          text: ['브란의 얼굴에서 표정이 사라졌다. “…그래. 사냥꾼도 나를 그렇게 내쫓았지.”', '그는 등을 돌렸다. 빗속으로 멀어지는 발소리가 오래 들렸다.'],
+          fx: { comp: { bran: 'left' } }, log: '브란을 내쫓았다. 그는 그대를 기억할 것이다.', next: 'map' } }
+    ]
+  },
+  c_bran_judge: {
+    place: '천 개의 계단',
+    art: { sky: 'rain', bg: 'stairs', actors: [{ k: 'hero', x: 0.36 }, { k: 'bran', x: 0.6, face: -1, s: 0.9 }], fx: ['rain'] },
+    title: '쓰러진 추종자', clock: '브란',
+    text: ['사내가 빗물 웅덩이에 주저앉아 그대를 올려다보았다. 지져진 손등에서 김이 피어올랐다.', '사냥개들이 멀찍이서 그를 노리고 있었다. 그대가 손을 떼면, 놈들이 마무리할 것이다.'],
+    choices: [
+      { id: 1, insp: 'mercy', label: '목숨은 살려 둔다', roll: false,
+        then: {
+          text: ['그대가 칼을 거두자, 사내가 웃었다. 웃음이라기보다 기침에 가까운 소리였다. “살려 준 걸 후회하게 될 거요.”', '그는 비틀거리며 일어나 사냥개들 쪽으로 걸어갔다. 사냥개들이 그를 둘러쌌지만 물지 않았다. 마치 — 데리러 온 것처럼.'],
+          fx: { comp: { bran: 'hostile' }, set: ['bran_met'] }, log: '쓰러진 브란을 살려 두었다. 그는 사냥개들과 함께 사라졌다.', next: 'map' } },
+      { id: 2, insp: 'brave', label: '끝을 낸다. 사냥꾼의 추종자를 살려 둘 수는 없다', roll: false,
+        then: {
+          text: ['칼이 내려왔다. 사내는 눈을 감지 않았다.', '빗물이 그의 두건을 적셨다. 지져진 손등이 마지막으로 한 번 움찔했다. 낙인이 있던 자리였다.'],
+          fx: { comp: { bran: 'dead' }, set: ['bran_met'] }, log: '회색 두건의 사내 브란을 쓰러뜨렸다.', next: 'map' } }
+    ]
+  },
+  c_sena_judge: {
+    place: '마지막 마을',
+    art: { sky: 'rain', bg: 'village', actors: [{ k: 'hero', x: 0.36 }, { k: 'sena', x: 0.6, face: -1, s: 0.9 }], fx: ['rain'] },
+    title: '빗속의 세나', clock: '세나',
+    text: ['세나가 젖은 흙바닥에 주저앉아 있었다. 부러진 활이 곁에 떨어져 있었다.', '언덕 위 오두막에서 등불이 흔들렸다. 노파가 문가에 서 있었다.'],
+    choices: [
+      { id: 1, insp: 'mercy', label: '손을 내민다', roll: false,
+        then: {
+          text: ['세나는 그대의 손을 쳐냈다. “…다시는 내 앞에 나타나지 마요.” 그녀는 부러진 활을 주워 숲 쪽으로 걸어갔다.', '오두막의 등불이 오래도록 그 뒷모습을 비췄다.'],
+          fx: { comp: { sena: 'hostile' } }, log: '세나가 그대를 원망하며 숲으로 떠났다.', next: 'map' } },
+      { id: 2, label: '말없이 돌아선다', roll: false,
+        then: {
+          text: ['그대는 아무 말 없이 마을을 떠났다. 등 뒤에서 노파가 손녀의 이름을 부르는 소리가 들렸다.'],
+          fx: { comp: { sena: 'hostile' } }, log: '쓰러진 세나를 두고 마을을 떠났다.', next: 'map' } }
+    ]
+  },
+
+  // 일행 탭의 '작별하기'에서 시작한다
+  part_sena: {
+    art: { sky: 'dusk', bg: 'forest', actors: [{ k: 'hero', x: 0.34 }, { k: 'sena', x: 0.6, face: -1 }] },
+    title: '작별 · 세나', clock: '동료와 헤어진다',
+    text: [
+      '“무슨 얘긴데요, 그렇게 심각한 얼굴로.” 세나가 활시위를 만지작거렸다.',
+      { if: { min: { ap_sena: 5 } }, t: '그녀는 그대가 무슨 말을 하려는지 이미 아는 것 같았다. 눈가가 붉어졌다.' },
+      { if: { max: { ap_sena: 0 } }, t: '그녀는 팔짱을 꼈다. “드디어 말하는군요.”' }
+    ],
+    choices: [
+      { id: 1, label: '“여기서 헤어지자. 마을로 돌아가라.”', roll: false,
+        then: {
+          text: [
+            { if: { min: { ap_sena: 5 } }, t: '세나가 그대를 꼭 끌어안았다가 밀어냈다. “바보.” 그녀가 바구니에서 은빛 병 두 개를 꺼내 쥐여 주었다. “다치면 이거 마셔요. 그리고… 돌아와요.”' },
+            { if: { max: { ap_sena: 4 } }, t: '세나는 한참 그대를 보다가 고개를 끄덕였다. “알았어요. 마을에 있을게요. 필요하면 찾아와요.”' }
+          ],
+          fx: { comp: { sena: 'parted' } }, fxIf: [{ if: { min: { ap_sena: 5 } }, fx: { items: ['은빛 물약', '은빛 물약'] } }],
+          log: '세나와 헤어졌다. 그녀는 마을로 돌아갔다.', next: 'map' } },
+      { id: 2, label: '“…아니다. 계속 함께 가자.”', roll: false,
+        then: { text: ['세나가 그대의 어깨를 툭 쳤다. “괜히 겁주지 마요.”'], next: 'map' } }
+    ]
+  },
+  part_bran: {
+    art: { sky: 'dusk', bg: 'mountains', actors: [{ k: 'hero', x: 0.34 }, { k: 'bran', x: 0.6, face: -1 }] },
+    title: '작별 · 브란', clock: '동료와 헤어진다',
+    text: [
+      '브란이 불씨를 손바닥 위에서 굴리다가 그대를 보았다. “할 말이 있는 얼굴이군.”',
+      { if: { min: { ap_bran: 5 } }, t: '그의 목소리에 처음 듣는 조심스러움이 섞여 있었다.' }
+    ],
+    choices: [
+      { id: 1, label: '“여기서 각자의 길을 가자.”', roll: false,
+        then: {
+          text: [
+            { if: { min: { ap_bran: 5 } }, t: '브란은 오래 말이 없었다. “…그대 덕에 조용한 밤을 몇 번 보냈소. 그거면 됐지.” 그가 지팡이 끝으로 그대의 발치에 작은 불꽃 룬을 그렸다. 불꽃 병 두 개가 그 자리에 놓여 있었다.' },
+            { if: { max: { ap_bran: 4 } }, t: '“그러지.” 브란이 두건을 깊이 눌러썼다. “동쪽으로 가겠소. 고향이 그쪽이니.”' }
+          ],
+          fx: { comp: { bran: 'parted' } }, fxIf: [{ if: { min: { ap_bran: 5 } }, fx: { items: ['불꽃 병', '불꽃 병'] } }],
+          log: '브란과 헤어졌다.', next: 'map' } },
+      { id: 2, label: '“…아니, 됐다. 계속 가자.”', roll: false,
+        then: { text: ['브란이 코웃음을 쳤다. “싱겁긴.”'], next: 'map' } }
+    ]
+  },
+  part_orden: {
+    art: { sky: 'dusk', bg: 'gate', actors: [{ k: 'hero', x: 0.34 }, { k: 'orden', x: 0.6, face: -1 }] },
+    title: '작별 · 오르덴', clock: '동료와 헤어진다',
+    text: ['오르덴이 장창을 땅에 세웠다. “말하라, {name:이여}. 기사는 돌려 말하는 것을 좋아하지 않는다.”'],
+    choices: [
+      { id: 1, label: '“관문으로 돌아가 문을 지켜 달라.”', roll: false,
+        then: {
+          text: ['오르덴이 투구를 숙였다. “그것이 그대의 뜻이라면.” 그는 돌아서다 말고 말했다. “문은 언제나 그대를 향해 열려 있을 것이다. 잊지 마라.”'],
+          fx: { comp: { orden: 'parted' } }, log: '오르덴과 헤어졌다. 그는 관문으로 돌아갔다.', next: 'map' } },
+      { id: 2, label: '“…아니다. 함께 가자.”', roll: false,
+        then: { text: ['오르덴이 장창을 다시 들었다. “그럼 앞장서라.”'], next: 'map' } }
+    ]
+  },
+
+  // 헤어지거나 떠난 동료를 다시 찾아간다
+  rejoin_sena: {
+    art: { sky: 'rain', bg: 'village', actors: [{ k: 'hero', x: 0.34 }, { k: 'sena', x: 0.6, face: -1 }], fx: ['rain'] },
+    title: '다시 만난 세나', clock: '세나',
+    text: [
+      { if: { flag: 'sena_parted' }, t: '노파의 오두막 앞에서 세나가 약초를 말리고 있었다. 그대를 보자 손을 멈추었다. “…왔네요.”' },
+      { if: { flag: 'sena_left' }, t: '노파의 오두막 앞에서 세나가 활을 손질하고 있었다. 그대를 보자 등을 돌렸다. “할 말 없어요.”' }
+    ],
+    choices: [
+      { id: 1, label: '“다시 함께 가자.”', roll: false, requires: { flag: 'sena_parted' }, reqText: '헤어졌을 때만',
+        then: { text: ['세나가 바구니를 내려놓고 활을 집었다. “그럴 줄 알았어요. 할머니, 다녀올게요!”'], fx: { comp: { sena: 'party' } }, approve: { sena: 1 }, log: '세나가 다시 일행이 되었다.', next: 'map' } },
+      { id: 2, skill: '설득', insp: 'mercy', label: '그때 일을 사과하고 다시 함께 가자고 한다', stat: '매력', dc: 14, requires: { flag: 'sena_left' }, reqText: '그녀가 떠났을 때',
+        adv: [{ if: { flag: 'crone_cured' }, why: '노파의 눈을 고쳐 주었다' }],
+        success: {
+          text: ['세나는 한참 등을 보인 채였다. 그러다 화살 하나를 집어 매듭을 고쳐 맸다. “…한 번만이에요. 또 그러면 진짜 끝이에요.”'],
+          fx: { comp: { sena: 'party' } }, log: '세나에게 사과했다. 그녀가 다시 일행이 되었다.', next: 'map' },
+        fail: { text: ['“말로는 다 쉽죠.” 세나는 오두막 안으로 들어가 버렸다. 문이 닫혔다.'], log: '세나는 사과를 받아 주지 않았다.', next: 'map' } },
+      { id: 3, insp: 'brave', label: '억지로라도 데려간다', roll: false, requires: { flag: 'sena_left' }, reqText: '그녀가 떠났을 때', approve: { sena: -3 },
+        then: { text: ['그대가 그녀의 팔을 잡자, 세나가 뿌리치며 활을 들었다.'], battle: SENA_FOE, next: 'map' } },
+      { id: 4, label: '잘 지내라고만 하고 돌아선다', roll: false,
+        then: { text: ['세나가 고개를 끄덕였다. 그대가 멀어질 때까지, 그녀는 그 자리에 서 있었다.'], next: 'map' } }
+    ]
+  },
+  rejoin_bran: {
+    art: [
+      { if: { flag: 'ch2' }, sky: 'dusk', bg: 'ford', actors: [{ k: 'hero', x: 0.34 }, { k: 'bran', x: 0.6, face: -1 }], fx: ['ash'] },
+      { sky: 'rain', bg: 'stairs', actors: [{ k: 'hero', x: 0.34 }, { k: 'bran', x: 0.6, face: -1 }], fx: ['rain'] }
+    ],
+    title: '다시 만난 브란', clock: '브란',
+    text: [
+      { if: { flag: 'ch2' }, t: '물레방아 뒤편, 지붕이 내려앉은 집. 브란이 문턱에 앉아 불씨를 굴리고 있었다.' },
+      { if: { not: 'ch2' }, t: '무너진 초소 안, 브란이 젖은 장작에 불씨를 붙이려 애쓰고 있었다.' },
+      { if: { flag: 'bran_parted' }, t: '“빚 갚을 때가 됐소?” 그가 그대를 보고 반쯤 웃었다.' },
+      { if: { flag: 'bran_left' }, t: '그대를 본 그의 눈이 차가워졌다. “무슨 볼일이오.”' },
+      { if: { flag: 'ch2', not: 'anchor_broken' }, t: '벽에 아이 둘의 키를 잰 칼자국이 남아 있었다. 낮은 쪽 옆에 서툰 글씨로 ‘브리타’. 그의 누이는 채석장에서 돌을 나른다.' }
+    ],
+    choices: [
+      { id: 1, label: '“다시 함께 가자.”', roll: false, requires: { flag: 'bran_parted' }, reqText: '헤어졌을 때만',
+        then: { text: ['브란이 지팡이를 짚고 일어섰다. “좋소. 혼자 불 피우는 것도 지겨웠으니.”', { if: { flag: 'ch2', not: 'anchor_broken' }, t: '“그 전에 — 누이가 채석장에 있소. 브리타. 닻돌을 부수는 걸 도와주시오.”' }], fx: { comp: { bran: 'party' } }, fxIf: [{ if: { flag: 'ch2' }, fx: { set: ['brita_known'] } }], approve: { bran: 1 }, log: '브란이 다시 일행이 되었다.', next: 'map' } },
+      { id: 2, skill: '설득', insp: 'mercy', label: '내쫓았던 일을 사과한다', stat: '매력', dc: 14, requires: { flag: 'bran_left' }, reqText: '그를 내쫓았거나 그가 떠났을 때',
+        success: {
+          text: ['브란은 오래 불씨만 바라보았다. “…사과를 받아 본 건 처음이오.” 그가 일어섰다. “한 번은 믿어 보지.”'],
+          fx: { comp: { bran: 'party' } }, log: '브란에게 사과했다. 그가 다시 일행이 되었다.', next: 'map' },
+        fail: { text: ['“사냥꾼도 사과는 잘했소.” 브란이 불씨를 꺼 버렸다. 대화는 끝났다.'], log: '브란은 사과를 받아 주지 않았다.', next: 'map' } },
+      { id: 3, insp: 'brave', label: '이번에야말로 끝장을 낸다', roll: false, requires: { flag: 'bran_left' }, reqText: '그를 내쫓았거나 그가 떠났을 때', approve: { sena: -1 },
+        then: { text: ['그대가 칼을 뽑자, 브란이 비웃으며 일어섰다. “결국 이렇게 되는군.”'], battle: BRAN_FOE, next: 'map' } },
+      { id: 4, label: '그냥 지나친다', roll: false,
+        then: { text: ['그대가 돌아서자, 등 뒤에서 불씨가 피어오르는 소리가 났다.'], next: 'map' } }
+    ]
+  },
+  rejoin_orden: {
+    art: { sky: 'dawn', bg: 'gate', actors: [{ k: 'hero', x: 0.34 }, { k: 'orden', x: 0.6, face: -1 }] },
+    title: '문 앞의 기사', clock: '오르덴',
+    text: ['오르덴은 관문 앞에 서 있었다. 천 년 동안 그래 왔듯이. 그대를 보자 투구를 들었다. “돌아왔군.”'],
+    choices: [
+      { id: 1, label: '“다시 함께 가 달라.”', roll: false,
+        then: { text: ['기사가 장창을 어깨에 걸쳤다. “문은 기다릴 수 있다. 그대는 기다려 주지 않겠지.”', '이번에는 관문을 등지고, 어디든 그대를 따라나설 차비를 했다.'], fx: { comp: { orden: 'party' }, set: ['orden_joins'] }, log: '오르덴이 다시 일행이 되었다. 이제 어디든 함께 간다.', next: 'map' } },
+      { id: 2, label: '안부만 묻고 돌아선다', roll: false,
+        then: { text: ['오르덴이 고개를 끄덕였다. “조심해라.”'], next: 'map' } }
+    ]
+  }
+});
+// 다시 찾아갈 곳
+window.SCENARIO.locations.village.actions.push({ label: '세나를 찾아간다', event: 'rejoin_sena', if: { any: ['sena_parted', 'sena_left'] } });
+window.SCENARIO.locations.stairs.actions.push({ label: '무너진 초소에서 브란을 찾는다', event: 'rejoin_bran', if: { any: ['bran_parted', 'bran_left'], not: 'ch2' } });
+window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에게 간다', event: 'rejoin_orden', if: { flag: 'orden_parted' } });

@@ -8,6 +8,14 @@
 //   anchor_broken/ford_freed · ford_burned · tobin_saved · brita_saved · rine_freed/rine_slain/rine_lost
 //   shard1 · irvan_named · irvan_offer_refused/asked/wavered · vask_down/vask_won/vask_doubt · hunter_mark · pup_named
 (function (SC) {
+  // 동료가 그 자리에 있는가: 함께 다니거나, 헤어졌어도 그 일 때문에 달려오는 경우 (어머니를 구하러 오는 세나, 누이를 구하러 오는 브란)
+  const SENA_AT = { or: [{ party: 'sena' }, { flag: 'sena_parted' }, { flag: 'sena_left' }, { flag: 'sena_bench' }] };
+  const BRAN_AT = { or: [{ party: 'bran' }, { flag: 'bran_parted' }, { flag: 'bran_left' }, { flag: 'bran_bench' }] };
+  // 그림자가 브란을 부른다: 그가 곁에 있고, 호감이 낮거나 그대가 장부를 지니고 있을 때
+  const BRAN_CALLED = { party: 'bran', or: [{ max: { ap_bran: 2 } }, { flag: 'ledger_kept' }] };
+  const SENA_COMES = [{ id: 'sena', if: { any: ['sena_parted', 'sena_left', 'sena_bench'] } }];
+  const BRAN_COMES = [{ id: 'bran', if: { any: ['bran_parted', 'bran_left', 'bran_bench'] } }];
+
   // ───────────────────────── 장과 지역
   SC.chapters.push({
     n: 2, title: '회색 사냥꾼', start: 'c2_start', after: 'ford',
@@ -52,6 +60,28 @@
           { if: { flag: 'pup_named' }, t: '{pup}. 그대 곁에서 자라 길을 찾는다' },
           { if: { item: '잿빛 새끼' }, t: '그대 곁에서 자란다' }
         ], else: '-' },
+      { label: '오르덴', cases: [
+          { if: { flag: 'orden_dead' }, t: '그대의 손에 쓰러졌다' },
+          { if: { flag: ['orden_parted', 'orden_oath_broken'] }, t: '그대와 맞선 끝에 맹세를 내려놓고 관문으로 돌아갔다' },
+          { if: { flag: 'orden_parted' }, t: '그대와 헤어져 관문을 지킨다' },
+          { if: { flag: 'orden_joins', not: 'orden_gone' }, t: '맹세를 지켜 그대와 함께 동쪽까지 왔다' }
+        ], else: '관문을 지키는 문지기로 남았다' },
+      { label: '세나', cases: [
+          { if: { flag: 'sena_dead' }, t: '그대의 손에 쓰러졌다' },
+          { if: { flag: 'sena_hostile' }, t: '그대를 원망한다. 어디선가 그대를 겨누고 있을지 모른다' },
+          { if: { flag: ['sena_left', 'rine_slain'] }, t: '어머니를 묻고 그대 곁을 떠났다' },
+          { if: { flag: 'sena_left' }, t: '그대 곁을 떠나 있다' },
+          { if: { flag: 'sena_parted' }, t: '그대와 헤어져 지낸다' },
+          { if: { flag: 'sena_met' }, t: '그대와 함께한다' }
+        ], else: '만나지 못했다' },
+      { label: '브란', cases: [
+          { if: { flag: 'bran_dead' }, t: '그대의 손에 쓰러졌다' },
+          { if: { flag: ['bran_hostile', 'bran_turned'] }, t: '사냥꾼의 부름에 답해 그림자 쪽으로 걸어갔다' },
+          { if: { flag: 'bran_hostile' }, t: '사냥꾼의 낙인에 다시 묶여 있다' },
+          { if: { flag: 'bran_left' }, t: '그대 곁을 떠나 있다' },
+          { if: { flag: 'bran_parted' }, t: '고향 회색 여울에서 지낸다' },
+          { if: { flag: 'bran_met' }, t: '그대와 함께한다' }
+        ], else: '만나지 못했다' },
       { label: '다음 길', cases: [], else: '두 번째 조각은 거울 호수 아래, 잠긴 왕도 아우렐리아에 있다' }
     ]
   });
@@ -140,6 +170,16 @@
       ],
       drops: [{ item: '재빛 가죽 갑옷', p: 1, once: 'got_ash_armor' }, { item: '사냥 대장의 뿔', p: 1, once: 'got_vask_horn' }],
       desc: '사냥꾼의 변경을 다스리는 사냥 대장. 낙인이 없는 몇 안 되는 수하 — 스스로 사냥꾼을 따른다. 한 번에 두 번 찌른다.' },
+    // 맞서게 된 동료 (2장의 세기)
+    foe_bran2: { art: 'bran', name: '낙인 찍힌 브란', people: true, lv: 7, hp: 52, ac: 13, atk: 7, dmg: '1d10+3', dtype: 'fire', xp: 50, gold: [0, 0], row: 'back', ranged: true, elite: true, init: 1,
+      skills: [{ name: '화염 파도', p: 0.3, dmg: '2d6+3', dtype: 'fire', sweep: true }, { name: '불씨 폭발', p: 0.25, ranged: true, dmg: '2d8', dtype: 'fire', onHit: { burn: 2 } }],
+      desc: '목덜미에 새 낙인이 박힌 브란. 지진 손등 위로 회색 빛이 기어오른다. 불씨에 망설임이 없다.' },
+    foe_sena2: { art: 'sena', name: '세나', people: true, lv: 7, hp: 48, ac: 15, atk: 8, dmg: '1d8+4', xp: 50, gold: [0, 0], row: 'back', ranged: true, elite: true, init: 3,
+      skills: [{ name: '조준 사격', p: 0.3, ranged: true, dmg: '2d8+4' }, { name: '그물 화살', p: 0.2, ranged: true, dmg: '1d8', onHit: { restrain: 2 } }],
+      desc: '활시위를 그대에게 겨눈 세나. 눈이 붉게 젖어 있다. 백발백중이다.' },
+    foe_orden: { art: 'orden', name: '오르덴', people: true, lv: 8, hp: 92, ac: 17, atk: 8, dmg: '1d10+4', xp: 80, gold: [0, 0], elite: true, init: 0,
+      skills: [{ name: '꿰뚫는 창', p: 0.3, reach: true, dmg: '2d10+4' }, { name: '맹세의 일격', p: 0.2, dmg: '2d8+4', onHit: { prone: 1 } }],
+      desc: '장창을 그대에게 겨눈 맹세기사. 천 년의 맹세가 그 창끝에 실려 있다.' },
     shade: { art: 'shade', name: '사냥꾼의 그림자', lv: 9, hp: 130, ac: 16, atk: 9, dmg: '2d8+5', xp: 200, gold: [0, 0], boss: true, multi: 2, init: 3,
       resist: ['psychic', 'poison', 'cold'], vuln: ['radiant'],
       skills: [
@@ -163,14 +203,16 @@
   };
 
   const ANCHOR_FIGHT = (alone) => ({
-    enemies: alone ? ['golem'] : ['golem', 'mason'], noFlee: true, perPC: { hp: 15 }, art: { sky: 'dusk', bg: 'quarry', props: ['anchor'], fx: ['ash'] },
+    enemies: alone ? ['golem'] : ['golem', 'mason'], noFlee: true, perPC: { hp: 15 }, art: { sky: 'dusk', bg: 'quarry', props: ['anchor'], fx: ['ash'] }, guestsIf: BRAN_COMES,
     intro: '닻돌이 웅웅 울었다. 돌에서 깎아 낸 파수꾼이 몸을 일으킨다!',
     win: {
       text: [
         '파수꾼이 무너지며 닻돌에 기대어 쓰러졌다. 그 무게에, 금이 간 닻돌이 둘로 쪼개졌다.',
         '회색 빛이 연기처럼 빠져나가 하늘로 흩어졌다. 채석장 곳곳에서, 돌을 나르던 사람들이 하나둘 손을 멈추고 자기 손을 내려다보았다.',
-        { if: { party: 'bran' }, t: '돌을 진 여자 하나가 짐을 떨어뜨렸다. “…브란?” 브란이 달려가 그녀를 붙잡았다. “브리타.” 그 이름을 부르는 목소리가 갈라졌다.' },
-        { if: { nor: [{ party: 'bran' }] }, t: '돌을 나르던 여자 하나가 다가와 그대의 손을 잡았다. “브리타예요. 오빠가… 브란이라는 사람이 살아 있다면, 전해 주세요. 나는 괜찮다고.”' }
+        { if: BRAN_AT, t: '돌을 진 여자 하나가 짐을 떨어뜨렸다. “…브란?” 브란이 달려가 그녀를 붙잡았다. “브리타.” 그 이름을 부르는 목소리가 갈라졌다.' },
+        { if: { nor: [BRAN_AT], not: ['bran_dead', 'bran_hostile'] }, t: '돌을 나르던 여자 하나가 다가와 그대의 손을 잡았다. “브리타예요. 오빠가… 브란이라는 사람이 살아 있다면, 전해 주세요. 나는 괜찮다고.”' },
+        { if: { flag: 'bran_dead' }, t: '돌을 나르던 여자 하나가 그대의 손을 잡았다. “브리타예요. 혹시… 브란이라는 사람을 본 적 있어요? 우리 오빠예요.” 그대는 대답할 수 없었다.' },
+        { if: { flag: 'bran_hostile' }, t: '돌을 나르던 여자 하나가 그대에게 다가왔다. “브리타예요. 오빠가 사냥꾼 쪽에 있다는 소문을 들었어요.” 그녀가 그대의 눈을 들여다보았다. “…혹시, 만나면 데려와 줘요.”' }
       ],
       fx: { set: ['anchor_broken', 'ford_freed', 'brita_saved'], xp: 40 }, approve: { bran: 2, sena: 1 },
       log: '닻돌을 부숴 회색 여울 사람들을 낙인에서 깨웠다.', next: 'map' },
@@ -224,34 +266,58 @@
   });
 
   const TRACKER_FIGHT = {
-    enemies: ['tracker'], noFlee: true, perPC: { hp: 12 }, art: { sky: 'night', bg: 'lodge', fx: ['ash'] },
+    enemies: ['tracker'], noFlee: true, perPC: { hp: 12 }, art: { sky: 'night', bg: 'lodge', fx: ['ash'] }, guestsIf: SENA_COMES,
     intro: '회색 눈의 추적자가 시위를 당겼다. 화살촉이 그대가 아니라 — 세나를 겨눈다.',
     special: [
       { id: 'arrow', label: '어머니의 화살촉으로 낙인을 끊는다', if: { or: [{ item: '세나 어머니의 화살촉' }, { flag: 'sena_sworn' }] }, below: 0.5, mp: 2, stat: 'class', dc: 15,
-        dcMod: [{ if: { flag: 'anchor_broken' }, v: -3, why: '닻돌이 부서졌다' }, { if: { party: 'sena' }, v: -3, why: '딸의 목소리' }, { if: { flag: 'mark_known' }, v: -2, why: '낙인의 비밀' }],
+        dcMod: [{ if: { flag: 'anchor_broken' }, v: -3, why: '닻돌이 부서졌다' }, { if: SENA_AT, v: -3, why: '딸의 목소리' }, { if: { flag: 'mark_known' }, v: -2, why: '낙인의 비밀' }],
         note: '추적자 HP가 절반 이하일 때. 성공하면 죽이지 않고 끝낸다', fxText: '낙인이 끊어진다',
         outcome: 'freed', failText: '화살촉이 회색 빛에 튕겨 나갔다. 추적자의 눈이 다시 하얗게 굳는다.', failHp: -4 }
     ],
     win: {
       text: [
         '추적자가 쓰러졌다. 회색 눈이 천천히 감겼다.',
-        { if: { party: 'sena' }, t: '세나가 그 곁에 무릎을 꿇었다. 활을 떨어뜨린 손이 떨렸다. “…엄마.” 대답은 없었다.' },
-        { if: { nor: [{ party: 'sena' }] }, t: '그녀의 화살통에는 매듭이 똑같은 화살이 한가득 들어 있었다. 그대는 그것을 세나에게 어떻게 전해야 할지 알 수 없었다.' }
+        { if: SENA_AT, t: '세나가 그 곁에 무릎을 꿇었다. 활을 떨어뜨린 손이 떨렸다. “…엄마.” 대답은 없었다.' },
+        { if: { nor: [SENA_AT] }, t: '그녀의 화살통에는 매듭이 똑같은 화살이 한가득 들어 있었다. 그대는 그것을 세나에게 어떻게 전해야 할지 알 수 없었다.' }
       ],
       fx: { set: ['rine_slain'] }, approve: { sena: -3 },
-      log: '회색 눈의 추적자를 쓰러뜨렸다.', next: 'c2_vask' },
+      log: '회색 눈의 추적자를 쓰러뜨렸다.', next: 'c2_sena_grief' },
     freed: {
       text: [
         '화살촉이 낙인을 꿰뚫었다. 회색 빛이 금이 간 유리처럼 흩어졌고, 추적자의 눈에 서서히 색이 돌아왔다. 초록빛 — 세나와 똑같은.',
-        { if: { party: 'sena' }, t: '“…세나?” 여인이 활을 떨어뜨렸다. “세나, 너 많이 컸구나.” 세나는 대답 대신 어머니에게 달려가 안겼다. 둘 다 아무 말도 하지 않았다. 할 필요가 없었다.' },
-        { if: { nor: [{ party: 'sena' }] }, t: '“…여기가 어디죠.” 여인이 그대의 손에 쥔 화살촉을 보았다. “그건… 내 딸에게 준 건데.” 그녀의 이름은 리네였다.' },
+        { if: SENA_AT, t: '“…세나?” 여인이 활을 떨어뜨렸다. “세나, 너 많이 컸구나.” 세나는 대답 대신 어머니에게 달려가 안겼다. 둘 다 아무 말도 하지 않았다. 할 필요가 없었다.' },
+        { if: { nor: [SENA_AT] }, t: '“…여기가 어디죠.” 여인이 그대의 손에 쥔 화살촉을 보았다. “그건… 내 딸에게 준 건데.” 그녀의 이름은 리네였다.' },
+        { if: { any: ['sena_parted', 'sena_bench'] }, t: '세나가 어머니의 손을 꼭 쥔 채 그대를 보았다. “엄마는 마을로 보낼게요. 나는… 다시 같이 갈래요.”' },
+        { if: { flag: 'sena_left' }, t: '세나가 어머니를 부축하며 그대를 돌아보았다. “…고마워요. 진심이에요.” 그러나 그녀는 어머니와 함께 산을 내려갈 것이다.' },
         '리네가 산장 안쪽을 가리켰다. “바스크는 트로피 전당에 있어요. 그리고 뿔피리 — 절대 불게 해서는 안 돼요.”'
       ],
-      fx: { set: ['rine_freed'], xp: 45 }, approve: { sena: 4 },
+      fx: { set: ['rine_freed'], xp: 45 }, approve: { sena: 4 }, fxIf: [{ if: { any: ['sena_parted', 'sena_bench'] }, fx: { comp: { sena: 'party' } } }],
       log: '세나의 어머니 리네의 낙인을 끊었다.', next: 'c2_vask' },
     lose: {
       text: ['화살이 그대를 바닥에 꿰어 놓았다. 추적자는 그대를 내려다보다가, 활을 거두고 산장 안으로 사라졌다.'],
       fx: { set: ['rine_lost'], hp: 6 }, log: '추적자에게 쓰러졌다. 그녀는 산장 안으로 사라졌다.', next: 'c2_vask' }
+  };
+
+  const BRAN2_FIGHT = {
+    enemies: ['foe_bran2', 'mason'], noFlee: true, art: { sky: 'dusk', bg: 'quarry', props: ['anchor'], fx: ['ash'] },
+    intro: '브란이 지팡이를 들었다. 그 눈에 그대를 알아보는 빛이 없다.',
+    win: { text: ['브란이 무릎을 꿇었다. 지팡이 끝의 불씨가 꺼졌다. 목덜미의 새 낙인이 맥박처럼 깜박였다.'], log: '낙인 찍힌 브란을 쓰러뜨렸다.', next: 'c2_bran_judge' },
+    lose: { text: ['불길이 그대를 채석장 비탈 아래로 밀어냈다. 브란은 그대를 내려다보다가, 그렐의 손짓에 등을 돌렸다.'],
+      fx: { set: ['bran_confronted'] }, log: '낙인 찍힌 브란에게 쓰러졌다.', next: 'map' }
+  };
+  const SENA2_FIGHT = (next) => ({
+    enemies: ['foe_sena2'], noFlee: true, perPC: { hp: 10 }, art: { sky: 'night', bg: 'lodge', fx: ['ash'] },
+    intro: '세나가 시위를 당겼다. 화살촉이 그대의 심장을 겨눈다.',
+    win: { text: ['세나의 활이 부러졌다. 그녀는 무릎을 꿇은 채 그대를 노려보았다. 울음을 삼키는 소리가 났다.'], log: '세나를 쓰러뜨렸다.', next: next === 'grief' ? 'c2_sena_judge' : 'c2_sena_judge2' },
+    lose: { text: ['화살이 그대를 땅에 꿰어 놓았다. 세나는 그대를 내려다보다가, 활을 거두고 어둠 속으로 사라졌다.'],
+      fx: { comp: { sena: 'hostile' } }, log: '세나에게 쓰러졌다. 그녀는 그대를 원망하며 떠났다.', next: next === 'grief' ? 'c2_vask' : 'c2_lodge' }
+  });
+  const ORDEN_FIGHT = {
+    enemies: ['foe_orden'], noFlee: true, perPC: { hp: 15 }, art: { sky: 'dawn', bg: 'lodge', fx: ['ash'] },
+    intro: '오르덴이 장창을 비껴 들었다. “맹세에 따라.”',
+    win: { text: ['장창이 땅에 떨어졌다. 오르덴이 한쪽 무릎을 꿇었다. 갑주의 틈으로 숨이 거칠게 새어 나왔다.'], log: '오르덴을 쓰러뜨렸다.', next: 'c2_orden_judge' },
+    lose: { text: ['장창의 자루가 그대를 땅에 눕혔다. 오르덴은 그대를 내려다보았다. “…그대를 죽이는 것은 맹세가 아니다.” 그는 창을 거두고 서쪽으로 걸어갔다.'],
+      fx: { comp: { orden: 'parted' }, set: ['orden_oath_broken'] }, log: '오르덴에게 쓰러졌다. 그는 관문으로 돌아갔다.', next: 'c2_after' }
   };
 
   const VASK_FIGHT = {
@@ -314,6 +380,14 @@
       fx: { set: ['shade_won', 'hunter_mark'], hp: 10 }, log: '그림자에게 쓰러졌다. 손등에 회색 자국이 남았다.', next: 'c2_end' }
   };
 
+  const SHADOW_BRAN_FIGHT = Object.assign({}, SHADOW_FIGHT, {
+    enemies: ['shade', 'foe_bran2'], scaleFree: 3,
+    intro: '브란이 그림자 곁에 섰다. 목덜미에 회색 낙인이 다시 피어올랐다. 그림자의 사냥개들이 연기 속에서 튀어나온다.',
+    win: Object.assign({}, SHADOW_FIGHT.win, { next: 'c2_bran_judge_horn' }),
+    broken: Object.assign({}, SHADOW_FIGHT.broken, { next: 'c2_bran_judge_horn' }),
+    lose: Object.assign({}, SHADOW_FIGHT.lose, { text: SHADOW_FIGHT.lose.text.concat(['그림자가 흩어질 때, 브란도 함께 연기 속으로 사라졌다.']), fx: { set: ['shade_won', 'hunter_mark'], hp: 10 } })
+  });
+
   // ───────────────────────── 사건
   Object.assign(SC.events, {
     // 1장의 관문에서 동쪽으로 (장을 시작한다)
@@ -328,8 +402,12 @@
         '그러나 동쪽 하늘은 맑지 않았다. 고개 너머로 회색 구름이 낮게 깔려 있었고, 바람이 불 때마다 눈송이 같은 것이 날아왔다. 손바닥에 받아 보니 — 재였다.',
         { if: { flag: 'star_map' }, t: '첫 번째 조각은 동쪽, 침묵의 숲에 있다. 새벽 별자리가 그렇게 말했다.' },
         { if: { not: 'star_map' }, t: '{relic:이} 동쪽을 가리키며 희미하게 떨렸다.' },
-        { if: { flag: 'orden_joins' }, t: '오르덴이 장창을 어깨에 걸쳤다. “천 년 동안 이 문 안쪽만 보았다. 바깥은 어떤지 보고 싶군.”' },
-        { if: { not: 'orden_joins' }, t: '오르덴은 문 앞에 남았다. “조각을 찾거든 돌아와 들려다오. 나는 여기서 기다리겠다.” 그는 장창으로 땅을 한 번 내리찍었다.' },
+        { if: { party: 'orden', flag: 'orden_joins' }, t: '오르덴이 장창을 어깨에 걸쳤다. “천 년 동안 이 문 안쪽만 보았다. 바깥은 어떤지 보고 싶군.”' },
+        { if: { nor: [{ party: 'orden', flag: 'orden_joins' }], not: ['orden_parted', 'orden_dead'] }, t: '오르덴은 문 앞에 남았다. “조각을 찾거든 돌아와 들려다오. 나는 여기서 기다리겠다.” 그는 장창으로 땅을 한 번 내리찍었다.' },
+        { if: { flag: 'orden_parted' }, t: '오르덴은 문 앞에서 그대를 배웅했다. 헤어질 때 한 말 그대로, 문은 그대를 향해 열려 있었다.' },
+        { if: { any: ['sena_parted', 'sena_left'] }, t: '세나는 마을에 남아 있다. 떠나기 전, 그녀의 오두막 쪽을 한 번 돌아보았다.' },
+        { if: { flag: 'bran_parted' }, t: '브란은 먼저 동쪽으로 떠났다. 고향으로 간다고 했었다.' },
+        { if: { flag: 'bran_hostile' }, t: '고개 너머 어딘가에, 그대를 저주하며 사냥개들과 사라진 회색 두건의 사내가 있다.' },
         { if: { party: 'sena' }, t: '세나가 활시위를 새로 갈아 끼웠다. “할머니가 그랬어요. 재가 내리는 곳에는 가지 말라고.” 그러고는 씩 웃었다. “그러니까 가 봐야죠.”' },
         { if: { party: 'bran' }, t: '브란은 재가 날아오는 쪽을 오래 바라보았다. “저 고개 너머가 내 고향이오.” 그는 더 말하지 않았다.' },
         { if: { item: '잿빛 새끼' }, t: '그대의 발치에서 새끼가 재 냄새를 맡더니, 귀를 바짝 세웠다. 처음 만났을 때보다 한 뼘은 자라 있었다.' }
@@ -633,11 +711,12 @@
         '북쪽 산등성이, 통나무로 지은 거대한 산장. 처마 밑에는 사슴뿔과 곰 머리, 그리고 — 사람의 것으로 보이는 해골들이 줄지어 걸려 있었다.',
         '산장 문 앞, 장작더미 위에 여인 하나가 앉아 있었다. 회색 망토, 회색 깃의 화살. 그녀가 고개를 들자 재처럼 흰 눈동자가 그대를 보았다.',
         '“사냥 대장께서 기다리신다.” 목소리에 아무 감정이 없었다. 그녀가 시위에 화살을 걸었다. 화살 깃의 매듭이 — 낯익었다.',
-        { if: { party: 'sena' }, t: '세나의 활이 떨렸다. “…엄마.” 여인은 대답하지 않았다. 화살촉이 천천히 세나를 향했다.' },
-        { if: { nor: [{ party: 'sena' }] }, t: '세나가 목에 걸고 있던 화살촉과 똑같은 모양의 화살촉이었다.' }
+        { if: { any: ['sena_parted', 'sena_left', 'sena_bench'], not: 'done_c2_sena_foe' }, t: '그때 산장 아래 숲에서 낯익은 발소리가 올라왔다. 세나였다. 숨이 턱에 닿아 있었다. “엄마 소식을 들었어요. 이번엔… 나도 가요.”' },
+        { if: SENA_AT, t: '세나의 활이 떨렸다. “…엄마.” 여인은 대답하지 않았다. 화살촉이 천천히 세나를 향했다.' },
+        { if: { nor: [SENA_AT] }, t: '세나가 목에 걸고 있던 화살촉과 똑같은 모양의 화살촉이었다.' }
       ],
       choices: [
-        { id: 1, skill: '설득', insp: 'mercy', label: '세나와 함께 그녀의 이름을 부른다', stat: '매력', dc: 15, requires: { party: 'sena' }, reqText: '세나',
+        { id: 1, skill: '설득', insp: 'mercy', label: '세나와 함께 그녀의 이름을 부른다', stat: '매력', dc: 15, requires: SENA_AT, reqText: '세나',
           dcMod: [{ if: { flag: 'anchor_broken' }, v: -3, why: '닻돌이 부서졌다' }, { if: { flag: 'sena_sworn' }, v: -2, why: '네 번째 화살의 맹세' }, { if: { item: '세나 어머니의 화살촉' }, v: -2, why: '어머니의 화살촉' }],
           note: '성공하면 싸우지 않고 낙인을 흔든다',
           success: {
@@ -647,7 +726,8 @@
               '“세나…?” 여인이 딸의 얼굴을 손으로 더듬었다. “너 많이 컸구나.” 세나는 대답 대신 어머니를 끌어안았다.',
               '리네가 떨리는 손으로 산장을 가리켰다. “바스크는 트로피 전당에 있어요. 그리고 뿔피리 — 절대 불게 해서는 안 돼요.”'
             ],
-            fx: { set: ['rine_freed'], xp: 50 }, approve: { sena: 4 }, log: '세나와 함께 이름을 불러 리네의 낙인을 끊었다.', next: 'c2_vask' },
+            fx: { set: ['rine_freed'], xp: 50 }, approve: { sena: 4 }, fxIf: [{ if: { any: ['sena_parted', 'sena_bench'] }, fx: { comp: { sena: 'party' } } }],
+            log: '세나와 함께 이름을 불러 리네의 낙인을 끊었다.', next: 'c2_vask' },
           fail: {
             text: ['이름은 닿지 않았다. 흰 눈동자는 끝내 흔들리지 않았다. 화살이 시위를 떠났다.'],
             battle: TRACKER_FIGHT, log: '이름이 닿지 않았다. 추적자가 활을 쏘았다.', next: 'c2_vask' } },
@@ -701,12 +781,29 @@
         '“찾았다, 별의 아이야.” 목소리는 전당 전체에서 들려왔다. “내 대장을 쓰러뜨리고, 내 마을을 깨우고, 내 조각의 형제를 품었구나.”',
         { if: { flag: 'vask_down' }, t: '쓰러진 바스크가 그림자를 올려다보았다. “사냥꾼이시여…” 그림자는 그를 보지도 않았다.' },
         '“그 조각을 내게 다오. 그러면 이 세상의 울음을 끝내 주마. 다시는 아무도 잃지 않는 세상을.”',
+        { if: BRAN_CALLED, t: '그림자가 브란을 보았다. “브란. 내 손등의 아이야. 장부가 탔어도, 지져 내도, 너는 내 것이다. 돌아오너라. 춥지 않게 해 주마.” 브란의 발이 한 걸음, 그림자 쪽으로 움직였다.' },
         '대답하기도 전에, 그림자가 활을 들었다. 사냥은 이미 시작되었다.',
         '그대의 품에서 고요의 조각이 차갑게 빛났다. 그 고요가 그대와 동료들의 상처를 잠재우고, 숨을 가라앉힌다.'
       ],
       choices: [
-        { id: 1, label: '조각을 쥐고 그림자와 맞선다', roll: false, note: '전투 (그림자 HP가 절반 이하일 때 조각으로 뿔피리를 깰 수 있다)',
-          then: { text: ['그림자의 사냥개들이 연기 속에서 튀어나왔다.'], fx: { hpFull: true, mpFull: true, partyFull: true }, battle: SHADOW_FIGHT, next: 'c2_end' } }
+        { id: 1, label: '조각을 쥐고 그림자와 맞선다', roll: false, note: '전투 (그림자 HP가 절반 이하일 때 조각으로 뿔피리를 깰 수 있다)', requires: { nor: [BRAN_CALLED] },
+          then: { text: ['그림자의 사냥개들이 연기 속에서 튀어나왔다.'], fx: { hpFull: true, mpFull: true, partyFull: true }, battle: SHADOW_FIGHT, next: 'c2_end' } },
+        { id: 2, skill: '설득', insp: 'mercy', label: '“브란, 대답하지 마!” 그의 이름을 부른다', stat: '매력', dc: 14, requires: BRAN_CALLED, reqText: '그림자가 브란을 부를 때',
+          dcMod: [{ if: { flag: 'brita_saved' }, v: -3, why: '누이 브리타가 풀려났다' }, { if: { flag: 'ledger_burned' }, v: -2, why: '장부를 함께 불태웠다' }, { if: { flag: 'ledger_kept' }, v: 2, why: '그대가 장부를 지니고 있다' }],
+          note: '실패하면 브란이 그림자 쪽으로 넘어간다',
+          success: {
+            text: ['브란의 걸음이 멈췄다. 그는 손등을 움켜쥐고, 이를 악물고, 그림자에게서 눈을 돌려 그대를 보았다. “…대답 안 했소. 천 날 동안 한 번도.”', '그가 지팡이 끝에 불씨를 피웠다. 이번에는 그림자를 향해.'],
+            fx: { hpFull: true, mpFull: true, partyFull: true, xp: 20 }, approve: { bran: 3 }, battle: SHADOW_FIGHT, log: '그림자의 부름에서 브란을 붙잡았다.', next: 'c2_end' },
+          fail: {
+            text: ['브란이 그대를 돌아보았다. 그 눈에 미안함 같은 것이 스쳤다. 그리고 그는 그림자 곁으로 걸어갔다. 목덜미에 회색 빛이 다시 피어올랐다.'],
+            fx: { hpFull: true, mpFull: true, partyFull: true, comp: { bran: 'hostile' }, set: ['bran_turned'] }, battle: SHADOW_BRAN_FIGHT, log: '브란이 그림자의 부름에 답했다.', next: 'c2_end' } },
+        { id: 3, insp: 'brave', label: '그림자에게 가려는 브란을 힘으로라도 붙잡는다', roll: false, requires: BRAN_CALLED, reqText: '그림자가 브란을 부를 때', approve: { bran: -1 },
+          note: '전투 (브란이 그림자 편에 선다)',
+          then: { text: ['그대가 브란의 팔을 잡자, 그는 불씨로 그대를 밀쳐 냈다. “놓으시오!” 그의 목덜미에 회색 빛이 피어올랐다.'],
+            fx: { hpFull: true, mpFull: true, partyFull: true, comp: { bran: 'hostile' }, set: ['bran_turned'] }, battle: SHADOW_BRAN_FIGHT, next: 'c2_end' } },
+        { id: 4, label: '가게 둔다', roll: false, requires: BRAN_CALLED, reqText: '그림자가 브란을 부를 때', approve: { sena: -1 },
+          then: { text: ['그대는 손을 뻗지 않았다. 브란은 그림자 곁을 지나 연기 속으로 걸어 들어갔다. 돌아보지 않았다.', '그림자가 웃었다. “하나 돌아왔군.” 사냥개들이 그대에게 달려들었다.'],
+            fx: { hpFull: true, mpFull: true, partyFull: true, comp: { bran: 'hostile' }, set: ['bran_turned'] }, battle: SHADOW_FIGHT, log: '브란이 그림자에게 걸어가도록 두었다.', next: 'c2_end' } }
       ]
     },
 
@@ -751,7 +848,7 @@
               '그림자가 미소 지었다. “그래, 망설여라. 망설이는 동안은 아직 늦지 않았으니.” 연기가 흩어졌다. “거울 호수 아래에서 기다리마.”',
               { if: { party: 'bran' }, t: '브란이 그대를 오래 바라보았다. 그 눈에는 걱정이 있었다.' }
             ],
-            fx: { set: ['irvan_offer_wavered'] }, log: '이르반의 제안에 대답하지 못했다.', next: 'c2_after' } }
+            fx: { set: ['irvan_offer_wavered'] }, log: '이르반의 제안에 대답하지 못했다.', next: 'c2_orden_oath' } }
       ]
     },
 
@@ -768,8 +865,11 @@
         { if: { flag: 'anchor_broken' }, t: '회색 여울에는 소리가 돌아와 있었다. 물레방아 소리, 아이들의 고함, 대장간 망치 소리. 누군가 노래를 흥얼거렸다. 아주 오래 잊고 있던 노래였다.' },
         { if: { not: 'anchor_broken' }, t: '회색 여울은 여전히 조용했다. 닻돌이 서 있는 한, 사람들은 깨어나지 못한다. 그대는 그 침묵을 등 뒤에 두고 떠날 수 없다는 것을 알았다.' },
         { if: { flag: 'tobin_mother' }, t: '토빈이 어머니의 손을 잡고 그대에게 손을 흔들었다.' },
-        { if: { flag: 'rine_freed', party: 'sena' }, t: '세나와 리네는 물레방아 둔덕에 나란히 앉아 있었다. 리네가 딸의 머리를 땋아 주고 있었다. 세나는 그대를 보더니 쑥스럽게 웃었다.' },
-        { if: { flag: 'brita_saved', party: 'bran' }, t: '브란은 옛집 지붕에 올라가 내려앉은 서까래를 고치고 있었다. 아래에서 브리타가 못을 건네주었다. 남매는 서로 아무 말도 하지 않았지만, 망치 소리가 박자를 맞추고 있었다.' },
+        { if: { flag: 'rine_freed', or: SENA_AT.or }, t: '세나와 리네는 물레방아 둔덕에 나란히 앉아 있었다. 리네가 딸의 머리를 땋아 주고 있었다. 세나는 그대를 보더니 쑥스럽게 웃었다.' },
+        { if: { flag: ['rine_slain', 'sena_left'] }, t: '세나는 어머니를 마을 뒤 언덕에 묻었다. 그리고 그대에게 아무 말 없이 서쪽으로 떠났다.' },
+        { if: { flag: ['brita_saved', 'bran_hostile'] }, t: '브리타는 물레방아 둔덕에 혼자 앉아 북쪽을 보고 있었다. 오빠는 돌아오지 않았다.' },
+        { if: { flag: 'orden_dead' }, t: '여울가에 오르덴의 장창을 꽂아 두었다. 천 년을 지킨 기사의 무덤으로는 너무 작은 표식이었다.' },
+        { if: { flag: 'brita_saved', or: BRAN_AT.or }, t: '브란은 옛집 지붕에 올라가 내려앉은 서까래를 고치고 있었다. 아래에서 브리타가 못을 건네주었다. 남매는 서로 아무 말도 하지 않았지만, 망치 소리가 박자를 맞추고 있었다.' },
         { if: { party: 'orden' }, t: '오르덴은 여울가에 서서 북쪽을 바라보았다. “거울 호수… 왕의 도시가 가라앉았다는 소문을 천 년 전에 들었다. 믿지 않았지.” 그가 장창을 고쳐 쥐었다. “이르반과 나는 같은 맹세를 했다. 그 맹세가 어디서 어긋났는지, 그 도시에 답이 있을 것이다.”' },
         { if: { flag: 'hunter_mark' }, t: '손등의 회색 자국이 이따금 서늘했다. 아직은 아무 소리도 들리지 않는다. 아직은.' },
         '품 안의 고요의 조각과 {relic:이} 같은 박자로 떨렸다. 북쪽을 가리키며. 거울 호수, 잠긴 왕도 아우렐리아.',
@@ -780,6 +880,197 @@
           then: {
             text: ['— 제2장 「회색 사냥꾼」 끝 —', '{name}의 이야기는 제3장 「잠긴 왕도」로 이어진다. 그때까지 동쪽 변경은 열려 있다.'],
             fx: { goto: 'ford' }, log: '제2장 「회색 사냥꾼」을 마쳤다.', next: 'end' } }
+      ]
+    },
+
+    // ───────────────────────── 동료와 맞서는 길
+    // 채석장: 다시 낙인에 묶인 브란 (1장에서 그와 맞섰거나 그를 살려 보냈다면)
+    c2_bran_foe: {
+      art: { sky: 'dusk', bg: 'quarry', props: ['anchor'], actors: [{ k: 'hero', x: 0.2 }, { k: 'bran', x: 0.56, face: -1 }, { k: 'acolyte', x: 0.74, face: -1 }], fx: ['ash'] },
+      title: '닻돌의 문지기', clock: '브란',
+      text: [
+        '닻돌로 내려가는 길목에 회색 두건의 사내가 서 있었다. 지팡이, 그을린 두건 — 브란이었다.',
+        '그러나 그의 목덜미에는 새 낙인이 박혀 있었다. 지져 낸 손등 위로 회색 빛이 기어올라 와 있었다. 그대를 보는 눈에 알아보는 빛이 없었다.',
+        '낙인공 그렐이 그 뒤에서 웃었다. “돌아온 개는 더 잘 짖지. 저자가 너를 기억하나 보자.”',
+        { if: { flag: 'brita_known' }, t: '짐꾼들 가운데, 짧게 깎은 머리의 여자 하나가 걸음을 멈추고 브란을 보았다. 브리타였다.' }
+      ],
+      choices: [
+        { id: 1, insp: 'brave', label: '맞선다', roll: false, note: '전투 (브란과 낙인공)',
+          then: { text: ['브란이 지팡이를 들었다. 불씨가 그대를 향해 피어올랐다.'], fx: { set: ['bran_confronted'] }, battle: BRAN2_FIGHT, next: 'map' } },
+        { id: 2, skill: '설득', insp: 'mercy', label: '“브란. 저기 브리타가 있다.” 누이의 이름을 부른다', stat: '매력', dc: 15,
+          dcMod: [{ if: { flag: 'brita_known' }, v: -3, why: '브리타가 지켜보고 있다' }],
+          note: '성공하면 낙인이 흔들려 그가 물러선다',
+          success: {
+            text: [
+              '“브리타.” 그 이름이 채석장에 울리자, 브란의 지팡이가 멈췄다. 회색 눈동자가 떨렸다. 그가 천천히 고개를 돌려 짐꾼들 쪽을 보았다.',
+              '“…브리타?” 목덜미의 낙인이 금 간 유리처럼 갈라졌다. 브란이 무릎을 꿇었다. 그렐이 욕설을 퍼부으며 닻돌 뒤로 달아났다.',
+              '“그대인가.” 브란이 그대를 올려다보았다. “살려 준 걸 후회하게 될 거라고 했지. …틀렸군.” 그는 일어서지 않았다. “닻돌을 부숴 주시오. 그 아이를 위해.”'
+            ],
+            fx: { comp: { bran: 'parted' }, set: ['bran_confronted', 'brita_known'], xp: 30 }, approve: { bran: 3 }, log: '누이의 이름으로 브란의 낙인을 흔들었다. 그는 물러섰다.', next: 'map' },
+          fail: { text: ['브란은 그 이름을 듣지 못한 것 같았다. 아니 — 들었지만, 낙인이 그 소리를 삼켰다. 불씨가 날아왔다.'], fx: { set: ['bran_confronted'] }, battle: BRAN2_FIGHT, log: '이름이 닿지 않았다. 브란이 불씨를 던졌다.', next: 'map' } },
+        { id: 3, label: '일단 물러난다', roll: false, note: '채석장 밖으로 (다시 오면 그가 길을 막는다)',
+          then: { text: ['그대는 채석장 비탈을 되짚어 올라갔다. 브란은 쫓아오지 않았다. 문지기처럼, 그 자리에 서 있었다.'], fx: { goto: 'ford' }, log: '채석장에서 물러났다. 낙인 찍힌 브란이 길을 막고 있다.', next: 'map' } }
+      ]
+    },
+    c2_bran_judge: {
+      place: '낙인 채석장',
+      art: { sky: 'dusk', bg: 'quarry', props: ['anchor'], actors: [{ k: 'hero', x: 0.36 }, { k: 'bran', x: 0.6, face: -1, s: 0.9 }], fx: ['ash'] },
+      title: '쓰러진 브란', clock: '브란',
+      text: ['브란이 쓰러진 채 숨을 몰아쉬었다. 목덜미의 낙인이 깜박였다. 그의 눈은 여전히 그대를 알아보지 못했다.'],
+      choices: [
+        { id: 1, skill: '의학', insp: 'mercy', label: '그의 지팡이 불씨로 낙인을 다시 지져 준다', stat: '지혜', dc: 13,
+          adv: [{ if: { flag: 'mark_known' }, why: '낙인의 비밀' }],
+          note: '성공하면 그가 깨어난다',
+          success: {
+            text: ['그대는 꺼져 가는 불씨를 그의 목덜미에 댔다. 살 타는 냄새. 브란이 비명을 질렀다 — 그리고 그 비명 끝에, 그의 목소리가 돌아왔다. “…이 짓을 두 번이나 하게 되다니.”', '그가 그대를 보았다. 알아보는 눈이었다. “빚이 또 늘었군.” 그는 비틀거리며 일어나 짐꾼들 쪽으로 걸어갔다. 누이를 찾아.'],
+            fx: { comp: { bran: 'parted' }, set: ['brita_known'], xp: 30 }, approve: { bran: 3 }, log: '브란의 낙인을 다시 지져 깨웠다. 그는 누이에게 갔다.', next: 'map' },
+          fail: { text: ['불씨가 손끝에서 꺼졌다. 브란이 그대의 손을 뿌리치고 비틀거리며 달아났다. 북쪽으로 — 사냥꾼의 산장 쪽으로.'], log: '낙인을 지지지 못했다. 브란이 달아났다.', next: 'map' } },
+        { id: 2, insp: 'brave', label: '끝을 낸다', roll: false, approve: { sena: -2 },
+          then: { text: ['그대는 칼을 내렸다. 브란의 눈이 마지막 순간, 아주 잠깐 맑아졌다. 그가 무언가를 말하려 했다. 그러나 소리가 되지 못했다.'], fx: { comp: { bran: 'dead' } }, log: '낙인 찍힌 브란을 쓰러뜨렸다.', next: 'map' } },
+        { id: 3, label: '그대로 두고 떠난다', roll: false,
+          then: { text: ['그대가 돌아서자 브란은 비틀거리며 일어나 북쪽으로 사라졌다. 낙인은 그를 다시 부를 것이다.'], log: '쓰러진 브란을 두고 떠났다. 그는 사냥꾼에게 돌아갔다.', next: 'map' } }
+      ]
+    },
+    c2_bran_judge_horn: {
+      place: '사냥꾼의 산장',
+      art: { sky: 'night', bg: 'lodge', props: ['trophies'], actors: [{ k: 'hero', x: 0.36 }, { k: 'bran', x: 0.6, face: -1, s: 0.9 }] },
+      title: '연기 속의 브란', clock: '브란',
+      text: ['그림자가 흩어진 자리에 브란이 쓰러져 있었다. 목덜미의 낙인은 그림자와 함께 흐려지고 있었지만, 아직 꺼지지 않았다.', '“…추웠소.” 브란이 중얼거렸다. “그자의 품이 따뜻할 줄 알았는데.”'],
+      choices: [
+        { id: 1, skill: '설득', insp: 'mercy', label: '손을 내밀어 다시 일으킨다', stat: '매력', dc: 12,
+          dcMod: [{ if: { flag: 'brita_saved' }, v: -2, why: '누이가 기다린다' }],
+          success: {
+            text: ['브란이 그대의 손을 오래 보다가 잡았다. “…다시는 대답하지 않겠소. 이번엔 정말로.” 목덜미의 낙인이 재가 되어 흩어졌다.'],
+            fx: { comp: { bran: 'party' } }, log: '그림자의 부름에서 돌아온 브란을 다시 일으켰다.', next: 'c2_end' },
+          fail: { text: ['브란은 그대의 손을 잡지 않았다. “나는 그대 곁에 있을 자격이 없소.” 그는 혼자 일어나 산장을 떠났다. 회색 여울 쪽으로.'],
+            fx: { comp: { bran: 'parted' } }, log: '브란은 그대의 손을 잡지 않고 떠났다.', next: 'c2_end' } },
+        { id: 2, insp: 'brave', label: '배신의 대가를 치르게 한다', roll: false, approve: { sena: -2 },
+          then: { text: ['브란은 눈을 감았다. “그래, 그게 맞겠지.” 칼이 내려왔다.'], fx: { comp: { bran: 'dead' } }, log: '그림자 편에 섰던 브란을 쓰러뜨렸다.', next: 'c2_end' } },
+        { id: 3, label: '그대로 둔다', roll: false,
+          then: { text: ['그대가 돌아서자, 브란은 사냥꾼의 연기가 사라진 쪽으로 기어가듯 걸어갔다. 낙인은 아직 그를 놓지 않았다.'], log: '쓰러진 브란을 두고 돌아섰다. 그는 사냥꾼을 따라갔다.', next: 'c2_end' } }
+      ]
+    },
+
+    // 산장: 어머니를 잃은 세나 (그대가 리네를 쓰러뜨렸을 때)
+    c2_sena_grief: {
+      place: '사냥꾼의 산장',
+      art: { sky: 'night', bg: 'lodge', actors: [{ k: 'hero', x: 0.3 }, { k: 'sena', x: 0.62, face: -1 }], fx: ['ash'] },
+      title: '네 번째 화살', clock: '세나',
+      text: [
+        { if: SENA_AT, t: '세나가 어머니의 손을 놓았다. 그리고 천천히 일어나, 활에 화살을 걸었다. 화살촉이 그대를 향했다.' },
+        { if: SENA_AT, t: '“엄마는… 낙인에 묶여 있었을 뿐이에요.” 목소리가 떨렸다. “다른 방법이 있었잖아요. 있었잖아요!”' },
+        { if: { nor: [SENA_AT] }, t: '그대는 추적자의 눈을 감겨 주고 산장 안으로 걸어 들어갔다.' }
+      ],
+      choices: [
+        { id: 1, skill: '설득', insp: 'mercy', label: '“그분을 풀어 드릴 수 없었다. 미안하다.”', stat: '매력', dc: 13, requires: SENA_AT, reqText: '세나',
+          dcMod: [{ if: { min: { ap_sena: 6 } }, v: -4, why: '깊은 믿음' }, { if: { min: { ap_sena: 3 } }, v: -2, why: '호감' }, { if: { max: { ap_sena: 0 } }, v: 3, why: '쌓인 원망' }],
+          note: '성공하면 세나가 곁에 남는다',
+          success: {
+            text: ['화살촉이 내려갔다. 세나가 무너지듯 주저앉아 울었다. 오래. 그대는 그 곁을 떠나지 않았다.', '“…알아요. 알지만.” 그녀가 소매로 눈을 문질렀다. “끝까지 가요. 엄마를 이렇게 만든 자한테.”'],
+            fx: { comp: { sena: 'party' } }, log: '어머니를 잃은 세나가 그래도 곁에 남았다.', next: 'c2_vask' },
+          fail: {
+            text: ['세나는 활을 내렸지만, 그대를 보지 않았다. “…엄마를 묻어 줄게요. 따라오지 마요.”', '그녀는 어머니를 등에 업고 산을 내려갔다.'],
+            fx: { comp: { sena: 'left' } }, log: '세나가 어머니를 업고 떠났다.', next: 'c2_vask' } },
+        { id: 2, insp: 'brave', label: '활을 내리라고 경고한다', roll: false, requires: SENA_AT, reqText: '세나', approve: { sena: -2 },
+          note: '전투 (세나와 싸운다)',
+          then: { text: ['“쏘지 마라, 세나.” 그 말이 끝나기도 전에 화살이 날아왔다.'], fx: { comp: { sena: 'hostile' } }, battle: SENA2_FIGHT('grief'), next: 'c2_vask' } },
+        { id: 3, label: '무기를 내려놓고 그녀가 떠나도록 둔다', roll: false, requires: SENA_AT, reqText: '세나',
+          then: { text: ['그대는 무기를 내려놓았다. 세나는 화살촉을 한참 그대에게 겨누고 있다가, 시위를 풀었다.', '“…다시는 보지 말아요.” 그녀는 어머니를 업고 어둠 속으로 사라졌다.'],
+            fx: { comp: { sena: 'left' } }, log: '세나가 그대를 두고 떠났다.', next: 'c2_vask' } },
+        { id: 4, label: '산장 안으로', roll: false, requires: { nor: [SENA_AT] }, reqText: '-',
+          then: { text: ['전당 쪽에서 난롯불 소리가 들렸다.'], next: 'c2_vask' } }
+      ]
+    },
+    c2_sena_judge: {
+      place: '사냥꾼의 산장',
+      art: { sky: 'night', bg: 'lodge', actors: [{ k: 'hero', x: 0.36 }, { k: 'sena', x: 0.6, face: -1, s: 0.9 }], fx: ['ash'] },
+      title: '부러진 활', clock: '세나',
+      text: ['세나가 부러진 활을 끌어안고 앉아 있었다. 그 곁에 어머니가 누워 있었다.'],
+      choices: [
+        { id: 1, insp: 'mercy', label: '그녀를 두고 산장 안으로 들어간다', roll: false,
+          then: { text: ['돌아보지 않으려 했지만, 문턱에서 한 번 돌아보았다. 세나는 어머니의 머리를 쓰다듬고 있었다. 그대를 보지 않았다.'], log: '쓰러진 세나를 두고 산장으로 들어갔다. 그녀는 그대를 잊지 않을 것이다.', next: 'c2_vask' } },
+        { id: 2, insp: 'brave', label: '끝을 낸다. 등 뒤의 화살을 남겨 둘 수 없다', roll: false,
+          then: { text: ['세나는 눈을 감지 않았다. 그대가 칼을 내릴 때까지, 그 초록빛 눈은 그대를 보고 있었다.'], fx: { comp: { sena: 'dead' } }, log: '세나를 쓰러뜨렸다.', next: 'c2_vask' } }
+      ]
+    },
+    // 산장: 그대를 원망하는 세나가 어머니를 구하러 와 있다
+    c2_sena_foe: {
+      place: '사냥꾼의 산장',
+      art: { sky: 'night', bg: 'lodge', actors: [{ k: 'hero', x: 0.22 }, { k: 'sena', x: 0.5, face: -1 }, { k: 'rine', x: 0.8, face: -1 }], fx: ['ash'] },
+      title: '산장 아래의 세나', clock: '세나',
+      text: [
+        '산장으로 오르는 길목, 바위 위에서 누군가 활을 겨누고 있었다. 세나였다.',
+        '“엄마가 저 안에 있다는 거 알아요.” 그녀의 목소리가 차가웠다. “내가 구해요. 당신은 끼어들지 마요.”',
+        '산장 문 앞에서 회색 눈의 여인이 고개를 들었다. 두 사람 사이에, 그대가 서 있었다.'
+      ],
+      choices: [
+        { id: 1, skill: '설득', insp: 'mercy', label: '“혼자서는 못 한다. 함께 구하자.”', stat: '매력', dc: 16,
+          dcMod: [{ if: { flag: 'crone_cured' }, v: -2, why: '노파의 눈을 고쳐 주었다' }, { if: { flag: 'anchor_broken' }, v: -2, why: '회색 여울을 깨웠다' }],
+          success: {
+            text: ['세나의 활이 흔들렸다. “…엄마를 위해서예요. 당신을 위해서가 아니라.” 그녀가 바위에서 내려와 그대 곁에 섰다. 한 걸음 떨어져서.'],
+            fx: { comp: { sena: 'left' }, xp: 20 }, log: '세나와 휴전하고 함께 어머니를 구하러 갔다.', next: 'c2_lodge' },
+          fail: { text: ['“당신 말은 이제 안 믿어요.” 화살이 그대의 발치에 꽂혔다. 경고였다. 다음은 경고가 아닐 것이다.'], battle: SENA2_FIGHT('foe'), log: '세나는 그대를 믿지 않았다.', next: 'c2_lodge' } },
+        { id: 2, insp: 'brave', label: '비키지 않는다', roll: false, note: '전투 (세나와 싸운다)',
+          then: { text: ['세나가 시위를 당겼다. “그럼 당신부터예요.”'], battle: SENA2_FIGHT('foe'), next: 'c2_lodge' } },
+        { id: 3, label: '그녀가 먼저 가도록 길을 비킨다', roll: false,
+          then: {
+            text: ['그대가 물러서자 세나가 바위에서 뛰어내려 산장으로 달렸다. “엄마!” 회색 눈의 여인이 활을 들었다 — 그리고 쏘지 않았다. 대신 몸을 돌려 산장 뒤편 숲으로 달아났다. 세나가 그 뒤를 쫓았다.', '둘 다 돌아오지 않았다. 산장의 문은 열려 있었다.'],
+            fx: { set: ['rine_lost', 'lodge_ambush'] }, log: '세나가 어머니를 쫓아 숲으로 사라졌다.', next: 'c2_vask' } }
+      ]
+    },
+    c2_sena_judge2: {
+      place: '사냥꾼의 산장',
+      art: { sky: 'night', bg: 'lodge', actors: [{ k: 'hero', x: 0.36 }, { k: 'sena', x: 0.6, face: -1, s: 0.9 }], fx: ['ash'] },
+      title: '부러진 활', clock: '세나',
+      text: ['세나가 부러진 활을 쥔 채 그대를 노려보았다. “…엄마는 내가 구한다고 했잖아요.”'],
+      choices: [
+        { id: 1, insp: 'mercy', label: '“그래서 함께 가자는 거다.” 손을 내민다', roll: false,
+          then: { text: ['세나는 그대의 손을 보지 않았다. 혼자 일어나, 부러진 활을 버리고 칼을 뽑았다. “…엄마를 구하고 나면, 그다음은 당신이에요.” 그러나 그녀는 그대 뒤를 따라왔다.'],
+            fx: { comp: { sena: 'left' } }, log: '쓰러뜨린 세나가 칼을 들고 그대 뒤를 따라왔다.', next: 'c2_lodge' } },
+        { id: 2, insp: 'brave', label: '끝을 낸다', roll: false,
+          then: { text: ['세나의 초록빛 눈이 마지막까지 산장 문을 보고 있었다. 어머니가 있는 쪽을.'], fx: { comp: { sena: 'dead' } }, log: '세나를 쓰러뜨렸다.', next: 'c2_lodge' } }
+      ]
+    },
+
+    // 에필로그: 이르반에게 망설인 그대에게 오르덴이 창을 겨눈다
+    c2_orden_oath: {
+      place: '사냥꾼의 산장',
+      art: { sky: 'dawn', bg: 'lodge', actors: [{ k: 'hero', x: 0.32 }, { k: 'orden', x: 0.62, face: -1 }], fx: ['ash'] },
+      title: '맹세의 창끝', clock: '오르덴',
+      text: [
+        { if: { party: 'orden' }, t: '연기가 걷히자 오르덴이 그대를 돌아보았다. 장창 끝이 그대를 향해 있었다.' },
+        { if: { party: 'orden' }, t: '“그대는 대답하지 않았다.” 기사의 목소리가 낮았다. “천 년 전, 이르반도 왕 앞에서 대답하지 않았다. 그리고 나는 그를 문밖에 두었다.” 창끝이 떨렸다. “말하라, {name:이여}. 그대는 그의 손을 잡을 것인가?”' },
+        { if: { nor: [{ party: 'orden' }] }, t: '연기가 걷힌 산장에 새벽빛이 들었다. 그대의 망설임을 본 사람은 없었다.' }
+      ],
+      choices: [
+        { id: 1, skill: '설득', insp: 'song', label: '“망설였을 뿐이다. 그의 손을 잡지는 않는다.”', stat: '매력', dc: 13, requires: { party: 'orden' }, reqText: '오르덴',
+          dcMod: [{ if: { min: { bond: 5 } }, v: -3, why: '깊은 유대' }, { if: { flag: 'oath_question' }, v: -2, why: '맹세를 묻던 밤' }],
+          success: {
+            text: ['오르덴의 창끝이 천천히 내려갔다. “…망설임은 죄가 아니다. 망설임 끝에 무엇을 고르느냐가 죄지.” 그가 투구를 벗었다. “그 고름을 끝까지 지켜보겠다.”'],
+            approve: { orden: 1 }, log: '오르덴에게 이르반의 손은 잡지 않겠다고 답했다.', next: 'c2_after' },
+          fail: {
+            text: ['오르덴은 창을 거두었지만, 그대에게서 눈을 떼지 않았다. “말은 이르반도 잘했다.” 그가 돌아섰다. “나는 관문으로 돌아가겠다. 그대가 무엇을 고르는지는 — 그 문 앞에서 보겠다.”'],
+            fx: { comp: { orden: 'parted' } }, log: '오르덴이 그대를 믿지 못하고 관문으로 돌아갔다.', next: 'c2_after' } },
+        { id: 2, insp: 'brave', label: '“내가 무엇을 고르든, 그대가 정할 일이 아니다.” 창끝을 쳐낸다', roll: false, requires: { party: 'orden' }, reqText: '오르덴', approve: { orden: -3 },
+          note: '전투 (오르덴과 싸운다)',
+          then: { text: ['오르덴이 한 걸음 물러나 창을 비껴 들었다. “그렇다면 맹세에 따라.”'], fx: { comp: { orden: 'hostile' } }, battle: ORDEN_FIGHT, next: 'c2_after' } },
+        { id: 3, label: '“가라, 오르덴. 그대의 문으로.”', roll: false, requires: { party: 'orden' }, reqText: '오르덴',
+          then: { text: ['오르덴은 오래 그대를 보았다. “…그대가 이르반이 되지 않기를.” 그는 서쪽으로 걸어갔다. 천 년 동안 지켜 온 문을 향해.'], fx: { comp: { orden: 'parted' } }, log: '오르덴을 관문으로 돌려보냈다.', next: 'c2_after' } },
+        { id: 4, label: '산을 내려간다', roll: false, requires: { nor: [{ party: 'orden' }] }, reqText: '-',
+          then: { text: ['그대는 아무에게도 망설임을 들키지 않은 채 산을 내려갔다.'], next: 'c2_after' } }
+      ]
+    },
+    c2_orden_judge: {
+      place: '사냥꾼의 산장',
+      art: { sky: 'dawn', bg: 'lodge', actors: [{ k: 'hero', x: 0.36 }, { k: 'orden', x: 0.6, face: -1, s: 0.9 }], fx: ['ash'] },
+      title: '무릎 꿇은 기사', clock: '오르덴',
+      text: ['오르덴이 한쪽 무릎을 꿇고 있었다. 장창은 그대의 발치에 있었다.', '“천 년 동안 무릎 꿇은 적이 없다.” 그가 투구 속에서 웃었다. “별께서 그대를 고르신 이유를 알 것 같군.”'],
+      choices: [
+        { id: 1, insp: 'mercy', label: '장창을 돌려주고 보낸다', roll: false,
+          then: { text: ['오르덴은 장창을 받아 들고 일어섰다. “내 맹세는 여기서 끝났다. 남은 것은 문뿐이다.” 그는 서쪽으로 걸어갔다. 한 번도 돌아보지 않았다.'],
+            fx: { comp: { orden: 'parted' }, set: ['orden_oath_broken'] }, log: '쓰러뜨린 오르덴에게 장창을 돌려주고 보냈다. 그는 관문으로 돌아갔다.', next: 'c2_after' } },
+        { id: 2, insp: 'brave', label: '끝을 낸다', roll: false, approve: { sena: -2, bran: -2 },
+          then: { text: ['오르덴은 투구를 벗었다. 천 년 만에 햇빛을 받은 얼굴이 그대를 올려다보았다. “카이론에게 전하마. 그대 같은 자가 있었다고.”', '새벽빛 속에서, 마지막 맹세기사가 눈을 감았다.'], fx: { comp: { orden: 'dead' } }, log: '마지막 맹세기사 오르덴을 쓰러뜨렸다.', next: 'c2_after' } }
       ]
     },
 
@@ -1017,7 +1308,8 @@
       actions: [
         { label: '헛간에서 앓는 아이들을 살핀다', event: 'c2_fever_start', if: { party: 'sena', flag: 'done_c2_ford', not: 'q_fever' } },
         { label: '재 이끼로 세나와 함께 약을 달인다', event: 'c2_fever_end', if: { flag: 'q_fever', not: 'fever_cured', count: { '재 이끼': 3 } }, star: true },
-        { label: '오스크에게 낙인석 조각을 건넨다', event: 'c2_osk', if: { flag: 'q_osk', not: 'osk_done', count: { '낙인석 조각': 3 } }, star: true }
+        { label: '오스크에게 낙인석 조각을 건넨다', event: 'c2_osk', if: { flag: 'q_osk', not: 'osk_done', count: { '낙인석 조각': 3 } }, star: true },
+        { label: '물레방아 뒤편, 브란의 옛집으로 간다', event: 'rejoin_bran', if: { flag: 'done_c2_ford', any: ['bran_parted', 'bran_left'] } }
       ],
       links: [{ to: 'pass' }, { to: 'quarry' }, { to: 'woods' }, { to: 'lodge' }]
     },
@@ -1028,6 +1320,7 @@
         '산허리를 계단처럼 깎아 낸 채석장. 회색 돌기둥 — 닻돌 — 이 한가운데서 맥박처럼 빛난다.',
         { if: { flag: 'anchor_broken' }, t: '쪼개진 닻돌이 쓰러져 있다. 낙인공들은 흩어졌지만, 남은 자들이 아직 돌을 깎는다.' }
       ],
+      onEnter: [{ event: 'c2_bran_foe', if: { flag: 'bran_hostile', not: 'bran_confronted' } }],
       encounters: [{ w: 3, e: ['mason', 'brandwolf'] }, { w: 2, e: ['patrol', 'patrol'] }, { w: 1, e: ['brandbear'] }, { w: 1, e: ['mason', 'mason'] }],
       ambush: 0.25, field: { high: 'foe', cover: true },
       explore: ['ex2_chips'],
@@ -1072,7 +1365,8 @@
       ambush: 0.3, field: { high: 'foe', cover: true },
       explore: ['ex2_trophy'],
       actions: [
-        { label: '산장으로 쳐들어간다 (권장 레벨 8)', event: 'c2_lodge', if: { flag: 'done_c2_night', not: 'done_c2_lodge' }, star: true }
+        { label: '산장으로 쳐들어간다 (권장 레벨 8)', event: 'c2_lodge', if: { flag: 'done_c2_night', not: ['done_c2_lodge', 'done_c2_sena_foe'], nor: [{ flag: 'sena_hostile' }] }, star: true },
+        { label: '산장으로 쳐들어간다 (권장 레벨 8)', event: 'c2_sena_foe', if: { flag: ['done_c2_night', 'sena_hostile'], not: ['done_c2_lodge', 'done_c2_sena_foe'] }, star: true }
       ],
       links: [{ to: 'ford' }, { to: 'quarry' }, { to: 'woods' }]
     }

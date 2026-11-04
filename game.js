@@ -277,8 +277,7 @@ function checkLeave(out,text){
   for(const id in (SC.companions||{})){
     const C=SC.companions[id];if(C.leaveAt==null||!compKnown(id))continue;
     if((S.counters[C.ap]||0)<=C.leaveAt){
-      S.flags[id+'_left']=true;if(S.comp&&S.comp[id])S.comp[id].trinket=null;
-      if(C.leaveText)text.push(C.leaveText);out.push(josa(C.name,'이')+' 일행을 떠났다');logp(josa(C.name,'이')+' 일행을 떠났다.');
+      if(C.leaveText)text.push(C.leaveText);setCompState(id,'left',out);
     }
   }
 }
@@ -309,6 +308,7 @@ function applyFx(fx,out){
   if(fx.xp){h.xp+=fx.xp;out.push('경험치 '+sign(fx.xp))}
   if(fx.goto&&SC.locations[fx.goto])S.loc=fx.goto;   // 이야기가 그대를 다른 곳으로 데려간다
   if(fx.names)S.names=Object.assign({},S.names,fx.names);   // 이야기 속에서 붙인 이름 ({pup} 등)
+  if(fx.comp)for(const id in fx.comp)setCompState(id,fx.comp[id],out);   // 동료의 처지가 바뀐다 (함께·헤어짐·떠남·적·쓰러짐)
 }
 // 쓰러져도 이야기는 끝나지 않는다. 경험치가 차면 레벨이 오른다.
 function settle(out){
@@ -702,9 +702,33 @@ function goNext(next){
 
 // ── 동료
 function COMP(id){return SC.companions[id]}
-function compKnown(id){return !!S.hero&&ok(COMP(id).joinIf)}
-// 지금 이 장소에서 함께 다니는가 (오르덴은 관문 근처에서만)
-function compHere(id){const c=COMP(id);return compKnown(id)&&(!c.locs||c.locs.includes(S.loc)||ok(c.anywhereIf))}
+// 동료의 처지: party(함께 다닌다) · bench(쉼터에서 기다린다) · parted(헤어졌다) · left(호감이 바닥나 떠났다) · hostile(적이 되었다) · dead(쓰러졌다) · unmet
+// 떠남·적·쓰러짐·헤어짐은 <id>_left 같은 플래그로 남아 이야기의 조건에 그대로 쓰인다
+const CSTATES=['dead','hostile','left','parted'];
+const CSTATE_N={party:'함께 다닌다',bench:'쉼터에서 기다린다',parted:'헤어졌다',left:'그대 곁을 떠났다',hostile:'그대와 적이 되었다',dead:'쓰러졌다'};
+function compState(id){
+  for(const k of CSTATES)if(S.flags[id+'_'+k])return k;
+  if(!S.hero||!(ok(COMP(id).joinIf)||S.flags[id+'_joined']))return 'unmet';
+  return S.flags[id+'_bench']?'bench':'party';
+}
+function compKnown(id){const st=compState(id);return st==='party'||st==='bench'}   // 일행에 속한다 (따라오든 쉼터에서 기다리든)
+// 지금 이 장소에서 함께 다니는가 (오르덴은 관문 근처에서만, 쉼터에 남긴 동료는 빠진다)
+function compHere(id){const c=COMP(id);return compState(id)==='party'&&(!c.locs||c.locs.includes(S.loc)||ok(c.anywhereIf))}
+// 처지를 바꾼다 (이야기의 fx.comp, 일행 고르기, 호감이 바닥날 때)
+function setCompState(id,st,out){
+  const C=COMP(id),was=compState(id);if(!C||was===st)return;
+  ['bench','gone'].concat(CSTATES).forEach(k=>delete S.flags[id+'_'+k]);
+  if(st!=='party')S.flags[id+'_'+st]=true;
+  if(CSTATES.includes(st))S.flags[id+'_gone']=true;   // 헤어짐·떠남·적·쓰러짐을 한데 묶은 플래그 (이야기 조건용)
+  if(st==='party'){
+    S.flags[id+'_joined']=true;
+    // 떠났던 동료가 돌아오면 호감을 떠나기 직전보다 조금 위로 되돌린다 (곧바로 다시 떠나지 않게)
+    if(C.leaveAt!=null&&(S.counters[C.ap]||0)<=C.leaveAt+2)S.counters[C.ap]=C.leaveAt+3;
+    syncComps();
+  }else if(st!=='bench'&&S.comp&&S.comp[id])S.comp[id].trinket=null;   // 떠나는 동료는 찬 장신구를 돌려준다
+  const N=C.name,msg={party:josa(N,'이')+(was==='bench'?' 다시 따라나선다':' 일행이 되었다'),bench:josa(N,'이')+' 쉼터에 남았다',parted:josa(N,'과')+' 헤어졌다',left:josa(N,'이')+' 일행을 떠났다',hostile:josa(N,'이')+' 그대의 적이 되었다',dead:josa(N,'이')+' 쓰러졌다'}[st];
+  if(out)out.push(msg);logp(msg+'.');
+}
 function party(){return Object.keys(SC.companions||{}).filter(compHere)}
 function compMaxHp(id){const c=COMP(id);return c.hp+c.hpGain*(S.hero.level-1)+(tfx(id).hp||0)}
 // 동료 기록을 레벨에 맞춘다. full이면 모두 회복. 새로 합류한 동료 id를 돌려준다
@@ -932,7 +956,8 @@ function startBattle(def,kind,ambush){
   field.rain=arr((ba||la).fx).includes('rain');
   const pids=party(),ids=def.enemies.slice();
   // 이야기 속에서 그 자리에 있는 동료는 함께 싸운다 (오르덴은 관문 안에서 유대와 상관없이 짐승을 막는다)
-  arr(def.guests).forEach(id=>{if(pids.includes(id)||!SC.companions[id])return;if(!compKnown(id)){const mx=compMaxHp(id);S.comp[id]=Object.assign(S.comp[id]||{ch:{}},{hp:mx,hpMax:mx})}pids.push(id)});
+  const guests=arr(def.guests).concat(arr(def.guestsIf).filter(g=>ok(g.if)).map(g=>g.id));
+  guests.forEach(id=>{if(pids.includes(id)||!SC.companions[id]||['hostile','dead'].includes(compState(id)))return;if(!compKnown(id)){const mx=compMaxHp(id);S.comp[id]=Object.assign(S.comp[id]||{ch:{}},{hp:mx,hpMax:mx})}pids.push(id)});
   if(def.scale){const n=Math.max(0,pids.length-(def.scaleFree||0));for(let i=0;i<n&&ids.length<5;i++)ids.push(def.scale[i%def.scale.length])}
   const units=[{uid:'hero',side:'pc',kind:'hero',id:'hero',name:S.hero.name,art:'hero',row:rowPref('hero')}];
   pids.forEach(id=>units.push({uid:id,side:'pc',kind:'comp',id,name:COMP(id).name,art:COMP(id).art,row:rowPref(id)}));
@@ -1960,13 +1985,13 @@ function renderParty(box){
   const fc=el('div','card');box.appendChild(fc);
   fc.appendChild(el('div','sub','전투 시작 위치 — 근접 공격은 앞열에서만 한다. 앞열에 누가 서 있는 한, 적의 근접 공격은 뒷열에 닿지 않는다.'));
   const rowSeg=id=>{const sg=el('div','seg');['front','back'].forEach(r=>{const b=el('button',rowPref(id)===r?'on':'',ROWN[r]);b.onclick=()=>{S.rows[id]=r;save();render()};sg.appendChild(b)});return sg};
-  ['hero'].concat(ids).forEach(id=>{const fr=el('div','formrow'),nb=el('div');nb.appendChild(el('b',null,id==='hero'?S.hero.name:COMP(id).name));if(id!=='hero'&&!compHere(id))nb.appendChild(el('span','mini',' 떨어져 있다'));fr.appendChild(nb);fr.appendChild(rowSeg(id));fc.appendChild(fr)});
+  ['hero'].concat(ids).forEach(id=>{const fr=el('div','formrow'),nb=el('div');nb.appendChild(el('b',null,id==='hero'?S.hero.name:COMP(id).name));if(id!=='hero'&&!compHere(id))nb.appendChild(el('span','mini',compState(id)==='bench'?' 쉼터에서 기다린다':' 떨어져 있다'));fr.appendChild(nb);fr.appendChild(rowSeg(id));fc.appendChild(fr)});
 
   box.appendChild(el('h2',null,'동료'));
   if(!ids.length)box.appendChild(el('div','card sub','아직 함께하는 동료가 없다. 숲과 계단에서 누군가를 만날지도 모른다.'));
   ids.forEach(id=>{
     const C=COMP(id),r=S.comp[id],here=compHere(id),d1=el('div','card comp');
-    const t=el('div','hudtop'),nb=el('div');nb.appendChild(el('b',null,C.name));nb.appendChild(el('span','mini',' · '+C.title+' · 레벨 '+S.hero.level));t.appendChild(nb);t.appendChild(el('span','mini',here?'함께 있다':'지금은 떨어져 있다'));d1.appendChild(t);
+    const t=el('div','hudtop'),nb=el('div');nb.appendChild(el('b',null,C.name));nb.appendChild(el('span','mini',' · '+C.title+' · 레벨 '+S.hero.level));t.appendChild(nb);t.appendChild(el('span','mini',here?'함께 있다':compState(id)==='bench'?'쉼터에서 기다린다':'지금은 떨어져 있다'));d1.appendChild(t);
     if(r){d1.appendChild(bar('var(--hp)',r.hp,r.hpMax));d1.appendChild(el('div','mini','HP '+r.hp+'/'+r.hpMax+' · 방어 '+(C.ac+compMod(id,'ac'))+' · '+C.attack.name+' 명중 '+sign(C.attack.hit+lvB()+compMod(id,'hit'))+' 피해 '+C.attack.dice+sign(C.attack.dmgB+lvB()+compMod(id,'dmg')+(C.attack.dtype==='fire'?tfx(id).fire||0:0))+(C.attack.ranged?' (원거리)':C.attack.reach?' (긴 창)':'')))}
     // 호감
     const v=apVal(id),tr=apTier(v),ef=[];if(tr.hit)ef.push('명중 '+sign(tr.hit));if(tr.ac)ef.push('방어 +'+tr.ac);
@@ -1974,6 +1999,17 @@ function renderParty(box){
     const pk=arr(C.perks).filter(p=>ok(p.if));if(pk.length)d1.appendChild(el('div','mini','보상: '+pk.map(p=>p.name+' ('+['hit','ac','dmg'].filter(k=>p[k]).map(k=>({hit:'명중',ac:'방어',dmg:'피해'})[k]+' +'+p[k]).join(', ')+')').join(', ')));
     const tn=trinketOn(id);if(tn){const tl=el('div','mini','장신구: ');tl.appendChild(rarName(tn));tl.appendChild(document.createTextNode(' — '+trinketText(SC.items[tn].fx)));d1.appendChild(tl)}
     if(campHint(id))d1.appendChild(el('div','sub','✦ 쉼터에서 긴 휴식을 하면 할 말이 있는 것 같다'));
+    // 데려갈지, 쉼터에 남길지, 헤어질지
+    const st=compState(id),ctl=el('div','row compctl');
+    ctl.appendChild(el('span','chip '+(st==='party'?'up':''),CSTATE_N[st]));
+    if(S.mode==='world'){
+      const atRest=canRest(),bb=el('button',null,st==='bench'?'데려가기':'쉼터에 남기기');
+      bb.disabled=!atRest;bb.title=atRest?'':'쉴 수 있는 곳에서만 일행을 바꿀 수 있다';
+      bb.onclick=()=>{setCompState(id,st==='bench'?'party':'bench');save();render()};ctl.appendChild(bb);
+      if(SC.events['part_'+id]){const pb=el('button',null,'작별하기');pb.onclick=()=>startEvent('part_'+id);ctl.appendChild(pb)}
+      if(!atRest)ctl.appendChild(el('span','mini','쉼터에서 일행을 바꿀 수 있다'));
+    }
+    d1.appendChild(ctl);
     if(!here&&C.awayText)d1.appendChild(el('div','sub',C.awayText));
     // 자세한 이야기와 기술은 접어 둔다
     const dt=el('details');dt.appendChild(el('summary',null,'이야기 · 도와주는 판정 · 기술'));
@@ -1983,7 +2019,10 @@ function renderParty(box){
     d1.appendChild(dt);
     box.appendChild(d1);
   });
-  Object.keys(SC.companions||{}).filter(id=>S.flags[id+'_left']).forEach(id=>box.appendChild(el('div','sub',COMP(id).name+' — 그대 곁을 떠났다')));
+  // 헤어지거나 떠나거나 적이 되거나 쓰러진 동료: 어디서 다시 만날 수 있는지
+  Object.keys(SC.companions||{}).forEach(id=>{const st=compState(id);if(!CSTATES.includes(st))return;const C=COMP(id),g=el('div','card comp gone');
+    const t=el('div','hudtop');t.appendChild(el('b',null,C.name));t.appendChild(el('span','chip '+(st==='hostile'||st==='dead'?'down':''),CSTATE_N[st]));g.appendChild(t);
+    if(C.gone&&C.gone[st])g.appendChild(el('div','sub',tpl(C.gone[st])));box.appendChild(g)});
   box.appendChild(el('div','sub','동료는 그대와 같은 레벨로 함께 자란다 — 경험치는 일행이 나누지 않고 함께 얻고, 레벨이 오르면 동료의 HP·명중·피해도 오르고 새 기술을 익힌다. 동료는 마력 대신 휴식마다 충전되는 기술을 쓴다.')).style.marginTop='8px';
   box.appendChild(el('div','sub','동료는 곁에 있을 때 그대의 선택에 반응한다. 호감이 높으면 더 잘 싸우고, 바닥나면 떠난다. 동료가 능한 기술의 이야기 판정은 곁에 있으면 유리하다.')).style.marginTop='4px';
 }
@@ -2189,12 +2228,19 @@ function choiceInfo(c){
   if(note)s+=' / '+note;
   return s;
 }
+// 서로 정반대인 조건(X와 nor:[X])의 짝 가운데 잠긴 쪽은 아예 보이지 않는다 (그 상황에 없는 선택지)
+function choiceHidden(n,c){
+  if(!c.requires||ok(c.requires))return false;const J=JSON.stringify;
+  return n.choices.some(d=>d!==c&&d.requires&&((d.requires.nor&&d.requires.nor.length===1&&J(d.requires.nor[0])===J(c.requires))||(c.requires.nor&&c.requires.nor.length===1&&J(c.requires.nor[0])===J(d.requires))));
+}
+function choiceNo(n,c){return n.choices.filter(d=>!choiceHidden(n,d)).indexOf(c)+1}
 function renderChoices(){
   const n=ev(),box=$('choices'),p=S.pending||S.reroll;box.innerHTML='';
   n.choices.forEach(c=>{
+    if(choiceHidden(n,c))return;
     const locked=c.requires&&!ok(c.requires);
     const b=el('button','opt'+((p?p.choiceId:S.sel)===c.id?' on':''));
-    b.appendChild(document.createTextNode(c.id+'. '+txt(c.label)));
+    b.appendChild(document.createTextNode(choiceNo(n,c)+'. '+txt(c.label)));
     let info=choiceInfo(c);
     if(locked)info='[잠김] 필요: '+(txt(c.reqText)||'조건 미달')+' / '+info;
     b.appendChild(el('small',null,info));
@@ -2257,7 +2303,7 @@ function renderResult(){
   const title=p.battleEnd?(p.battleEnd==='win'?'승리!':p.battleEnd==='lose'?'패배…':p.battleEnd==='fled'?'도망쳤다':'성공!'):
     p.key==='auto'?p.label:p.key==='crit'?'대성공!':p.key==='fumble'?'대실패…':good?'성공':'실패';
   head.appendChild(el('b',null,title));
-  if(p.roll)head.appendChild(el('div','sub',p.choiceId+'번 '+p.label+' · '+calcText(p.roll)));
+  if(p.roll){const n=ev(),c=n.choices.find(x=>x.id===p.choiceId);head.appendChild(el('div','sub',(c?choiceNo(n,c):p.choiceId)+'번 '+p.label+' · '+calcText(p.roll)))}
   else if(p.battleEnd)head.appendChild(el('div','sub','전투: '+p.label));
   rb.appendChild(head);
   const story=el('div','card prose story');p.text.forEach(t=>story.appendChild(el('p',null,t)));rb.appendChild(story);
