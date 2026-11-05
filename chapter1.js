@@ -2845,7 +2845,7 @@ window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에
       breath: { every: 3, dmg: '4d8', dtype: 'radiant', save: '민첩' }, rank: 4,
       desc: '불려 나오자마자, 그 뒤로 세 라운드마다 모든 적에게 별빛 숨결 4d8+지혜 (민첩 내성에 성공하면 절반)' },
     moonwolf: { name: '달늑대', art: 'sp_moon', row: 'front', hp: 14, hpLv: 6, ac: 15, atk: { name: '물어뜯기', dice: '2d8' }, multi: 2, trip: true, rank: 3,
-      desc: '한 차례에 두 번 문다. 물린 적은 힘 내성에 실패하면 넘어진다' }
+      desc: '한 차례에 두 번 문다 (돌격 명령에도 두 번). 물린 적은 힘 내성에 실패하면 넘어진다' }
   };
   Object.assign(CS, {
     spiritbolt: { cls: 'summoner', lv: 1, name: '정령의 화살', mp: 0, kind: 'attack', attack: 'spell', stat: '지혜', dmg: '1d10', addStat: true, dtype: 'arcane',
@@ -2897,4 +2897,45 @@ window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에
       passive: { name: '공명', desc: '부린 소환수 하나마다 그대의 주문 피해 +1 (최대 +4). 소환수가 흩어지면 별빛이 터져 적 앞열에 2d6+지혜. 최대 마력 +6', resonance: 1, burst: '2d6' }, fx: { mp: 6 },
       skills: ['starchain', 'offering'] }
   ];
+})();
+
+// ── 소환사 전용: 1장 세트 「별지기의 예복」과 기술서 「첫 부름의 서」
+// 소환사일 때만 떨어지고(cls), 소환사만 낀다. 마지막 부위와 첫째 장은 가라앉은 기사단장(되풀이하는 우두머리)이 지닌다.
+(function () {
+  const SC = window.SCENARIO, CS = SC.combatSkills, E = SC.enemies;
+  const SET = { set: 'starkeeper', rar: 'set', cls: 'summoner' };
+  Object.assign(SC.items, {
+    '별지기의 두건': Object.assign({ kind: '머리', slot: 'head', ac: 1, fx: { mp: 3, sumHit: 1 }, desc: '별을 세던 이들이 쓰던 두건. 안쪽에 별자리가 수놓여 있다' }, SET),
+    '별지기의 예복': Object.assign({ kind: '방어구', slot: 'armor', ac: 1, fx: { mp: 4, sumHp: 0.05 }, desc: '은실로 짠 예복. 입으면 정령들의 숨소리가 들린다' }, SET),
+    '별지기의 장갑': Object.assign({ kind: '손', slot: 'hands', ac: 1, fx: { sumDmg: 1 }, desc: '정령의 갈기를 쓰다듬던 얇은 장갑' }, SET),
+    '별지기의 방울': Object.assign({ kind: '장신구', slot: 'trinket', fx: { sumHp: 0.1, mp: 2 }, desc: '기사단장의 갑주 틈에 걸려 있던 작은 은방울. 울리지 않아도 정령이 알아듣는다' }, SET)
+  });
+  SC.sets.starkeeper = {
+    name: '별지기의 예복', cls: 'summoner', chapter: 1,
+    where: '1장 서쪽 땅. 두건은 회색 사냥꾼의 추종자(무너지는 회랑), 예복은 물에 잠긴 기사(옛 수로), 장갑은 검은 소나무 거미(검은 소나무 숲), 방울은 가라앉은 기사단장(옛 수로의 묘실)만 지닌다',
+    pieces: ['별지기의 두건', '별지기의 예복', '별지기의 장갑', '별지기의 방울'],
+    bonus: [
+      { n: 2, fx: { sumHp: 0.15 } },
+      { n: 3, fx: { sumDmg: 2, sumHit: 1 } },
+      { n: 4, fx: { sumCap: 1, sumCost: 1 } }
+    ]
+  };
+  // 기술서 「첫 부름의 서」: 낱장 넷, 저마다 다른 적이 지닌다
+  const P1 = ['첫 부름의 서 · 첫째 장', '첫 부름의 서 · 둘째 장', '첫 부름의 서 · 셋째 장', '첫 부름의 서 · 넷째 장'];
+  P1.forEach((n, i) => { SC.items[n] = { kind: '낱장', cls: 'summoner', rar: 'legendary', nosell: true, desc: ['별을 부르는 첫 문장이 적힌 낱장', '정령의 이름을 엮는 법이 적힌 낱장', '빛의 날개를 그린 그림이 있는 낱장', '맹세의 마지막 구절이 적힌 낱장'][i] }; });
+  SC.items['첫 부름의 서'] = { kind: '기술서', cls: 'summoner', rar: 'legendary', nosell: true, learn: 'callherald', lvReq: 5, desc: '천 년 전 별지기들이 별의 사도를 부르던 책' };
+  SC.books = SC.books || {};
+  SC.books.firstcall = { name: '첫 부름의 서', learn: 'callherald', pages: P1,
+    where: '첫째 장은 가라앉은 기사단장, 둘째 장은 물에 잠긴 기사, 셋째 장은 이끼 곰, 넷째 장은 회색 사냥꾼의 추종자가 지닌다. 오래 사냥해야 모인다' };
+  E.captain.drops.push({ item: '별지기의 방울', p: 0.2, pity: 6, uniq: true }, { item: P1[0], p: 0.08, pity: 14, uniq: true });
+  E.drowned.drops.push({ item: '별지기의 예복', p: 0.12, pity: 10, uniq: true }, { item: P1[1], p: 0.04, pity: 30, uniq: true });
+  E.bear.drops.push({ item: P1[2], p: 0.03, pity: 40, uniq: true });
+  E.acolyte.drops.push({ item: '별지기의 두건', p: 0.06, pity: 18, uniq: true }, { item: P1[3], p: 0.03, pity: 40, uniq: true });
+  E.spider.drops.push({ item: '별지기의 장갑', p: 0.06, pity: 18, uniq: true });
+  // 별의 사도: 기술서로만 익힌다. 자리를 차지하지 않고 따로 온다 (하나만)
+  SC.summons.herald = { name: '별의 사도', art: 'sp_herald', row: 'front', fly: true, hp: 30, hpLv: 9, ac: 17, atk: { name: '빛의 검', dice: '2d10', dtype: 'radiant' }, multi: 2, heal: '1d8', noCap: true, rank: 6,
+    desc: '자리를 차지하지 않고 따로 온다. 빛의 검으로 두 번 베고 (돌격 명령에도 두 번), 차례마다 날개의 빛으로 아군 모두(소환수 포함)를 1d8+지혜 치유한다' };
+  CS.callherald = { cls: 'summoner', lv: 5, book: true, name: '별의 사도 부르기', cost: 'bonus', uses: 1, per: 'long', kind: 'summon', summon: ['herald'],
+    up: [{ lv: 10, hpMul: 0.3, note: '사도 HP +30%' }, { lv: 14, dmgAdd: 5, note: '사도 피해 +5' }],
+    desc: '보조 행동으로 별의 사도를 부른다 (긴 휴식마다 1번) — {sum}' };
 })();

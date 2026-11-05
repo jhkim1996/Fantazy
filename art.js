@@ -365,6 +365,12 @@ window.Art=(function(){
     else if(k==='sp_golem'){knight(x,gy,122*s,f,{stone:true});glow(x,gy-62*s,52*s,'#8fb6ff',.28)}
     else if(k==='sp_wisp')wisp(x,gy,s,t);
     else if(k==='sp_drake')drake(x,gy,150*s,f,t);
+    else if(k==='sp_herald'){const h=112*s,fl=motion?Math.sin(t*2.4)*.06:0;glow(x,gy-h*.6,h*.7,'#ffe6a0',.32);g.fillStyle='rgba(230,236,255,.55)';
+      poly([[x-f*h*.02,gy-h*.68],[x-f*h*.42,gy-h*(1.02+fl)],[x-f*h*.3,gy-h*.55]]);poly([[x-f*h*.02,gy-h*.64],[x-f*h*.34,gy-h*(.82+fl)],[x-f*h*.22,gy-h*.42]]);
+      figure(x,gy-(motion?Math.sin(t*2)*3:0),h,f,{robe:true,col:'#8fa6cc',weapon:'sword',eyes:'#fff1c4'});g.strokeStyle='#ffe6a0';g.lineWidth=2;g.beginPath();g.ellipse(x+f*h*.01,gy-h*.9,h*.08,h*.025,0,0,Math.PI*2);g.stroke()}
+    else if(k==='sp_colossus'){beast('bear',x,gy-bob,168*s,f,{col:'#6a84b4',eye:'#fff1c4'});glow(x,gy-80*s,90*s,'#8fb6ff',.32)}
+    else if(k==='spiritking'){const h=150*s;glow(x,gy-h*.6,h*.6,'#8fb6ff',.25);figure(x,gy,h,f,{robe:true,hood:true,eyes:'#9fc8ff',col:'#33405a'});
+      g.strokeStyle='#8a8f99';g.lineWidth=2.2;for(let i=0;i<5;i++){const a=-.9+i*.45,sy=gy-h*(.35+.08*(i%3));g.beginPath();g.moveTo(x-h*.12+i*h*.06,sy);g.quadraticCurveTo(x+Math.sin(a)*h*.4,gy-h*.1,x+Math.sin(a)*h*.55,gy);g.stroke()}}
     g.restore();
     if(a.flash){g.save();g.globalAlpha=a.flash;glow(x,gy-40*s,46*s,'#ffffff',.4);g.restore()}
   }
@@ -411,7 +417,7 @@ window.Art=(function(){
 
   // ── 전투 배치: 열마다 자리를 나눈다 (왼쪽이 아군, 오른쪽이 적)
   const ZX={'pc-front':{c:.34,w:.08,rx:.12},'pc-back':{c:.135,w:.07,rx:.11},'foe-front':{c:.665,w:.09,rx:.17},'foe-back':{c:.885,w:.07,rx:.1}};
-  const HT={sp_wolf:64,sp_moon:80,sp_golem:122,sp_wisp:84,sp_drake:112,wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,captain:136,brandwolf:62,brandbear:100,hunter:94,rine:90,vask:112,villager:86,smith:96,boy:58,hawk:110,moths:110,stag:120,shade:128,acolyte:98,hero:96,orden:118,sena:90,bran:96};
+  const HT={sp_herald:120,sp_colossus:120,spiritking:150,sp_wolf:64,sp_moon:80,sp_golem:122,sp_wisp:84,sp_drake:112,wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,captain:136,brandwolf:62,brandbear:100,hunter:94,rine:90,vask:112,villager:86,smith:96,boy:58,hawk:110,moths:110,stag:120,shade:128,acolyte:98,hero:96,orden:118,sena:90,bran:96};
   function battleLayout(info){
     const B=info.battle,list=[];if(!B)return list;
     const groups={};B.units.forEach(u=>{const z=u.side+'-'+u.row;(groups[z]=groups[z]||[]).push(u)});

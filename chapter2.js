@@ -1375,3 +1375,90 @@
   SC.locations.gate.links.push({ to: 'pass' });
   SC.locations.gate.actions.push({ label: '동쪽 고개를 넘는다 — 제2장 「회색 사냥꾼」', event: 'c2_start', if: { flag: 'done_n10', not: 'ch2' }, star: true });
 })(window.SCENARIO);
+
+// ── 2장 사냥터의 우두머리 「사슬에 묶인 정령왕」 (침묵의 숲, 되풀이해 싸운다)
+// 소환사 전용 2장 세트 「달그림자 계약자」와 기술서 「달그림자 계약서」
+(function () {
+  const SC = window.SCENARIO, CS = SC.combatSkills, E = SC.enemies;
+  E.spiritking = { art: 'spiritking', name: '사슬에 묶인 정령왕', where: '침묵의 숲 깊은 곳', lv: 9, hp: 190, ac: 16, atk: 9, dmg: '2d8+5', xp: 160, gold: [60, 100], boss: true, big: true, multi: 2, init: 2,
+    resist: ['radiant', 'psychic'], vuln: ['fire'],
+    skills: [
+      { name: '사슬 휘두르기', p: 0.3, dmg: '2d8+4', hit: -2, sweep: true },
+      { name: '회색 사슬', p: 0.2, ranged: true, dmg: '1d10', onHit: { restrain: 2 } },
+      { name: '잊힌 별의 노래', p: 0.15, debuff: { atk: -2, turns: 2 }, text: '정령왕이 사슬 속에서 소리 없는 노래를 부른다. 귀가 먹먹해진다! (2턴 동안 모두 명중 -2)' },
+      { name: '빛을 잃은 정령들', p: 0.25, summon: 'moths', once: true }
+    ],
+    drops: [{ item: '정령왕의 사슬 고리', p: 0.15, pity: 8, uniq: true }, { item: '푸른 물약', p: 0.6 }, { item: '은빛 물약', p: 0.6 }],
+    desc: '회색 사슬에 수십 겹 묶인 옛 별의 정령왕. 한 번에 두 번 치고, 동료가 둘 이상이면 한 라운드에 두 번 움직인다. 별빛과 정신에 강하고 불에 약하다.' };
+  SC.items['정령왕의 사슬 고리'] = { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hp: 6, save: 1, check: 1 }, desc: '정령왕을 묶던 사슬에서 떨어져 나온 고리. 쥐면 마음이 고요해진다' };
+  const KING_FIGHT = {
+    enemies: ['spiritking'], noFlee: true, perPC: { hp: 28 }, extraTurn: 2,
+    art: { sky: 'night', bg: 'forest', fx: ['motes', 'fog'] },
+    intro: '정령왕이 사슬을 끌며 일어섰다. 소리 없는 숲이 처음으로 울린다!',
+    win: {
+      text: ['정령왕이 무릎을 꿇었다. 사슬 사이로 새어 나오던 빛이 잦아들고, 그것은 다시 공터 한가운데 웅크렸다.',
+        { if: { cls: 'summoner' }, t: '사슬에 묶인 채 그것은 그대를 바라보았다. 원망이 아니었다. 언젠가 이 사슬을 끊어 줄 사람을 기다리는 눈이었다.' },
+        '하지만 사슬은 그것을 놓아주지 않는다. 그대가 쉬고 나면 정령왕은 다시 일어설 것이다.'],
+      fx: { set: ['king_slept'], add: { king_wins: 1 } }, log: '사슬에 묶인 정령왕을 쓰러뜨렸다. 긴 휴식 뒤에 다시 일어난다.', next: 'map' },
+    lose: { text: ['사슬이 그대를 공터 밖으로 내동댕이쳤다. 숲은 다시 소리를 삼켰다.'], log: '사슬에 묶인 정령왕에게 쓰러졌다.', next: 'map' }
+  };
+  SC.events.king_lair = {
+    art: { sky: 'night', bg: 'forest', actors: [{ k: 'hero', x: 0.26 }, { k: 'spiritking', x: 0.68, face: -1 }], fx: ['motes', 'fog'] },
+    title: '사슬에 묶인 정령왕', clock: '사냥터의 우두머리', place: '침묵의 숲 깊은 곳',
+    text: [
+      '침묵의 숲 가장 깊은 곳, 소리 없는 공터에 거대한 형상이 무릎을 꿇고 있다. 회색 사슬이 그 몸을 수십 겹 휘감았고, 사슬마다 낙인이 박혀 있다.',
+      '한때는 별의 정령들을 이끌던 왕이었다고, 숲의 이끼들이 속삭인다. 이제 그것은 사슬이 시키는 대로만 움직인다.',
+      { if: { cls: 'summoner' }, t: '그대의 종이 저절로 떨렸다. 사슬 속의 저것은 — 그대가 부르는 정령들의 왕이다. 사슬 틈으로 달그림자 빛의 종 하나와, 낡은 계약서의 낱장이 흔들린다.' },
+      { if: { min: { king_wins: 1 } }, t: '그대가 몇 번을 쓰러뜨려도, 사슬은 그것을 다시 일으켜 세운다.' }
+    ],
+    choices: [
+      { id: 1, insp: 'brave', label: '공터로 걸어 들어가 정령왕과 싸운다', roll: false, note: '전투 (매우 강하다 · 권장 레벨 9)',
+        then: { text: ['그대가 공터에 발을 들이자, 사슬이 일제히 팽팽하게 당겨졌다.'], battle: KING_FIGHT, next: 'map' } },
+      { id: 2, label: '아직은 아니다. 조용히 물러난다', roll: false,
+        then: { text: ['그대는 공터를 등지고 물러났다. 사슬 끌리는 소리가 오래 뒤따라왔다.'], next: 'map' } }
+    ]
+  };
+  const W = SC.locations.woods;
+  W.actions = (W.actions || []).concat([{ label: '숲 가장 깊은 곳에서 사슬에 묶인 정령왕과 싸운다 (권장 레벨 9 · 되풀이할 수 있다)', event: 'king_lair', if: { flag: 'ch2', not: 'king_slept' } }]);
+  SC.restClears.push('king_slept');
+
+  // 소환사 전용 2장 세트
+  const SET = { set: 'moonshadow', rar: 'set', cls: 'summoner' };
+  Object.assign(SC.items, {
+    '달그림자 두건': Object.assign({ kind: '머리', slot: 'head', ac: 1, fx: { mp: 3, sumAc: 1 }, desc: '달빛을 머금은 검은 두건' }, SET),
+    '달그림자 장포': Object.assign({ kind: '방어구', slot: 'armor', ac: 2, fx: { mp: 5, sumHp: 0.05 }, desc: '정령과 맺은 계약이 안감에 새겨진 장포' }, SET),
+    '달그림자 장갑': Object.assign({ kind: '손', slot: 'hands', ac: 1, fx: { sumHit: 1 }, desc: '손등에 달 문양이 박힌 장갑' }, SET),
+    '달그림자 신발': Object.assign({ kind: '발', slot: 'feet', ac: 1, fx: { init: 2, sumAc: 1 }, desc: '소리 없이 걷게 해 주는 신발' }, SET),
+    '달그림자 종': Object.assign({ kind: '무기', slot: 'weapon', dice: '1d8', bonus: 2, fx: { sumDmg: 2 }, desc: '정령왕의 사슬 틈에 걸려 있던 종. 울리면 달빛이 번진다' }, SET)
+  });
+  SC.sets.moonshadow = {
+    name: '달그림자 계약자', cls: 'summoner', chapter: 2,
+    where: '2장 동쪽 땅. 두건은 회색 순찰병, 장포는 낙인 곰, 장갑은 낙인공, 신발은 회색 매, 종은 사슬에 묶인 정령왕(침묵의 숲 깊은 곳)만 지닌다',
+    pieces: ['달그림자 두건', '달그림자 장포', '달그림자 장갑', '달그림자 신발', '달그림자 종'],
+    bonus: [
+      { n: 2, fx: { sumAc: 2 } },
+      { n: 3, fx: { sumDmg: 2, sumHit: 1 } },
+      { n: 4, fx: { sumHp: 0.25 } },
+      { n: 5, fx: { sumRevive: true, sumDmg: 2 } }
+    ]
+  };
+  // 기술서 「달그림자 계약서」
+  const P2 = ['달그림자 계약서 · 첫째 장', '달그림자 계약서 · 둘째 장', '달그림자 계약서 · 셋째 장', '달그림자 계약서 · 넷째 장'];
+  P2.forEach((n, i) => { SC.items[n] = { kind: '낱장', cls: 'summoner', rar: 'legendary', nosell: true, desc: ['정령왕이 사슬에 묶이기 전 맺은 계약의 첫 장', '두 정령의 이름을 하나로 엮는 문장', '거수의 그림이 그려진 낱장', '계약의 마지막 서명'][i] }; });
+  SC.items['달그림자 계약서'] = { kind: '기술서', cls: 'summoner', rar: 'legendary', nosell: true, learn: 'fusion', lvReq: 8, desc: '정령들을 하나로 엮어 거수를 빚는 금지된 계약' };
+  SC.books.moonpact = { name: '달그림자 계약서', learn: 'fusion', pages: P2,
+    where: '첫째 장은 사슬에 묶인 정령왕, 둘째 장은 낙인 곰, 셋째 장은 소리 먹는 나방 떼, 넷째 장은 낙인공이 지닌다. 오래 사냥해야 모인다' };
+  E.spiritking.drops.push({ item: '달그림자 종', p: 0.2, pity: 6, uniq: true }, { item: P2[0], p: 0.08, pity: 14, uniq: true });
+  (E.patrol.drops = E.patrol.drops || []).push({ item: '달그림자 두건', p: 0.05, pity: 22, uniq: true });
+  (E.brandbear.drops = E.brandbear.drops || []).push({ item: '달그림자 장포', p: 0.08, pity: 16, uniq: true }, { item: P2[1], p: 0.03, pity: 40, uniq: true });
+  (E.mason.drops = E.mason.drops || []).push({ item: '달그림자 장갑', p: 0.06, pity: 20, uniq: true }, { item: P2[3], p: 0.03, pity: 40, uniq: true });
+  E.hawk.drops = (E.hawk.drops || []).concat({ item: '달그림자 신발', p: 0.06, pity: 20, uniq: true });
+  (E.moths.drops = E.moths.drops || []).push({ item: P2[2], p: 0.03, pity: 40, uniq: true });
+  // 별의 융합: 기술서로만 익힌다
+  SC.summons.colossus = { name: '별의 거수', art: 'sp_colossus', row: 'front', big: true, hp: 30, hpLv: 8, ac: 18, atk: { name: '별의 발톱', dice: '3d10', dtype: 'radiant' }, multi: 3,
+    breath: { every: 2, dmg: '5d8', dtype: 'radiant', save: '민첩' }, rank: 7,
+    desc: '세 번 할퀴고 (돌격 명령에도 세 번), 태어나자마자 그 뒤로 두 라운드마다 모든 적에게 별빛 숨결 5d8+지혜 (민첩 내성에 성공하면 절반)' };
+  CS.fusion = { cls: 'summoner', lv: 8, book: true, name: '별의 융합', uses: 1, per: 'long', mp: 4, kind: 'fuse', into: 'colossus',
+    up: [{ lv: 12, dmgAdd: 4, note: '거수 피해 +4' }],
+    desc: '자리를 차지한 소환수를 모두 하나로 합쳐 별의 거수를 빚는다 (둘 이상 있어야 한다). 거수의 HP는 합친 소환수들의 남은 HP를 모은 것의 두 배이고, 우두머리를 더 단단하게 만들지 않는다 — {sum}' };
+})();
