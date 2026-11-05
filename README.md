@@ -340,7 +340,8 @@
   | 14 | ★별빛 강타 +5d8, ★별빛 선언 4d6, 전문화 기술 강화 |
 
 - **소환사** (마력) — 종을 울려 별의 정령을 부르고, 명령해 함께 싸운다. 몸은 약하지만(뒷열, HP가 가장 낮다) 소환수가 앞에서 막고 친다. 타고난 힘 「별의 계약」: 지혜 +2, 소환수를 둘까지 부린다 (레벨 6에 셋, 12에 넷). 짧은 휴식에 마력 절반을 되찾는다.
-  - **소환수**는 전투에 아군으로 들어와 주도권 순서에 끼고, 자기 차례에 알아서 싸운다 (그대가 고른 적을 먼저 노린다). 적도 소환수를 노리므로 그대와 동료를 지키는 방패가 된다. HP·명중·피해는 부를 때의 레벨과 지혜로 정해지고 (기술 설명에 지금 값이 나온다), 쓰러지면 흩어지고, 전투가 끝나면 돌아간다. 자리가 모자라면 가장 먼저 부른 것이 자리를 내준다. 우두머리·정예는 소환수가 하나 늘 때마다 동료 반 몫만큼 단단해진다.
+  - **소환수**는 전투에 아군으로 들어와 주도권 순서에 끼고, 자기 차례에 알아서 싸운다 (그대가 고른 적을 먼저 노린다). 적도 소환수를 노리므로 그대와 동료를 지키는 방패가 된다. HP·명중·피해는 레벨·지혜·장비로 정해진다 (기술 설명에 지금 값이 나온다). 쓰러지면 흩어진다. 자리가 모자라면 가장 먼저 부른 것이 자리를 내준다. 우두머리·정예는 소환수가 하나 늘 때마다 동료 반 몫만큼 단단해진다.
+  - **영구 소환수**: 소환수는 싸움이 끝나도 남은 HP 그대로 곁에 남고, 다음 싸움에 처음부터 함께 나선다. **전투 밖에서도** 「일행」 탭의 소환수 칸(탐험 탭의 「소환수 부르기」 단추로도 간다)에서 마력이나 횟수를 써서 부르고, 돌려보낼 수 있다. 별의 융합도 전투 밖에서 할 수 있다. 짧은 휴식에 HP 절반, 긴 휴식에 모두 회복하고, 레벨이 오르면 다 회복한다. 레벨·지혜·장비가 바뀌면 함께 자란다 (융합한 거수는 HP가 정해져 있다). 곁의 소환수는 상태판에 파란 막대로 보인다. 사냥에서는 곁의 소환수 둘마다 적이 하나 더 몰려온다.
 
   | 소환수 | 자리 | 특징 |
   |---|---|---|
@@ -451,6 +452,7 @@ events: {
 - **직업(classes)**: `{ id, name, key(대표 능력치, +2), hp, mp, hpGain, mpGain, passive, amp, aura(동료 방어 오라), weapon, item, fine, relic, oath, armor, skills, row, profs, blurb, role }`. 직업마다 갈리는 문장 `{ mage, warrior, rogue, bard, paladin, summoner, _ }`은 모든 직업 몫을 갖거나 `_`(기본값)를 둔다 (검사기가 확인한다). 무기 기술의 `dtype`은 그 일격 전체의 피해 종류를 바꾼다 (별빛 강타).
 - **소환수(summons)**: `SC.summons[id] = { name, art, row, fly, big, guard, hp, hpLv, ac, atk: { name, dice, dtype, ranged }, multi(돌격 명령에도 그만큼), trip, burn, heal(차례마다 아군 모두 치유), noCap(자리를 차지하지 않음), breath: { every, dmg, dtype, save }, rank, desc }`. 기술 `kind: 'fuse'`(`into`: 소환수를 합쳐 빚을 소환수).
 - **직업 전용 물건**: 아이템의 `cls: '직업 id'` — 그 직업만 끼고, 그 직업일 때만 떨어진다 (보장도 그때만 쌓인다). 세트의 `cls`·`chapter`. 소환수 장비 효과 `sumHp`(비율), `sumDmg`, `sumHit`, `sumAc`, `sumCap`, `sumCost`(부르기 마력), `sumRevive`.
+- **영구 소환수(S.pets)**: `[{ id, sk(부른 기술), hp, hpMax, fixed, dmgB }]` — 전투가 시작되면 소환수 단위가 되고, 전투가 끝나면 살아남은 소환수로 다시 채운다 (`keepPets`). `summonOutside(기술)`이 전투 밖에서 부르고, `syncPets`가 레벨·장비에 맞춘다.
 - **기술서(books)**: `SC.books[id] = { name, learn, pages: [낱장 이름…], where }`. 낱장이 모두 모이면 `name` 아이템이 되고, 그 아이템(`learn`, `lvReq`, `cls`)을 읽으면 `S.learned`에 기술이 들어간다. 기술서로 익히는 기술은 `book: true`. 기술 `kind: 'summon'`(`summon: [id…]`, `hpMul`·`dmgAdd`는 `up`으로 키운다, 설명의 `{sum}`은 지금 값), `'command'`(`times`, `buff`), `'bond'`(`heal`, `buff`), `'sacrifice'`(`dmg`), 내성 기술의 `command: true`(효과 뒤 소환수가 그 대상을 공격).
 - **전문화(specs)**: `SC.specs[직업 id] = [{ id, name, desc, passive: { name, desc, spellCrit, elemDmg, weapCrit, rage, guard, sneakDice, healLv, buffTurns, aura, finisher, sumCap, sumHp, sumDmg, resonance, burst }, fx: { hp, mp, ac, hit, dmg, init … }, skills: ['레벨 8 기술', '레벨 11 기술'] }]`. `fx`는 장비처럼 더해지고, `passive`의 나머지 값은 엔진이 읽는다. `SC.maxLevel`이 최고 레벨, `xpTable`은 그만큼 길어야 한다.
 - **높은 레벨 기술의 값**: `hits`(여러 번 휘두름, `spread`면 적들에게 돌아가며), `drain`(준 피해의 비율만큼 회복), `rehide`(맞히면 다시 숨음), `markD`(표식: 맞힐 때마다 더하는 피해), `kind: 'volley'`(모든 적을 한 번씩, `adv`면 모두 유리), `selfBuff`(도발과 함께 자기 버프), 내성 기술의 `shock`·`partyBuff`+`pbTurns`·`bossOnFail`(`noBoss`일 때 우두머리에게 대신), 회복 노래(`rally`)의 `buff`, 버프 값 `adv`(공격 유리)·`halve`(받는 피해 절반)·`blur`(노리는 공격 불리)·`undying`(HP 1 아래로 내려가지 않음). 설명의 `{chain}` `{hits}` `{execute}` `{markD}` `{pdmg}`도 지금 값으로 바뀐다.

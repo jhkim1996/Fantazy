@@ -110,7 +110,7 @@ function freshMake(){
 function fresh(){
   return {mode:'create',mk:freshMake(),cls:null,race:null,bg:null,hero:null,stats:[],amp:null,skills:[],items:[],equip:{},gold:0,
     insp:0,opt:{karmic:true,autoComp:false,autoGear:true},failStreak:0,pity:{},newItems:[],reroll:null,comp:{},rows:{},ch:{},rest:{short:2},
-    flags:{},counters:{},log:[],loc:SC.startLoc,ev:null,pending:null,sel:null,lvl:0,battle:null,notice:null,done:false};
+    flags:{},counters:{},log:[],pets:[],loc:SC.startLoc,ev:null,pending:null,sel:null,lvl:0,battle:null,notice:null,done:false};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function restore(){
@@ -626,6 +626,7 @@ function longRest(){
   const fill=(v,mx)=>full?mx:Math.max(v,Math.ceil(mx/2));
   h.hp=fill(h.hp,h.hpMax);h.mp=fill(h.mp,h.mpMax);
   for(const id in S.comp)S.comp[id].hp=fill(S.comp[id].hp,S.comp[id].hpMax);
+  pets().forEach(p=>{p.hp=fill(p.hp,p.hpMax)});
   S.rest={short:2};recharge('long');arr(SC.restClears).forEach(f=>{delete S.flags[f]});
   logp(l.name+'에서 '+(full?'':'빈속으로 ')+'긴 휴식을 했다.');
   const msg=restText(l)+' — '+(full?'밤이 지나고, 모두 HP와 마력을 되찾았다.':'먹을 것이 없어 잠을 설쳤다. 절반만 회복했다.')+(!free&&has?' (야영 물자 -1)':'')+' 짧은 휴식과 기술이 모두 충전되었다.';
@@ -637,7 +638,7 @@ function longRest(){
 // 쉬어서 되찾을 것이 있는가: 다친 이, 쓴 짧은 휴식 기술, (마법사) 마력
 function restNeeded(){
   const h=S.hero,used=c=>Object.keys(c||{}).some(k=>{const ab=SC.combatSkills[k];return ab&&ab.per==='short'});
-  return h.hp<h.hpMax||((S.cls==='mage'||S.cls==='summoner')&&h.mp<h.mpMax)||used(S.ch)||party().some(id=>S.comp[id].hp<S.comp[id].hpMax||used(S.comp[id].ch));
+  return h.hp<h.hpMax||((S.cls==='mage'||S.cls==='summoner')&&h.mp<h.mpMax)||used(S.ch)||party().some(id=>S.comp[id].hp<S.comp[id].hpMax||used(S.comp[id].ch))||pets().some(p=>p.hp<p.hpMax);
 }
 // 짧은 휴식: 어디서나, 긴 휴식 사이에 두 번. HP 절반 회복, 짧은 휴식 기술 충전
 function shortRest(){
@@ -646,6 +647,7 @@ function shortRest(){
   const h=S.hero,song=S.cls==='bard'?d(6):0,add=(v,mx)=>Math.min(mx,v+Math.ceil(mx/2)+song);
   h.hp=add(h.hp,h.hpMax);
   for(const id in S.comp)S.comp[id].hp=add(S.comp[id].hp,S.comp[id].hpMax);
+  pets().forEach(p=>{p.hp=add(p.hp,p.hpMax)});
   let mp=0;if(S.cls==='mage'||S.cls==='summoner'){const was=h.mp;h.mp=Math.min(h.mpMax,h.mp+Math.ceil(h.mpMax/2));mp=h.mp-was}
   recharge('short');
   logp('짧은 휴식을 했다.');
@@ -791,7 +793,7 @@ function party(){return Object.keys(SC.companions||{}).filter(compHere)}
 function compMaxHp(id){const c=COMP(id);return c.hp+c.hpGain*(S.hero.level-1)+(tfx(id).hp||0)}
 // 동료 기록을 레벨에 맞춘다. full이면 모두 회복. 새로 합류한 동료 id를 돌려준다
 function syncComps(full){
-  S.comp=S.comp||{};const fresh=[];
+  S.comp=S.comp||{};const fresh=[];syncPets();if(full)pets().forEach(p=>{p.hp=p.hpMax});
   Object.keys(SC.companions||{}).forEach(id=>{
     if(!compKnown(id))return;
     const mx=compMaxHp(id);let r=S.comp[id];
@@ -1040,12 +1042,16 @@ function startBattle(def,kind,ambush){
   if(def.scale){const n=Math.max(0,pids.length-(def.scaleFree||0));for(let i=0;i<n&&ids.length<5;i++)ids.push(def.scale[i%def.scale.length])}
   const units=[{uid:'hero',side:'pc',kind:'hero',id:'hero',name:S.hero.name,art:'hero',row:rowPref('hero')}];
   pids.forEach(id=>units.push({uid:id,side:'pc',kind:'comp',id,name:COMP(id).name,art:COMP(id).art,row:rowPref(id)}));
+  // 영구 소환수도 처음부터 함께 나선다 (남은 HP 그대로)
+  const petU=[];S.battle={units};pets().forEach(p=>{const u=summonUnit(p.id,p.sk&&SC.combatSkills[p.sk]?abOf(p.sk):null,{sk:p.sk,hp:p.hp,hpMax:p.hpMax,fixed:p.fixed,dmgB:p.dmgB});units.push(u);petU.push(u)});
+  const sumN=S.battle.sumN||0;
   const en=ids.map(mkFoe);
   const cnt={},seen={};en.forEach(e=>cnt[e.name]=(cnt[e.name]||0)+1);
   en.forEach(e=>{if(cnt[e.name]>1){seen[e.name]=(seen[e.name]||0)+1;e.name+=' '+'ABCDE'[seen[e.name]-1]}});
   // 동료가 많을수록 우두머리·정예도 단단해진다
   const mods=[];
   if(def.perPC&&pids.length)en.forEach(e=>{const E=SC.enemies[e.id];if(E.boss||E.elite){e.hp+=def.perPC.hp*pids.length;e.hpMax=e.hp;mods.push('동료가 '+pids.length+'명이라 '+josa(e.name,'이')+' 더 단단하다 (HP +'+def.perPC.hp*pids.length+')')}});
+  if(def.perPC&&petU.length)en.forEach(e=>{const E=SC.enemies[e.id];if(E.boss||E.elite){const add=Math.round(def.perPC.hp/2)*petU.length;e.hp+=add;e.hpMax=e.hp;mods.push('소환수가 '+petU.length+'마리라 '+josa(e.name,'이')+' 더 버틴다 (HP +'+add+')')}});
   if(def.drawn)mods.push('여럿이 다니니 적도 '+def.drawn+(ids.slice(-def.drawn).some(i=>SC.enemies[i].people)?'명':'마리')+' 더 몰려왔다 (쓰러뜨리면 그만큼 경험치도 많다)');
   arr(def.mods).forEach(m=>{if(ok(m.if)){en.forEach(e=>{if(m.hp)e.hp=Math.max(1,e.hp+m.hp);if(m.ac)e.ac+=m.ac;if(m.atk)e.atk+=m.atk});mods.push(m.why)}});
   units.push(...en);
@@ -1054,13 +1060,14 @@ function startBattle(def,kind,ambush){
   // 두 번째 차례(*)는 움직이기만 한다 — 상태와 표면 피해는 첫 차례에만 흐른다
   if(def.extraTurn&&pids.length>=def.extraTurn)en.filter(e=>SC.enemies[e.id].boss).forEach(e=>ord.push({uid:e.uid+'*',ini:e.ini-10,pc:0}));
   ord.sort((a,b)=>b.ini-a.ini||b.pc-a.pc);
-  const B=S.battle={def,kind,units,order:ord.map(o=>o.uid),turn:-1,round:1,log:[],target:en[0].uid,surf:{},field,nE:en.length,
+  const B=S.battle={def,kind,units,sumN,order:ord.map(o=>o.uid),turn:-1,round:1,log:[],target:en[0].uid,surf:{},field,nE:en.length,
     surprise:ambush?'pc':def.surprise||null,over:null,res:null,last:null,tr:null};
   if(field.water){ZONES.forEach(z=>B.surf[z]={t:'water',r:99});units.forEach(u=>{if(!u.fly)u.st.wet=2})}
   for(const z in (def.surf||{}))B.surf[z]={t:def.surf[z],r:def.surf[z]==='fire'?fireLife():SURF[def.surf[z]].r};
   S.mode='combat';S.notice=null;cmenu=null;fxDelay=0;
   logB(def.intro?tpl(def.intro):(ambush?'매복이다! ':'')+josa(nameList(ids),'이')+' 나타났다!','sys');
   if(pids.length)logB('함께 싸운다: '+pids.map(id=>COMP(id).name).join(', '),'sys');
+  if(petU.length)logB('곁의 소환수: '+petU.map(u=>nm(u)+' (HP '+u.hp+'/'+u.hpMax+')').join(', '),'sys');
   mods.forEach(m=>logB('▸ '+m,'sys'));
   if(S.flags.shield)logB('별빛 방벽이 그대를 감싸고 있다. (첫 피해를 막는다)','sys');
   if(B.surprise==='foe')logB('적이 기습당했다! 첫 라운드에 적은 움직이지 못한다','sys');
@@ -1075,7 +1082,7 @@ function startRandomBattle(ambush){
   let r=Math.random()*pool.reduce((a,b)=>a+b.w,0),g=pool[0];
   for(const x of pool){r-=x.w;if(r<0){g=x;break}}
   // 동료와 함께 다니면 적도 더 몰려온다
-  const ids=g.e.slice(),n=party().length,extra=n?n+(n>=2&&Math.random()<0.25?1:0):0;
+  const ids=g.e.slice(),n=party().length+Math.floor(petCapN()/2),extra=n?n+(n>=2&&Math.random()<0.25?1:0):0;
   const singles=pool.filter(x=>x.e.length===1&&!SC.enemies[x.e[0]].elite&&!arr(SC.enemies[x.e[0]].skills).some(k=>k.summon)).map(x=>x.e[0]);
   const base=ids.length;
   for(let i=0;i<extra&&ids.length<5&&singles.length;i++)ids.push(singles[rint(0,singles.length-1)]);
@@ -1265,13 +1272,18 @@ function sumStats(id,ab){
   return {hp,ac:T.ac+Math.floor(L/4)+(G.sumAc||0),hit:profBonus()+W+(T.hit||0)+(G.sumHit||0),dmgB:W+Math.floor(L/3)+(specP('sumDmg')||0)+(G.sumDmg||0)+((ab&&ab.dmgAdd)||0),L};
 }
 function sumText(id,ab){const T=SUMT(id),x=S.hero?sumStats(id,ab):null;return T.name+(x?' (HP '+x.hp+' · 방어 '+x.ac+' · '+T.atk.name+' 명중 +'+x.hit+' 피해 '+T.atk.dice+'+'+x.dmgB+(T.multi?' ×'+T.multi:'')+')':'')+' — '+T.desc}
-function addSummon(id,ab,noScale){
-  const B=S.battle,T=SUMT(id),x=sumStats(id,ab);
+// 전투 속 소환수 하나 (o: sk 부른 기술, hp·hpMax 이어받은 HP, fixed 융합처럼 HP가 정해진 것, dmgB)
+function summonUnit(id,ab,o){
+  o=o||{};const B=S.battle,T=SUMT(id),x=sumStats(id,ab);
+  const n=(B.sumN=(B.sumN||0)+1),same=B.units.filter(u=>u.kind==='summon'&&u.id===id).length;
+  return {uid:'s'+n,side:'pc',kind:'summon',id,sk:o.sk||null,fixed:!!o.fixed,art:T.art,name:T.name+(same?' '+'ABCDEFGHIJ'[Math.min(9,same)]:''),row:T.row,fly:!!T.fly,big:!!T.big,guard:!!T.guard,multi:T.multi||1,
+    hp:o.hp!=null?o.hp:x.hp,hpMax:o.hpMax!=null?o.hpMax:x.hp,ac:x.ac,hit:x.hit,dmgB:Math.max(x.dmgB,o.dmgB||0),atk:T.atk,lv:x.L,st:{},buffs:[],saves:{s:0,f:0},react:true,high:false};
+}
+function addSummon(id,ab,o){
+  o=o||{};const B=S.battle,T=SUMT(id),noScale=o.noScale;
   if(T.noCap)summons().filter(x=>x.id===id).forEach(x=>{x.gone=true;x.noBurst=true});   // 따로 오는 소환수는 하나만
   else while(capSummons().length>=sumCap()){const old=capSummons()[0];old.gone=true;logB(josa(nm(old),'이')+' 자리를 내주고 별빛으로 돌아갔다','sys')}
-  const n=(B.sumN=(B.sumN||0)+1),same=B.units.filter(u=>u.kind==='summon'&&u.id===id).length;
-  const u={uid:'s'+n,side:'pc',kind:'summon',id,art:T.art,name:T.name+(same?' '+'ABCDEFGHIJ'[Math.min(9,same)]:''),row:T.row,fly:!!T.fly,big:!!T.big,guard:!!T.guard,multi:T.multi||1,
-    hp:x.hp,hpMax:x.hp,ac:x.ac,hit:x.hit,dmgB:x.dmgB,atk:T.atk,lv:x.L,st:{},buffs:[],saves:{s:0,f:0},react:true,high:false};
+  const u=summonUnit(id,ab,o);
   B.units.push(u);B.order.splice(B.turn+1,0,u.uid);
   afx({type:'heal',target:u.uid,val:u.hp,delay:fxDelay+200});
   // 동료가 늘면 우두머리가 단단해지듯, 소환수 하나마다 동료 반 몫만큼 (perPC의 절반)
@@ -1312,6 +1324,48 @@ function summonBurst(t){
   const parts=[];tg.forEach(x=>{const dm=hurt(x,rollDice(bd).total+statVal('지혜'),'radiant');parts.push(nm(x)+' '+wtxt(dm,x))});
   logB(nm(t)+' — 흩어지며 별빛이 터졌다: '+parts.join(', '),'me');
 }
+
+// ── 영구 소환수: 싸움이 끝나도 남은 HP 그대로 곁에 남고, 전투 밖에서도 부른다. 다음 싸움에 처음부터 함께 나선다
+function pets(){return S.pets||(S.pets=[])}
+function petCapN(){return pets().filter(p=>!SUMT(p.id).noCap).length}
+function petStats(p){const x=sumStats(p.id,p.sk&&SC.combatSkills[p.sk]?abOf(p.sk):null);if(p.fixed)x.dmgB=Math.max(x.dmgB,p.dmgB||0);return x}
+// 레벨·지혜·장비가 바뀌면 소환수도 따라 자란다 (HP 비율은 그대로)
+function syncPets(){
+  if(!S.hero)return;if(S.cls!=='summoner'){S.pets=[];return}
+  pets().forEach(p=>{if(p.fixed)return;const mx=petStats(p).hp;if(p.hpMax!==mx){p.hp=Math.max(1,Math.min(mx,Math.round(p.hp*mx/(p.hpMax||mx))));p.hpMax=mx}});
+}
+// 싸움이 끝날 때: 살아남은 소환수가 영구 소환수로 남는다 (먼저 부른 것이 앞에)
+function keepPets(){
+  if(S.cls!=='summoner'||!S.battle)return;
+  S.pets=summons().filter(up).map(u=>{const p={id:u.id,sk:u.sk,hp:u.hp,hpMax:u.hpMax};if(u.fixed){p.fixed=true;p.dmgB=u.dmgB}return p});
+}
+// 전투 밖에서 부를 수 없는 까닭 (없으면 null)
+function outWhy(k){
+  const ab=abOf(k);if(!ab||ab.lv>S.hero.level)return '아직 모른다';
+  if(ab.mp&&S.hero.mp<ab.mp)return '마력 부족';
+  if(ab.uses&&usesLeft({kind:'hero'},k)<=0)return '다 썼다 (휴식으로 충전)';
+  if(ab.kind==='fuse'&&petCapN()<2)return '합칠 소환수가 둘 이상 있어야 한다';
+  return null;
+}
+function summonOutside(k){
+  const ab=abOf(k);if(rolling||S.mode!=='world'||outWhy(k))return;
+  if(ab.mp)S.hero.mp-=ab.mp;if(ab.uses){const c=chOf({kind:'hero'});c[k]=usesLeft({kind:'hero'},k)-1}
+  const made=[],left=[];
+  if(ab.kind==='fuse'){
+    const ms=pets().filter(p=>!SUMT(p.id).noCap),sum=ms.reduce((a,p)=>a+p.hp,0),dB=Math.max(...ms.map(p=>petStats(p).dmgB)),x=sumStats(ab.into,ab),mx=Math.max(x.hp,Math.round(sum*(ab.hpMul2||2)));
+    ms.forEach(p=>left.push(SUMT(p.id).name));S.pets=pets().filter(p=>SUMT(p.id).noCap);
+    S.pets.push({id:ab.into,sk:k,hp:mx,hpMax:mx,fixed:true,dmgB:Math.max(x.dmgB,dB+2)});made.push([SUMT(ab.into).name,mx]);
+  }else arr(ab.summon).forEach(id=>{
+    const T=SUMT(id);
+    if(T.noCap)S.pets=pets().filter(p=>p.id!==id);
+    else while(petCapN()>=sumCap()){const i=pets().findIndex(p=>!SUMT(p.id).noCap);left.push(SUMT(pets()[i].id).name);S.pets.splice(i,1)}
+    const x=sumStats(id,ab);S.pets.push({id,sk:k,hp:x.hp,hpMax:x.hp});made.push([T.name,x.hp]);
+  });
+  const names=made.map(x=>x[0]).join(', '),hps=made.map(x=>x[0]+' HP '+x[1]).join(', ');
+  const t=ab.kind==='fuse'?josa(left.join(', '),'이')+' 하나로 합쳐져 '+josa(names,'이')+' 되었다 ('+hps+')':josa(names,'을')+' 불렀다 ('+hps+')'+(left.length?' — '+josa(left.join(', '),'은')+' 자리를 내주고 돌아갔다':'');
+  logp(t+'.');S.notice=t+'. 다음 싸움에서 처음부터 함께 나선다.';save();render();
+}
+function dismissPet(i){const p=pets()[i];if(!p||rolling)return;S.pets.splice(i,1);logp(SUMT(p.id).name+'을 돌려보냈다.');save();render()}
 
 // ── 아군의 행동
 // 지금 레벨의 기술: up에 적힌 레벨에 이르면 그 값으로 바뀐다 (lv는 처음 익히는 레벨 그대로)
@@ -1567,7 +1621,7 @@ function useAb(u,k,t,au){
   }
   // 소환: 부르고, 자리가 모자라면 가장 먼저 부른 것을 돌려보낸다
   if(ab.kind==='summon'){
-    const made=arr(ab.summon).map(id=>addSummon(id,ab));
+    const made=arr(ab.summon).map(id=>addSummon(id,ab,{sk:k}));
     if(ab.buff)summons().forEach(x=>addBuff(x,ab.name,ab.buff,ab.turns));
     fx_(u,ab.name,'#9fc8ff');B.last={r:null,txt:ab.name+' — '+made.map(nm).join(', ')+' 나타났다'};
     logB(lab+'! '+made.map(x=>nm(x)+' (HP '+x.hp+')').join(', ')+' — 소환수 '+summons().length+'/'+sumCap(),'me');return;
@@ -1576,7 +1630,7 @@ function useAb(u,k,t,au){
   if(ab.kind==='fuse'){
     const ss=capSummons(),hpSum=ss.reduce((a,x)=>a+x.hp,0),dB=Math.max(...ss.map(x=>x.dmgB)),names=ss.map(nm);
     ss.forEach(x=>{x.gone=true;x.noBurst=true});
-    const c=addSummon(ab.into,ab,true);c.hp=c.hpMax=Math.max(c.hp,Math.round(hpSum*(ab.hpMul2||2)));c.dmgB=Math.max(c.dmgB,dB+2);
+    const c=addSummon(ab.into,ab,{noScale:true,sk:k,fixed:true});c.hp=c.hpMax=Math.max(c.hp,Math.round(hpSum*(ab.hpMul2||2)));c.dmgB=Math.max(c.dmgB,dB+2);
     fx_(u,ab.name,'#ffe6a0');B.last={r:null,txt:ab.name+' — '+names.join('·')+' → '+nm(c)+' (HP '+c.hp+')'};
     logB(lab+'! '+names.join(', ')+'이 하나로 합쳐져 '+josa(nm(c),'이')+' 되었다 (HP '+c.hp+')','me');return;
   }
@@ -1830,6 +1884,7 @@ function knockout(){
 }
 function endBattle(){
   const B=S.battle;if(!B||!B.over)return;
+  keepPets();
   for(const id in (S.comp||{}))if(S.comp[id].hp<=0)S.comp[id].hp=1;
   S.battle=null;cmenu=null;
   if(B.kind==='story'){
@@ -1917,6 +1972,7 @@ function render(){
     $('stitle').textContent='모험가 만들기';para((SC.creation&&SC.creation.intro)||[]);
     $('clock').textContent=MK_STEPS.join(' → ');renderMake();return;
   }
+  if(m!=='combat')syncPets();   // 장비·레벨이 바뀌면 곁의 소환수도 따라 자란다
   renderHud();if(needLevel())renderLevelup();
   if(m==='world'){
     const l=L();$('stitle').textContent=l.name;para(texts(l.desc));
@@ -1963,8 +2019,9 @@ function renderHud(){
   });
   box.appendChild(meta);
   const pt=party();
-  if(pt.length){
+  if(pt.length||pets().length){
     const pm=el('div','pmini');
+    pets().forEach(p=>{const d1=el('div','pet'),l=el('div','ml');l.appendChild(el('span',null,SUMT(p.id).name));l.appendChild(el('span',null,p.hp+'/'+p.hpMax));d1.appendChild(l);d1.appendChild(bar('#8fb6ff',p.hp,p.hpMax));d1.title='소환수 '+SUMT(p.id).name;pm.appendChild(d1)});
     pt.forEach(id=>{
       const c=S.comp[id],v=apVal(id),tr=apTier(v),d1=el('div'),l=el('div','ml'),nmS=el('span',null,COMP(id).name);
       if(v>=3||v<=-3){const ap=el('span','ap '+(v>=3?'up':'down'),' '+(v>=6?'♥♥':v>=3?'♥':'✕'));ap.title=tr.n;nmS.appendChild(ap)}
@@ -2050,6 +2107,7 @@ function paneExplore(box){
   s1.appendChild(el('h2',null,'할 수 있는 일'));
   const acts=el('div','card');s1.appendChild(acts);
   arr(l.actions).filter(a=>ok(a.if)).forEach(a=>actBtn(acts,a.label,null,()=>startEvent(a.event),{star:a.star}));
+  if(S.cls==='summoner'){const cap=sumCap();actBtn(acts,'소환수 부르기 ('+petCapN()+'/'+cap+')',pets().length?'곁에 '+pets().map(p=>SUMT(p.id).name).join(', ')+' — 일행 탭에서 부르고 돌려보낸다':'전투 밖에서 미리 불러 두면 싸움이 시작될 때부터 함께 나선다',()=>setTab('party'))}
   if(l.encounters)actBtn(acts,'사냥한다','전투를 벌여 경험치와 금화를 얻는다 · 이곳의 적 레벨 '+l.lv+(party().length?' · 동료와 함께라 적도 더 몰려온다':''),()=>{S.notice=null;startRandomBattle(false)});
   if(l.encounters||arr(l.explore).length)actBtn(acts,'탐색한다','무언가를 찾아내거나, 무언가와 마주친다',explore);
   if(canRest()){const sup=countItem('야영 물자');actBtn(acts,'긴 휴식 — '+restText(l),(l.restFree?'모두 회복 · 짧은 휴식과 기술 충전':sup?'야영 물자 1 (보유 '+sup+') · 모두 회복 · 짧은 휴식과 기술 충전':'야영 물자가 없다 — 절반만 회복')+(campTalk()?' · ✦ 모닥불 곁에서 동료가 할 말이 있다':''),longRest)}
@@ -2320,7 +2378,30 @@ function paneSettings(box){
   const rb=el('button','danger','처음부터 다시');rb.id='restart2';rb.onclick=()=>restartGame(rb);sv.appendChild(rb);
 }
 // 동료와 전투 시작 위치
+// 소환수: 지금 곁에 있는 영구 소환수와, 전투 밖에서 부르기
+function petsPane(box){
+  if(S.cls!=='summoner')return;
+  const cap=sumCap(),ks=clsSkills().filter(k=>{const a=abOf(k);return a.lv<=S.hero.level&&(a.kind==='summon'||a.kind==='fuse')});
+  box.appendChild(el('h2',null,'소환수 '+petCapN()+'/'+cap+' — 전투 밖에서도 부르고, 싸움이 끝나도 곁에 남는다'));
+  const c=el('div','card');box.appendChild(c);
+  if(!pets().length)c.appendChild(el('div','sub','곁에 소환수가 없다. 아래에서 부르면 다음 싸움부터 처음부터 함께 나선다.'));
+  pets().forEach((p,i)=>{
+    const T=SUMT(p.id),x=petStats(p),r=el('div','item pet'),info=el('div');
+    info.appendChild(el('b',null,T.name));info.appendChild(el('span','mini',' HP '+p.hp+'/'+p.hpMax+' · 방어 '+x.ac+' · '+T.atk.name+' 명중 +'+x.hit+' 피해 '+T.atk.dice+'+'+x.dmgB+(T.multi?' ×'+T.multi:'')+(T.noCap?' · 자리를 차지하지 않는다':'')));
+    info.appendChild(bar('#8fb6ff',p.hp,p.hpMax));r.appendChild(info);
+    const b=el('button',null,'돌려보내기');b.onclick=()=>dismissPet(i);r.appendChild(b);c.appendChild(r);
+  });
+  if(ks.length){
+    c.appendChild(el('div','sub petcall','부르기 — 마력 '+S.hero.mp+'/'+S.hero.mpMax+(petCapN()>=cap?' · 자리가 차 있어 가장 먼저 부른 것이 돌아간다':'')));
+    ks.forEach(k=>{
+      const a=abOf(k),w=outWhy(k),ids=arr(a.summon).concat(a.into?[a.into]:[]);
+      const what=ids.map(id=>{const x=sumStats(id,a);return SUMT(id).name+(a.kind==='fuse'?'':' HP '+x.hp)}).join(', ');
+      actBtn(c,a.name,(a.mp?'마력 '+a.mp:'')+(a.uses?(a.mp?' · ':'')+(a.per==='long'?'긴':'짧은')+' 휴식마다 '+a.uses+'번 (남은 '+usesLeft({kind:'hero'},k)+')':'')+' · '+(a.kind==='fuse'?'곁의 소환수를 모두 합쳐 '+what+'로 (HP 두 배)':what)+(w?' · '+w:''),()=>summonOutside(k),{disabled:!!w});
+    });
+  }
+}
 function renderParty(box){
+  petsPane(box);
   const ids=Object.keys(SC.companions||{}).filter(compKnown);
   box.appendChild(el('h2',null,'진형'));
   const fc=el('div','card');box.appendChild(fc);
