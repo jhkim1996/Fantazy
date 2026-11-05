@@ -210,6 +210,8 @@ window.Art=(function(){
     const hx=x+f*h*.17,hy=sh+h*.17;
     seg(x+f*h*.05,sh+h*.03,hx,hy);seg(x-f*h*.05,sh+h*.03,x-f*h*.11,sh+h*.24);
     weapon(o.weapon,hx,hy,h,f,o,c);
+    // 방패: 반대쪽 손에 든 연 모양 방패 (성기사)
+    if(o.shield){const sx=x-f*h*.13,sy=sh+h*.22;poly([[sx-h*.07,sy-h*.09],[sx+h*.07,sy-h*.09],[sx+h*.065,sy+h*.02],[sx,sy+h*.12],[sx-h*.065,sy+h*.02]]);g.fillStyle=o.relic?'#9fc8ff':'#d9c27a';circ(sx,sy-h*.01,h*.018);g.fillStyle=c}
   }
   function weapon(w,hx,hy,h,f,o,c){
     g.strokeStyle=c;g.fillStyle=c;
@@ -221,10 +223,10 @@ window.Art=(function(){
     else if(w==='bigsword'){g.lineWidth=h*.045;seg(hx,hy,hx+f*h*.38,hy-h*.1)}
     else if(w==='bow'){g.lineWidth=h*.022;const cx=hx-f*h*.1,cy=hy-h*.06,rr=h*.27,a0=f>0?-Math.PI/3:Math.PI*2/3,a1=f>0?Math.PI/3:Math.PI*4/3;g.beginPath();g.arc(cx,cy,rr,a0,a1);g.stroke();g.lineWidth=1;g.strokeStyle='rgba(225,225,215,.55)';seg(cx+Math.cos(a0)*rr,cy+Math.sin(a0)*rr,cx+Math.cos(a1)*rr,cy+Math.sin(a1)*rr);g.strokeStyle=c}
     else if(w==='torch'){g.lineWidth=h*.026;seg(hx,hy+h*.26,hx+f*h*.05,hy-h*.4);const tx=hx+f*h*.05,ty=hy-h*.44;glow(tx,ty,h*.2,'#ff8a3c',.75);g.fillStyle='#ffb35c';poly([[tx-h*.03,ty+h*.03],[tx,ty-h*.09],[tx+h*.03,ty+h*.03]]);g.fillStyle=c}
-    else if(w==='hammer'){g.lineWidth=h*.024;seg(hx,hy+h*.06,hx+f*h*.1,hy-h*.22);g.fillRect(hx+f*h*.1-h*.05,hy-h*.27,h*.1,h*.07)}
+    else if(w==='hammer'){g.lineWidth=h*.024;seg(hx,hy+h*.06,hx+f*h*.1,hy-h*.22);g.fillRect(hx+f*h*.1-h*.05,hy-h*.27,h*.1,h*.07);if(o.relic)glow(hx+f*h*.1,hy-h*.24,h*.16,'#9fc8ff',.6)}
     else if(w==='lantern'){g.lineWidth=h*.02;seg(hx,hy,hx+f*h*.03,hy+h*.12);g.fillStyle='#f6c26a';circ(hx+f*h*.03,hy+h*.16,h*.035);glow(hx+f*h*.03,hy+h*.16,h*.5,'#f3a64a',.45)}
   }
-  const HERO={mage:{robe:true,pointy:true,weapon:'staff'},warrior:{cape:true,helm:true,weapon:'sword'},rogue:{hood:true,cape:true,weapon:'dagger'},bard:{hat:true,cape:true,weapon:'lute'}};
+  const HERO={mage:{robe:true,pointy:true,weapon:'staff'},warrior:{cape:true,helm:true,weapon:'sword'},rogue:{hood:true,cape:true,weapon:'dagger'},bard:{hat:true,cape:true,weapon:'lute'},paladin:{helm:true,cape:true,shield:true,weapon:'hammer'}};
   function knight(x,gy,h,f,o){
     o=o||{};
     const col=o.stone?mix(P.ink,P.hz,.42):o.drowned?'#16232b':ink();

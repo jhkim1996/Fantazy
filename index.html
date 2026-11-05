@@ -89,6 +89,7 @@ summary{cursor:pointer;color:var(--sub);font-size:13px}
 .nav button{flex:1;padding:10px}
 .nav .go{background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text);font-weight:500}
 .cls-name{font-size:15px;font-weight:600}
+.opt small.role{color:var(--acc-text);font-weight:500}
 input[type=text]{font:inherit;font-size:16px;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
 .sheet{background:var(--bg);border-radius:8px;padding:10px 12px}
 .sheet .stats{margin-top:6px}
@@ -279,6 +280,39 @@ h3{font-size:12px;font-weight:500;color:var(--sub);margin:0 0 6px}
 .kbd{font-size:11px;color:var(--sub);margin-top:6px}
 @media (hover:none){.kbd{display:none}}
 .setrow+.setrow{margin-top:8px}
+/* 탭 막대: 넓은 화면은 위에 붙는 탭, 좁은 화면은 아래에 붙는 아이콘 막대 */
+.wtabs .ico{display:none;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.wtabs .cnt.new{color:var(--r-set);font-weight:600}
+@media (min-width:960px){.wtabs{position:sticky;top:0;z-index:6;background:var(--bg)}}
+@media (max-width:959.98px){
+  body.world{padding-bottom:calc(78px + env(safe-area-inset-bottom,0px))}
+  .wtabs{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(100%,680px);z-index:30;margin:0;padding:5px 6px calc(5px + env(safe-area-inset-bottom,0px));background:var(--card);border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0;box-shadow:0 -6px 18px rgba(0,0,0,.12);overflow:visible;gap:2px}
+  .wtabs button{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px 5px;font-size:11px;border:0;border-radius:10px;margin:0;position:relative}
+  .wtabs button.on{background:var(--acc-bg);color:var(--acc-text);border:0}
+  .wtabs .ico{display:block}
+  .wtabs .cnt{position:absolute;top:2px;left:calc(50% + 7px);margin:0;min-width:16px;padding:0 4px;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-size:10px;line-height:15px;text-align:center}
+  .wtabs .cnt.new,.wtabs .cnt.star{border-color:currentColor}
+  .pane>h2:first-child,.pane>.xgrid>section:first-child>h2:first-child{margin-top:12px}
+}
+/* 탐험 말고 다른 탭에서는 장면을 접는다 */
+body.scene-min .art,body.scene-min #scene,body.scene-min #clock{display:none}
+body.scene-min .scene{padding:8px 12px}
+body.scene-min #stitle{font-size:16px;margin:0}
+.qlink{margin-top:12px}
+.huntb{display:block;width:100%;margin-top:8px;padding:10px}
+.themeseg{margin:4px 0 10px}
+.junk{display:block;width:100%;margin:2px 0 6px;padding:6px 10px}
+ul.journal li+li{margin-top:2px}
+button.danger{margin-top:8px;color:var(--bad);border-color:var(--bad)}
+button.danger.armed{background:var(--bad-bg)}
+.acts.fin.three{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr)}
+.acts .autoall{border-style:dashed}
+/* 글자 크게 */
+body.bigtext{font-size:15.5px}
+body.bigtext .prose p{font-size:17px}
+body.bigtext .sub,body.bigtext .mini{font-size:13.5px}
+body.bigtext .opt small,body.bigtext .acts button small{font-size:12.5px}
+body.bigtext h2{font-size:14px}
 </style>
 </head>
 <body>
@@ -370,7 +404,7 @@ h3{font-size:12px;font-weight:500;color:var(--sub);margin:0 0 6px}
 
 <div id="cside" class="cside" hidden></div>
 
-<div class="foot row"><button id="restart">처음부터 다시</button></div>
+<div class="foot row" id="foot"><button id="restart">처음부터 다시</button></div>
 </div>
 
 <script src="chapter1.js"></script>
