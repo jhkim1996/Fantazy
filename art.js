@@ -224,9 +224,10 @@ window.Art=(function(){
     else if(w==='bow'){g.lineWidth=h*.022;const cx=hx-f*h*.1,cy=hy-h*.06,rr=h*.27,a0=f>0?-Math.PI/3:Math.PI*2/3,a1=f>0?Math.PI/3:Math.PI*4/3;g.beginPath();g.arc(cx,cy,rr,a0,a1);g.stroke();g.lineWidth=1;g.strokeStyle='rgba(225,225,215,.55)';seg(cx+Math.cos(a0)*rr,cy+Math.sin(a0)*rr,cx+Math.cos(a1)*rr,cy+Math.sin(a1)*rr);g.strokeStyle=c}
     else if(w==='torch'){g.lineWidth=h*.026;seg(hx,hy+h*.26,hx+f*h*.05,hy-h*.4);const tx=hx+f*h*.05,ty=hy-h*.44;glow(tx,ty,h*.2,'#ff8a3c',.75);g.fillStyle='#ffb35c';poly([[tx-h*.03,ty+h*.03],[tx,ty-h*.09],[tx+h*.03,ty+h*.03]]);g.fillStyle=c}
     else if(w==='hammer'){g.lineWidth=h*.024;seg(hx,hy+h*.06,hx+f*h*.1,hy-h*.22);g.fillRect(hx+f*h*.1-h*.05,hy-h*.27,h*.1,h*.07);if(o.relic)glow(hx+f*h*.1,hy-h*.24,h*.16,'#9fc8ff',.6)}
+    else if(w==='bell'){g.lineWidth=h*.02;seg(hx,hy,hx+f*h*.04,hy-h*.12);const bx=hx+f*h*.05,by=hy-h*.15;poly([[bx-h*.045,by+h*.06],[bx-h*.025,by-h*.02],[bx+h*.025,by-h*.02],[bx+h*.045,by+h*.06]]);glow(bx,by+h*.02,h*(o.relic?.18:.09),'#9fc8ff',o.relic?.85:.5)}
     else if(w==='lantern'){g.lineWidth=h*.02;seg(hx,hy,hx+f*h*.03,hy+h*.12);g.fillStyle='#f6c26a';circ(hx+f*h*.03,hy+h*.16,h*.035);glow(hx+f*h*.03,hy+h*.16,h*.5,'#f3a64a',.45)}
   }
-  const HERO={mage:{robe:true,pointy:true,weapon:'staff'},warrior:{cape:true,helm:true,weapon:'sword'},rogue:{hood:true,cape:true,weapon:'dagger'},bard:{hat:true,cape:true,weapon:'lute'},paladin:{helm:true,cape:true,shield:true,weapon:'hammer'}};
+  const HERO={mage:{robe:true,pointy:true,weapon:'staff'},warrior:{cape:true,helm:true,weapon:'sword'},rogue:{hood:true,cape:true,weapon:'dagger'},bard:{hat:true,cape:true,weapon:'lute'},paladin:{helm:true,cape:true,shield:true,weapon:'hammer'},summoner:{robe:true,hood:true,weapon:'bell'}};
   function knight(x,gy,h,f,o){
     o=o||{};
     const col=o.stone?mix(P.ink,P.hz,.42):o.drowned?'#16232b':ink();
@@ -300,6 +301,19 @@ window.Art=(function(){
     [-1,1].forEach(sd=>{seg(ax,ay,ax+sd*h*.12,ay-h*.16);seg(ax+sd*h*.06,ay-h*.08,ax+sd*h*.15,ay-h*.08);seg(ax+sd*h*.1,ay-h*.13,ax+sd*h*.07,ay-h*.24)});
     glow(x,gy-h*.55,h*.6,'#aeb8c6',motion?.2+.1*Math.sin(t*1.7):.25);
   }
+  // 소환수: 푸른 별빛으로 엮인 정령들
+  const SPC='#5f7fae';
+  function wisp(x,gy,s,t){const y=gy-72*s+(motion?Math.sin(t*3+x)*5:0);glow(x,y,42*s,'#ff9a4a',.7);glow(x,y,18*s,'#ffe0a0',.9);g.fillStyle='#fff3d6';circ(x,y,5*s);for(let i=0;i<3;i++){const a=(motion?t*4:0)+i*2.1;glow(x+Math.cos(a)*15*s,y+Math.sin(a)*8*s,6*s,'#ffb35c',.6)}}
+  function drake(x,gy,L,f,t){
+    const y=gy-L*.42+(motion?Math.sin(t*2)*4:0),fl=motion?Math.sin(t*5)*.18:0;g.fillStyle=SPC;g.strokeStyle=SPC;g.lineCap='round';
+    glow(x,y,L*.38,'#8fb6ff',.28);
+    ell(x,y,L*.22,L*.1);g.lineWidth=L*.06;seg(x+f*L*.16,y-L*.04,x+f*L*.3,y-L*.2);ell(x+f*L*.34,y-L*.23,L*.07,L*.045);
+    poly([[x+f*L*.39,y-L*.255],[x+f*L*.47,y-L*.22],[x+f*L*.39,y-L*.2]]);
+    g.lineWidth=L*.04;seg(x-f*L*.2,y,x-f*L*.42,y+L*.06);seg(x-f*L*.42,y+L*.06,x-f*L*.5,y-L*.02);
+    poly([[x-f*L*.02,y-L*.06],[x-f*L*.3,y-L*(.44+fl)],[x+f*L*.12,y-L*.08]]);poly([[x+f*L*.04,y-L*.05],[x-f*L*.1,y-L*(.36+fl*.6)],[x+f*L*.16,y-L*.06]]);
+    g.lineWidth=L*.035;seg(x-L*.08,y+L*.06,x-L*.1,gy-L*.02);seg(x+L*.08,y+L*.06,x+L*.1,gy-L*.02);
+    g.fillStyle='#fff1c4';circ(x+f*L*.36,y-L*.24,2);glow(x+f*L*.36,y-L*.24,L*.05,'#fff1c4',.7);
+  }
   function crone(x,gy,h,f){g.save();g.translate(x,gy);g.rotate(f*.16);figure(0,0,h,f,{robe:true,hood:true,weapon:'lantern'});g.restore()}
 
   // 그리기 가능한 것들
@@ -346,6 +360,11 @@ window.Art=(function(){
     else if(k==='moths')moths(x,gy,100*s,t);
     else if(k==='stag')stag(x,gy,150*s,f,t);
     else if(k==='shade')shade(x,gy,128*s,f,t);
+    else if(k==='sp_wolf'){beast('wolf',x,gy-bob,82*s,f,{col:SPC,eye:'#e6f1ff'});glow(x,gy-34*s,40*s,'#8fb6ff',.3)}
+    else if(k==='sp_moon'){beast('wolf',x,gy-bob,104*s,f,{col:'#8496bd',eye:'#fff1c4'});glow(x,gy-44*s,50*s,'#dfe8ff',.3)}
+    else if(k==='sp_golem'){knight(x,gy,122*s,f,{stone:true});glow(x,gy-62*s,52*s,'#8fb6ff',.28)}
+    else if(k==='sp_wisp')wisp(x,gy,s,t);
+    else if(k==='sp_drake')drake(x,gy,150*s,f,t);
     g.restore();
     if(a.flash){g.save();g.globalAlpha=a.flash;glow(x,gy-40*s,46*s,'#ffffff',.4);g.restore()}
   }
@@ -392,7 +411,7 @@ window.Art=(function(){
 
   // ── 전투 배치: 열마다 자리를 나눈다 (왼쪽이 아군, 오른쪽이 적)
   const ZX={'pc-front':{c:.34,w:.08,rx:.12},'pc-back':{c:.135,w:.07,rx:.11},'foe-front':{c:.665,w:.09,rx:.17},'foe-back':{c:.885,w:.07,rx:.1}};
-  const HT={wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,captain:136,brandwolf:62,brandbear:100,hunter:94,rine:90,vask:112,villager:86,smith:96,boy:58,hawk:110,moths:110,stag:120,shade:128,acolyte:98,hero:96,orden:118,sena:90,bran:96};
+  const HT={sp_wolf:64,sp_moon:80,sp_golem:122,sp_wisp:84,sp_drake:112,wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,captain:136,brandwolf:62,brandbear:100,hunter:94,rine:90,vask:112,villager:86,smith:96,boy:58,hawk:110,moths:110,stag:120,shade:128,acolyte:98,hero:96,orden:118,sena:90,bran:96};
   function battleLayout(info){
     const B=info.battle,list=[];if(!B)return list;
     const groups={};B.units.forEach(u=>{const z=u.side+'-'+u.row;(groups[z]=groups[z]||[]).push(u)});
