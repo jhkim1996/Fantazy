@@ -281,7 +281,7 @@ window.SCENARIO = {
   inspMax: 4,
   // 레벨 L → L+1 에 필요한 경험치. 경험치는 일행이 나누지 않고 함께 얻는다 (동료는 그대와 같은 레벨).
   // 동료가 늘면 적도 더 몰려와 한 번에 얻는 경험치가 커지므로, 동료가 모이는 레벨 3부터 가파르게 오른다
-  xpTable: [15, 40, 100, 175, 220, 280, 350, 420, 500, 600],
+  xpTable: [15, 40, 100, 175, 220, 280, 350, 420, 500, 600, 700, 820, 950], maxLevel: 14,
   stats: [{ n: '지혜' }, { n: '민첩' }, { n: '힘' }, { n: '매력' }],
 
   classes: [
@@ -2546,3 +2546,178 @@ Object.assign(window.SCENARIO.events, {
 window.SCENARIO.locations.village.actions.push({ label: '세나를 찾아간다', event: 'rejoin_sena', if: { any: ['sena_parted', 'sena_left'] } });
 window.SCENARIO.locations.stairs.actions.push({ label: '무너진 초소에서 브란을 찾는다', event: 'rejoin_bran', if: { any: ['bran_parted', 'bran_left'], not: 'ch2' } });
 window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에게 간다', event: 'rejoin_orden', if: { flag: 'orden_parted' } });
+
+// ── 레벨 8~14: 전문화와 높은 레벨 기술
+// 레벨 8에 직업마다 두 갈래 중 하나를 고른다 (전문화 기술 8·11, 레벨 14 강화). 레벨 9·13은 직업 공통 기술,
+// 10·12·14에는 지금 기술이 강해진다. 동료도 레벨 6·10에 기술을 하나씩 더 익힌다.
+(function () {
+  const SC = window.SCENARIO, CS = SC.combatSkills;
+  const up = (k, ...xs) => { CS[k].up = (CS[k].up || []).concat(xs).sort((a, b) => a.lv - b.lv); };
+  Object.assign(CS, {
+    // ── 마법사 공통
+    timewarp: { cls: 'mage', lv: 9, name: '시간 비틀기', cost: 'bonus', mp: 4, uses: 1, per: 'long', kind: 'surge',
+      desc: '행동을 쓴 뒤, 보조 행동으로 시간을 비틀어 행동을 하나 더 얻는다 (주문을 두 번 외울 수 있다)' },
+    starfall: { cls: 'mage', lv: 13, name: '별의 비', mp: 10, kind: 'save', area: 'all', save: '민첩', stat: '지혜', dmg: '6d10', addStat: true, dtype: 'radiant', half: true, onFail: { prone: 1 },
+      desc: '하늘의 별을 모든 적 위로 쏟는다. 별빛 {dmg}+지혜 (민첩 내성에 성공하면 절반), 실패한 적은 넘어진다' },
+    // 마법사 · 별의 학자
+    starsight: { cls: 'mage', lv: 8, name: '별의 눈', cost: 'bonus', mp: 2, kind: 'buff', self: true, buff: { adv: 1 }, turns: 2,
+      desc: '이번 차례와 다음 차례에 그대의 공격이 모두 유리하다. 별빛 창·초신성과 함께 쓰면 치명타가 쉽게 터진다' },
+    supernova: { cls: 'mage', lv: 11, name: '초신성', mp: 8, kind: 'attack', attack: 'spell', stat: '지혜', dmg: '8d8', addStat: true, dtype: 'radiant', crit: 19,
+      up: [{ lv: 14, dmg: '10d8', note: '피해 10d8' }],
+      desc: '원거리 주문 공격. 별빛 {dmg}+지혜, 19~20 치명타. 한 적에게 쏟는 마법사의 가장 무거운 주문' },
+    // 마법사 · 폭풍 술사
+    icestorm: { cls: 'mage', lv: 8, name: '얼음 폭풍', mp: 5, kind: 'save', area: 'row', save: '민첩', stat: '지혜', dmg: '3d8', addStat: true, dtype: 'cold', half: true, onFail: { restrain: 1 }, surface: 'ice',
+      up: [{ lv: 14, dmg: '5d8', note: '피해 5d8' }],
+      desc: '대상이 선 열에 얼음 폭풍. 냉기 {dmg}+지혜 (민첩 내성에 성공하면 절반), 실패한 적은 1턴 동안 얼음에 묶인다 (속박). 그 열이 얼음으로 덮인다' },
+    tempest: { cls: 'mage', lv: 11, name: '폭풍의 부름', mp: 8, kind: 'save', area: 'all', save: '민첩', stat: '지혜', dmg: '5d8', addStat: true, dtype: 'lightning', half: true, shock: true,
+      up: [{ lv: 14, dmg: '7d8', note: '피해 7d8' }],
+      desc: '모든 적에게 번개 {dmg}+지혜 (민첩 내성에 성공하면 절반). 젖은 적은 감전되어 얼어붙는다' },
+
+    // ── 전사 공통
+    quake: { cls: 'warrior', lv: 9, name: '대지 가르기', uses: 1, per: 'short', kind: 'save', area: 'row', save: '힘', stat: '힘', dmg: '3d8', addStat: true, dtype: 'phys', half: true, onFail: { prone: 1 },
+      desc: '무기로 땅을 내리쳐 대상이 선 열을 뒤흔든다. 물리 {dmg}+힘 (힘 내성에 성공하면 절반), 실패한 적은 넘어진다' },
+    undying: { cls: 'warrior', lv: 13, name: '꺾이지 않는 의지', cost: 'bonus', uses: 1, per: 'long', kind: 'buff', self: true, buff: { undying: 1, atk: 3, dmg: 3 }, turns: 3,
+      desc: '{turns}턴 동안 그대는 쓰러지지 않는다 (HP가 1 아래로 내려가지 않는다). 그동안 명중·피해 +3' },
+    // 전사 · 수호 기사
+    challenge: { cls: 'warrior', lv: 8, name: '결투 신청', cost: 'bonus', uses: 2, per: 'short', kind: 'taunt', turns: 2, selfBuff: { ac: 2 },
+      up: [{ lv: 14, turns: 3, note: '3턴' }],
+      desc: '{turns}턴 동안 적들이 그대만 노린다 (닿을 수 있으면). 그동안 그대의 방어 +2' },
+    bulwark: { cls: 'warrior', lv: 11, name: '불굴의 방벽', cost: 'bonus', uses: 1, per: 'short', kind: 'buff', self: true, buff: { halve: 1 }, turns: 2,
+      up: [{ lv: 14, uses: 2, note: '짧은 휴식마다 2번' }],
+      desc: '이번 차례와 다음 차례가 끝날 때까지 그대가 받는 모든 피해가 절반이 된다' },
+    // 전사 · 광전사
+    bloodstrike: { cls: 'warrior', lv: 8, name: '피의 일격', uses: 2, per: 'short', kind: 'attack', weapon: true, extra: '2d8', drain: 0.5,
+      up: [{ lv: 14, extra: '3d8', note: '피해 +3d8' }],
+      desc: '무기 피해 +{extra}. 준 피해의 절반만큼 HP를 되찾는다' },
+    frenzy: { cls: 'warrior', lv: 11, name: '광란', uses: 1, per: 'short', kind: 'attack', weapon: true, hits: 3,
+      up: [{ lv: 14, hits: 4, note: '네 번' }],
+      desc: '한 대상에게 무기 공격을 {hits}번 퍼붓는다 (대상이 쓰러지면 닿는 다른 적에게)' },
+
+    // ── 도적 공통
+    blur: { cls: 'rogue', lv: 9, name: '잔상', cost: 'bonus', uses: 1, per: 'short', kind: 'buff', self: true, buff: { blur: 1 }, turns: 2,
+      desc: '이번 차례와 다음 차례가 끝날 때까지 그대를 노린 공격이 모두 불리하다 (그대의 잔상을 벤다)' },
+    ambush: { cls: 'rogue', lv: 13, name: '그림자 습격', uses: 1, per: 'long', kind: 'volley', weapon: true, extra: '2d6', adv: true,
+      desc: '그림자를 타고 모든 적을 한 번씩 벤다. 열과 상관없이 닿고, 모두 유리하다. 무기 피해 +{extra}, 기습 피해는 첫 적에게만' },
+    // 도적 · 그림자 암살자
+    shadowstrike: { cls: 'rogue', lv: 8, name: '그림자 일격', uses: 2, per: 'short', kind: 'attack', weapon: true, extra: '3d6', critAdv: true, rehide: true,
+      up: [{ lv: 14, extra: '5d6', note: '피해 +5d6' }],
+      desc: '무기 피해 +{extra}. 유리한 채로 맞히면 치명타. 뒷열에서 맞히면 곧바로 다시 그림자 속으로 숨는다' },
+    deathmark: { cls: 'rogue', lv: 11, name: '죽음의 표식', cost: 'bonus', uses: 1, per: 'short', kind: 'mark', turns: 3, markD: '2d6',
+      up: [{ lv: 14, markD: '3d6', note: '표식 피해 3d6' }],
+      desc: '{turns}턴 동안 그 적을 향한 아군의 공격이 모두 유리하고, 맞힐 때마다 피해 +{markD}' },
+    // 도적 · 칼춤꾼
+    flurry: { cls: 'rogue', lv: 8, name: '칼날 폭풍', uses: 2, per: 'short', kind: 'attack', weapon: true, hits: 3, spread: true,
+      up: [{ lv: 14, hits: 4, note: '네 번' }],
+      desc: '닿는 적들에게 돌아가며 무기 공격 {hits}번 (뒷열이면 단검을 던진다). 기습 피해는 한 번만' },
+    venomcloud: { cls: 'rogue', lv: 11, name: '독안개', uses: 1, per: 'short', kind: 'save', area: 'all', save: '힘', stat: '민첩', dmg: '3d6', addStat: true, dtype: 'poison', half: true, onFail: { poison: 3, pdmg: '1d8' },
+      up: [{ lv: 14, dmg: '5d6', note: '피해 5d6' }],
+      desc: '모든 적에게 독 {dmg}+민첩 (힘 내성에 성공하면 절반), 실패한 적은 3턴 동안 매 턴 독 {pdmg}' },
+
+    // ── 음유시인 공통
+    shatter: { cls: 'bard', lv: 9, name: '깨뜨리는 음', mp: 4, kind: 'save', area: 'one', save: '힘', stat: '매력', dmg: '4d8', addStat: true, dtype: 'thunder', half: true, onFail: { weak: 1 },
+      desc: '한 적에게 천둥 {dmg}+매력 (힘 내성에 성공하면 절반), 실패하면 다음 턴 명중 -2' },
+    genesis: { cls: 'bard', lv: 13, name: '창세의 노래', mp: 10, kind: 'save', area: 'all', save: '지혜', stat: '매력', dmg: '6d8', addStat: true, dtype: 'radiant', half: true, partyHeal: '3d8',
+      desc: '모든 적에게 별빛 {dmg}+매력 (지혜 내성에 성공하면 절반), 아군 모두 HP 3d8 회복 (쓰러진 아군도 일어난다)' },
+    // 음유시인 · 전쟁 가인
+    wardrum: { cls: 'bard', lv: 8, name: '전쟁의 북소리', cost: 'bonus', mp: 4, kind: 'rally', heal: '1d6', stat: '매력', buff: { atk: 2, dmg: 2, ac: 1 }, turns: 3,
+      desc: '아군 모두 HP {heal}+매력 회복, {turns}턴 동안 명중·피해 +2, 방어 +1. 얼어붙음·명중 감소·속박·중독도 씻어 낸다' },
+    crescendo: { cls: 'bard', lv: 11, name: '절정의 화음', mp: 7, kind: 'save', area: 'all', save: '힘', stat: '매력', dmg: '5d8', addStat: true, dtype: 'thunder', half: true, onFail: { prone: 1 }, partyBuff: { atk: 2 }, pbTurns: 2,
+      up: [{ lv: 14, dmg: '7d8', note: '피해 7d8' }],
+      desc: '모든 적에게 천둥 {dmg}+매력 (힘 내성에 성공하면 절반), 실패한 적은 넘어진다. 아군 모두 2턴 동안 명중 +2' },
+    // 음유시인 · 별의 성가대
+    masshymn: { cls: 'bard', lv: 8, name: '별의 성가', mp: 5, kind: 'rally', heal: '3d8', stat: '매력',
+      up: [{ lv: 14, heal: '4d8', note: '회복 4d8' }],
+      desc: '아군 모두 HP {heal}+매력 회복, 얼어붙음·명중 감소·속박·중독을 씻어 낸다' },
+    hush: { cls: 'bard', lv: 11, name: '고요의 노래', mp: 6, kind: 'save', area: 'all', save: '지혜', stat: '매력', onFail: { stun: 1 }, noBoss: true, bossOnFail: { weak: 2 },
+      desc: '모든 적이 지혜 내성에 실패하면 1턴 잠든다. 우두머리와 정예는 잠들지 않는 대신 2턴 동안 명중 -2' },
+
+    // ── 동료
+    phalanx: { comp: 'orden', lv: 6, name: '방패 진형', cost: 'bonus', uses: 1, per: 'short', kind: 'buff', buff: { ac: 2 }, turns: 2,
+      desc: '오르덴이 방패를 세운다. 아군 모두 {turns}턴 동안 방어 +2' },
+    oathspear: { comp: 'orden', lv: 10, name: '맹세의 창', uses: 1, per: 'short', kind: 'pierce', weapon: true, extra: '3d8',
+      desc: '앞열의 적과 그 뒤 뒷열의 적 하나를 함께 찌른다. 피해 +{extra}' },
+    volley: { comp: 'sena', lv: 6, name: '화살비', uses: 1, per: 'short', kind: 'volley', weapon: true,
+      desc: '모든 적에게 화살을 한 대씩 쏜다 (열과 상관없이)' },
+    forestbreath: { comp: 'sena', lv: 10, name: '숲의 숨결', cost: 'bonus', uses: 1, per: 'long', kind: 'rally', heal: '2d8',
+      desc: '아군 모두 HP {heal} 회복, 얼어붙음·명중 감소·속박·중독을 씻어 낸다' },
+    brandfire: { comp: 'bran', lv: 6, name: '낙인 불꽃', uses: 2, per: 'short', kind: 'attack', weapon: true, extra: '2d6', onHit: { burn: 3 },
+      desc: '불 피해 +{extra}, 맞으면 3턴 동안 불붙는다' },
+    firestorm: { comp: 'bran', lv: 10, name: '불의 폭풍', uses: 1, per: 'long', kind: 'save', area: 'all', save: '민첩', dmg: '4d6+4', dtype: 'fire', half: true,
+      desc: '모든 적에게 불 {dmg} (민첩 내성에 성공하면 절반). 기름에 불이 붙는다' }
+  });
+
+  // 지금 기술의 강화 (레벨 10·12·14)
+  up('runebolt', { lv: 10, dmg: '3d10', note: '피해 3d10' }, { lv: 14, dmg: '4d10', note: '피해 4d10' });
+  up('chain', { lv: 10, dmg: '3d8', chain: 3, note: '피해 3d8, 세 번 튐' });
+  CS.chain.chain = 2;
+  CS.chain.desc = CS.chain.desc.replace('맞으면 다른 적 둘에게 절반씩 튄다', '맞으면 다른 적에게 {chain}번까지 절반씩 튄다');
+  up('bolt', { lv: 12, darts: 5, note: '화살 다섯 발' });
+  up('frost', { lv: 12, dmg: '4d8', note: '피해 4d8' });
+  up('starfire', { lv: 12, dmg: '5d6', note: '피해 5d6' });
+  up('lance', { lv: 14, dmg: '6d8', note: '피해 6d8' });
+  up('meteor', { lv: 14, dmg: '6d10', note: '피해 6d10' });
+  up('smash', { lv: 10, extra: '3d8', note: '피해 +3d8' });
+  up('execute', { lv: 12, extra: '2d8', execute: '4d8', note: '피해 +2d8, 처형 +4d8' });
+  CS.execute.desc = '무기 피해 +{extra}. 대상의 HP가 절반 이하면 피해 +{execute} 더';
+  up('whirl', { lv: 12, uses: 3, note: '짧은 휴식마다 3번' });
+  up('second', { lv: 14, heal: '2d10', note: '회복 2d10+레벨' });
+  up('stab', { lv: 10, extra: '3d6', note: '피해 +3d6' }, { lv: 14, extra: '4d6', note: '피해 +4d6' });
+  CS.smoke.turns = 2;
+  CS.smoke.desc = '{turns}턴 동안 모든 적이 연막에 갇힌다 (적의 공격 불리, 적을 향한 공격 유리)';
+  up('smoke', { lv: 12, turns: 3, status: { blind: 3 }, note: '3턴' });
+  up('venom', { lv: 10, onHit: { poison: 3, pdmg: '2d6' }, note: '독 2d6' });
+  CS.venom.onHit = Object.assign({ pdmg: '1d6' }, CS.venom.onHit);
+  CS.venom.desc = '무기 공격. 맞으면 3턴 동안 매 턴 독 {pdmg}';
+  up('assassin', { lv: 12, extra: '4d6', note: '피해 +4d6' });
+  up('mock', { lv: 10, dmg: '3d6', note: '피해 3d6' }, { lv: 14, dmg: '4d6', note: '피해 4d6' });
+  up('discord', { lv: 6, dmg: '2d8', note: '피해 2d8' }, { lv: 10, dmg: '3d8', note: '피해 3d8' });
+  up('mend', { lv: 12, heal: '3d8', note: '회복 3d8' });
+  up('starsong', { lv: 12, dmg: '3d8', note: '피해 3d8' });
+  up('rally', { lv: 12, heal: '2d6', note: '회복 2d6' });
+
+  // 직업 공통 기술
+  const add = (id, ks) => SC.classes.find(c => c.id === id).skills.push(...ks);
+  add('mage', ['timewarp', 'starfall']);
+  add('warrior', ['quake', 'undying']);
+  add('rogue', ['blur', 'ambush']);
+  add('bard', ['shatter', 'genesis']);
+  SC.companions.orden.skills.push('phalanx', 'oathspear');
+  SC.companions.sena.skills.push('volley', 'forestbreath');
+  SC.companions.bran.skills.push('brandfire', 'firestorm');
+
+  // 전문화: passive는 엔진이 읽는 타고난 힘, fx는 장비처럼 더해지는 수치
+  SC.specs = {
+    mage: [
+      { id: 'astral', name: '별의 학자', desc: '별빛과 비전을 갈고닦아 한 적을 꿰뚫는다.',
+        passive: { name: '별을 읽는 눈', desc: '주문 공격의 치명타 범위 +1, 최대 마력 +6', spellCrit: 1 }, fx: { mp: 6 },
+        skills: ['starsight', 'supernova'] },
+      { id: 'storm', name: '폭풍 술사', desc: '불·얼음·번개로 싸움터 전체를 다스린다.',
+        passive: { name: '원소의 맥', desc: '불·냉기·번개 주문 피해 +3, 최대 HP +8', elemDmg: 3 }, fx: { hp: 8 },
+        skills: ['icestorm', 'tempest'] }
+    ],
+    warrior: [
+      { id: 'guardian', name: '수호 기사', desc: '방패가 되어 동료를 지킨다.',
+        passive: { name: '수호', desc: '앞열에 서면 다른 아군을 노린 근접 공격을 불리하게 막아선다 (라운드마다 한 번). 방어 +1, 최대 HP +10', guard: true }, fx: { ac: 1, hp: 10 },
+        skills: ['challenge', 'bulwark'] },
+      { id: 'berserker', name: '광전사', desc: '피를 흘릴수록 강해진다.',
+        passive: { name: '피의 갈증', desc: '무기 공격의 치명타 범위 +1. HP가 절반 이하면 무기 피해 +3', weapCrit: 1, rage: 3 },
+        skills: ['bloodstrike', 'frenzy'] }
+    ],
+    rogue: [
+      { id: 'shade', name: '그림자 암살자', desc: '한 번의 기습으로 끝낸다.',
+        passive: { name: '급소의 달인', desc: '기습 피해 +2d6, 주도권 +3', sneakDice: 2 }, fx: { init: 3 },
+        skills: ['shadowstrike', 'deathmark'] },
+      { id: 'blade', name: '칼춤꾼', desc: '칼날을 흩뿌려 여럿을 상대한다.',
+        passive: { name: '칼날의 춤', desc: '방어 +1, 무기 피해 +2' }, fx: { ac: 1, dmg: 2 },
+        skills: ['flurry', 'venomcloud'] }
+    ],
+    bard: [
+      { id: 'skald', name: '전쟁 가인', desc: '노래로 동료의 칼끝을 벼린다.',
+        passive: { name: '전쟁의 박자', desc: '아군을 북돋우는 노래가 1턴 더 이어진다. 명중 +1', buffTurns: 1 }, fx: { hit: 1 },
+        skills: ['wardrum', 'crescendo'] },
+      { id: 'chorus', name: '별의 성가대', desc: '치유와 잠의 노래로 싸움을 이끈다.',
+        passive: { name: '맑은 목소리', desc: '회복하는 노래가 레벨의 절반만큼 더 회복한다. 최대 마력 +6', healLv: true }, fx: { mp: 6 },
+        skills: ['masshymn', 'hush'] }
+    ]
+  };
+})();
