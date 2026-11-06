@@ -2940,69 +2940,84 @@ window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에
     desc: '보조 행동으로 별의 사도를 부른다 (긴 휴식마다 1번) — {sum}' };
 })();
 
-// ── 소환사의 숨은 계약: 「잿불 왕관의 대군주 아즈라칸」 (1장, 별의 무덤 아래)
-// 잿불 뿔 조각 셋을 모아(소환사일 때만 아주 드물게 떨어진다) 봉인 앞에서 대군주의 그림자를 이기면 기술을 익힌다.
+// ── 소환사의 숨은 계약: 「잿불 왕관의 대군주 아즈라칸」
+// 마지막 마을에서 곧바로 고른다: 왕관을 쓰면 그대가 잿불의 대군주가 된다 (쉬운 길), 거절하면 평범한 길.
+// 계약하면 별의 무덤 가장 깊은 곳에 숨은 우두머리 「일곱 사슬의 간수」가 나타나고, 쓰러뜨리면 아즈라칸이 해방된다 (진화).
 (function () {
   const SC = window.SCENARIO, CS = SC.combatSkills, E = SC.enemies;
-  const SH = ['잿불 뿔 조각 · 왼뿔', '잿불 뿔 조각 · 오른뿔', '잿불 뿔 조각 · 왕관'];
-  const desc = ['검붉게 식은 뿔의 왼쪽 끝. 쥐면 손바닥이 뜨겁다', '오른쪽 뿔의 조각. 귀에 대면 먼 불길 소리가 난다', '왕관의 가시 하나. 종을 울리면 함께 떨린다'];
-  SH.forEach((n, i) => { SC.items[n] = { kind: '증표', cls: 'summoner', rar: 'legendary', nosell: true, desc: desc[i] + ' (셋을 모아 별의 무덤으로)' }; });
-  const NOT_DONE = { not: 'ember_done' };
-  E.hound.drops.push({ item: SH[0], p: 0.03, pity: 40, uniq: true, if: NOT_DONE });
-  E.leech.drops.push({ item: SH[1], p: 0.03, pity: 40, uniq: true, if: NOT_DONE });
-  E.captain.drops.push({ item: SH[2], p: 0.08, pity: 14, uniq: true, if: NOT_DONE });
+  // 예전 판의 뿔 조각 (저장에 남아 있을 수 있다 — 이제는 쓰이지 않는다)
+  ['잿불 뿔 조각 · 왼뿔', '잿불 뿔 조각 · 오른뿔', '잿불 뿔 조각 · 왕관'].forEach(n => { SC.items[n] = { kind: '증표', cls: 'summoner', rar: 'legendary', nosell: true, old: true, desc: '옛 봉인의 조각. 이제는 아무것도 열지 않는다' }; });
 
-  E.imp = { art: 'imp', name: '잿불 임프', lv: 3, hp: 18, ac: 13, atk: 5, dmg: '1d6+2', dtype: 'fire', xp: 10, gold: [1, 4], fly: true, row: 'back', ranged: true, resist: ['fire'],
-    desc: '불꽃을 튀기며 날아다니는 작은 악마.' };
-  E.embershade = { art: 'embershade', name: '대군주의 그림자', where: '별의 무덤 아래 잿불 봉인', people: true, lv: 8, hp: 200, ac: 17, atk: 9, dmg: '2d10+5', dtype: 'fire', xp: 150, gold: [40, 80],
-    boss: true, big: true, multi: 2, init: 2, resist: ['fire', 'poison'], vuln: ['radiant'],
-    skills: [
-      { name: '잿불 휩쓸기', p: 0.3, dmg: '2d10+4', hit: -2, sweep: true, dtype: 'fire' },
-      { name: '지옥불 화살', p: 0.2, ranged: true, dmg: '2d8', dtype: 'fire', onHit: { burn: 3 } },
-      { name: '군주의 포효', p: 0.15, debuff: { atk: -2, turns: 2 }, text: '그림자가 포효한다. 무덤 전체가 떨린다! (2턴 동안 모두 명중 -2)' },
-      { name: '임프 부르기', p: 0.25, summon: 'imp', once: true }
-    ],
-    drops: [{ item: '푸른 물약', p: 0.6 }, { item: '은빛 물약', p: 0.6 }],
-    desc: '봉인 너머에서 대군주가 보낸 그림자. 잿불을 두른 거대한 뿔의 형체. 한 번에 두 번 베고, 동료가 둘 이상이면 한 라운드에 두 번 움직인다. 불과 독에 강하고 별빛에 약하다.' };
-  SC.items['봉인지기의 맹세'] = { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hp: 8, save: 2, resist: ['fire'] }, desc: '잿불 봉인을 영영 닫은 자가 받은 별빛의 맹세' };
-
-  const TRIAL = {
-    enemies: ['embershade'], noFlee: true, perPC: { hp: 30 }, extraTurn: 2,
-    art: { sky: 'cave', bg: 'tomb', fx: ['ash'] },
-    intro: '왕관에서 잿불이 일어나 하나의 형체가 되었다. 뿔이 천장에 닿을 듯하다!',
-    win: {
-      text: ['그림자가 무릎을 꿇고 잿불로 흩어졌다. 일곱 겹의 사슬이 한꺼번에 끊어지며, 잿불의 왕관이 떠올라 — 그대의 머리 위에 내려앉았다.',
-        '불길이 그대의 핏줄을 타고 흘렀다. 이마에서 두 뿔이 돋고, 등 뒤로 잿불의 날개가 펼쳐졌다. 그대가 부르던 정령들마저 검붉은 불꽃으로 다시 태어났다.',
-        '거대한 그림자가 다시 일어나 그대 앞에 무릎을 꿇었다. “새 군주여. 아즈라칸이 그대의 권속이 되겠다. 부르는 곳 어디든.”'],
-      fx: { lord: true, learn: 'demonlord', drop: SH, set: ['ember_pact', 'ember_done'], xp: 60 },
-      approve: { orden: -2, sena: -1 },
-      log: '계약을 맺고 잿불의 대군주가 되었다. 아즈라칸이 권속이 되었다.', next: 'map' },
-    lose: { text: ['잿불이 그대를 계단 위로 내던졌다. 왕관은 여전히 사슬 속에서 기다린다. 뿔 조각은 그대 손에 남아 있다.'],
-      log: '대군주의 그림자에게 쓰러졌다.', next: 'map' }
-  };
-  SC.events.ember_seal = {
-    art: { sky: 'cave', bg: 'tomb', actors: [{ k: 'hero', x: 0.24 }, { k: 'embershade', x: 0.7, face: -1 }], fx: ['ash'] },
-    title: '잿불 봉인', clock: '숨겨진 계약', place: '별의 무덤 아래',
+  SC.events.ember_offer = {
+    art: { sky: 'rain', bg: 'village', actors: [{ k: 'hero', x: 0.28 }, { k: 'embershade', x: 0.7, face: -1 }], fx: ['rain', 'ash'] },
+    title: '잿불 왕관의 목소리', clock: '숨겨진 계약', place: '마지막 마을',
     text: [
-      '수정관 아래, 바닥의 별 문양 하나가 잿빛으로 식어 있다. 그대가 지닌 뿔 조각 셋이 한꺼번에 뜨거워지자, 문양 밑에서 계단이 열렸다.',
-      '가장 깊은 방은 별빛 대신 검붉은 잿불로 밝다. 일곱 겹의 사슬이 가운데 놓인 왕관 하나를 묶고 있고, 왕관 위로 거대한 뿔의 그림자가 일렁인다.',
-      '“일곱째 별이 떨어질 때, 그 그림자도 함께 떨어졌다. 나는 아즈라칸, 별이 버린 불이다. 종을 울리는 자여, 이 왕관을 써라. 그러면 네가 잿불의 군주가 되고, 나는 너의 권속이 되리라.”',
-      { if: { party: 'orden' }, t: '오르덴의 창끝이 떨렸다. “저것은 맹세를 삼키는 불이다. …그대가 정한다면 막지는 않겠다. 그러나 잊지 마라.”' },
-      { if: { party: 'bran' }, t: '브란이 낮게 웃었다. “낙인보다 지독한 계약이로군. 그래도 — 저걸 부릴 수 있다면.”' }
+      '마을 어귀에 들어서자, 허리춤의 종이 저절로 울었다. 빗물 고인 우물 속에서 검붉은 잿불이 피어올랐다.',
+      '잿불은 거대한 뿔의 그림자가 되었다. “일곱째 별이 떨어질 때, 그 그림자도 함께 떨어졌다. 나는 아즈라칸, 별이 버린 불이다.”',
+      '“종을 울리는 자여, 이 왕관을 써라. 그러면 네가 잿불의 군주가 되고, 나는 너의 권속이 되리라. 다만 — 내 힘의 절반은 아직 별의 무덤 아래 일곱 사슬에 묶여 있다.”'
     ],
     choices: [
-      { id: 1, insp: 'brave', label: '왕관에 손을 얹고 계약의 시험을 받는다', roll: false, note: '전투 (매우 강하다 · 권장 레벨 7) · 이기면 그대가 「잿불의 대군주」가 된다 — 능력치·장비·기술·소환수가 모두 크게 강해지고 아즈라칸을 영영 부린다 (쉬운 길)',
-        then: { text: ['왕관이 그대의 손을 태웠다. 잿불이 일어나 하나의 거대한 형체가 되었다 — 대군주의 그림자.'], battle: TRIAL, next: 'map' } },
-      { id: 2, insp: 'mercy', label: '뿔 조각을 수정관의 별빛에 던져 봉인을 영영 닫는다', roll: false, note: '평범한 길로 간다 · 다시는 계약할 수 없다', approve: { orden: 2, sena: 1 },
-        then: { text: ['뿔 조각들이 별빛 속에서 하얗게 타올랐다. 왕관이 비명을 지르며 사슬 속으로 가라앉았고, 계단은 다시 닫혔다.', '수정관에 남은 별빛이 그대의 손목에 감겨 작은 맹세가 되었다.'],
-          fx: { drop: SH, set: ['ember_done', 'ember_refused'], items: ['봉인지기의 맹세'] }, log: '잿불 봉인을 영영 닫았다.', next: 'map' } },
-      { id: 3, label: '아직은 아니다. 계단을 올라간다', roll: false, then: { text: ['그대가 등을 돌리자, 잿불이 낮게 웃었다. “기다리지. 나는 오래 기다리는 데 익숙하다.”'], next: 'map' } }
+      { id: 1, insp: 'brave', label: '왕관을 쓴다 — 잿불의 대군주가 된다', roll: false,
+        note: '쉬운 길 · 능력치·장비·기술·소환수가 모두 크게 강해지고 아즈라칸이 영구 권속이 된다 · 별의 무덤 깊은 곳에 숨은 우두머리가 나타난다',
+        then: {
+          text: ['그대가 잿불의 왕관을 집어 들자, 왕관이 스스로 떠올라 그대의 머리 위에 내려앉았다.',
+            '불길이 그대의 핏줄을 타고 흘렀다. 이마에서 두 뿔이 돋고, 등 뒤로 잿불의 날개가 펼쳐졌다. 그대가 부르던 정령들마저 검붉은 불꽃으로 다시 태어났다.',
+            '거대한 그림자가 우물에서 걸어 나와 그대 앞에 무릎을 꿇었다. “새 군주여. 아즈라칸이 그대의 권속이 되겠다. 그리고 언젠가 — 내 사슬을 끊어 다오.”'],
+          fx: { lord: true, learn: 'demonlord', set: ['ember_pact', 'ember_done'] },
+          log: '계약을 맺고 잿불의 대군주가 되었다. 아즈라칸이 권속이 되었다.', next: 'map' } },
+      { id: 2, insp: 'mercy', label: '왕관을 거절한다', roll: false, note: '평범한 길 · 다시는 계약할 수 없다',
+        then: { text: ['그대가 종을 손으로 감싸 쥐자, 잿불이 낮게 웃으며 우물 속으로 가라앉았다. “그것도 하나의 길이지, 종지기여.”'],
+          fx: { set: ['ember_done', 'ember_refused'] }, log: '잿불 왕관의 계약을 거절했다.', next: 'map' } },
+      { id: 3, label: '아직은 정하지 않는다', roll: false, note: '마을에서 언제든 다시 답할 수 있다',
+        then: { text: ['잿불이 우물 속에서 일렁였다. “기다리지. 나는 오래 기다리는 데 익숙하다.”'], next: 'map' } }
     ]
   };
-  SC.locations.tomb.actions.push({ label: '수정관 아래 잿불 봉인으로 내려간다', event: 'ember_seal', if: { cls: 'summoner', item: SH, not: 'ember_done' }, star: true });
-  // 일지: 조각을 하나라도 얻으면 무엇을 더 모아야 하는지 보인다
-  SC.quests.push({ name: '잿불 뿔', if: { cls: 'summoner', not: 'ember_done', or: SH.map(n => ({ item: n })) },
-    t: '왼뿔 {@' + SH[0] + '} · 오른뿔 {@' + SH[1] + '} · 왕관 {@' + SH[2] + '} — 셋을 모아 별의 무덤으로. 왼뿔은 잿빛 사냥개, 오른뿔은 수로 거머리, 왕관 조각은 가라앉은 기사단장이 아주 드물게 지닌다' });
+  SC.locations.village.actions.unshift({ label: '종이 저절로 운다 — 잿불 왕관의 목소리에 답한다', event: 'ember_offer', if: { cls: 'summoner', not: 'ember_done' }, star: true });
+
+  // 숨은 우두머리: 일곱 사슬의 간수 (계약한 대군주에게만 보인다)
+  E.chainlight = { art: 'sp_wisp', name: '사슬의 빛', lv: 5, hp: 28, ac: 14, atk: 6, dmg: '1d10', dtype: 'radiant', xp: 15, gold: [2, 6], fly: true, row: 'back', ranged: true, resist: ['radiant'],
+    desc: '간수의 사슬에서 떨어져 나온 차가운 빛.' };
+  E.jailer = { art: 'jailer', name: '일곱 사슬의 간수', where: '별의 무덤 가장 깊은 곳', people: true, lv: 11, hp: 460, ac: 20, atk: 12, dmg: '3d10+8', dtype: 'radiant', xp: 320, gold: [120, 200],
+    boss: true, big: true, multi: 2, init: 4, resist: ['radiant', 'psychic', 'cold', 'fire'],
+    skills: [
+      { name: '심판의 빛', p: 0.3, dmg: '3d10+6', hit: -1, sweep: true, dtype: 'radiant' },
+      { name: '별의 사슬', p: 0.25, ranged: true, dmg: '2d10', dtype: 'radiant', onHit: { restrain: 2 } },
+      { name: '봉인의 노래', p: 0.15, debuff: { atk: -3, turns: 2 }, text: '간수가 봉인의 노래를 읊는다. 모두의 손발이 무거워진다! (2턴 동안 명중 -3)' },
+      { name: '사슬의 빛을 부른다', p: 0.25, summon: 'chainlight', once: true }
+    ],
+    drops: [{ item: '간수의 열쇠고리', p: 1, uniq: true }, { item: '푸른 물약', p: 0.8 }, { item: '은빛 물약', p: 0.8 }],
+    desc: '아즈라칸을 일곱 사슬로 묶어 둔 별의 간수. 은빛 갑주에 날개가 돋았고, 사슬마다 별빛이 흐른다. 한 번에 두 번 베고, 동료가 하나라도 있으면 한 라운드에 두 번 움직인다. 잿불을 가두던 자라 불에 강하다 (대군주의 불은 절반만 든다). 별빛·정신·냉기에도 강하다.' };
+  SC.items['간수의 열쇠고리'] = { kind: '장신구', slot: 'trinket', rar: 'legendary', cls: 'summoner', nosell: true, fx: { hp: 10, ac: 1, save: 2, sumDmg: 2 }, desc: '일곱 사슬을 잠그던 열쇠들. 이제는 그대의 허리에서 짤랑인다' };
+  const JAIL = {
+    enemies: ['jailer'], noFlee: true, perPC: { hp: 45 }, extraTurn: 1,
+    art: { sky: 'cave', bg: 'tomb', fx: ['motes'] },
+    intro: '간수가 날개를 펼쳤다. 일곱 사슬이 일제히 울며 팽팽하게 당겨진다!',
+    win: {
+      text: ['간수가 무릎을 꿇었다. 일곱 사슬이 한 줄씩, 유리처럼 깨져 나갔다.',
+        '사슬이 모두 끊어지자 아즈라칸이 하늘을 향해 포효했다. 그의 몸이 두 배로 부풀고, 뿔 사이에 검붉은 왕관이 솟았다. 잿불은 이제 지옥불이 되어 타오른다.',
+        '“드디어 온전하다. 군주여, 이제 이 불은 모두 그대의 것이다.” — 해방된 아즈라칸이 그대 곁에 섰다.'],
+      fx: { set: ['azra_evolved'], evolve: true, xp: 150 },
+      log: '일곱 사슬의 간수를 쓰러뜨렸다. 아즈라칸이 해방되었다.', next: 'map' },
+    lose: { text: ['별빛 사슬이 그대를 계단 위로 내던졌다. 간수는 다시 사슬 곁에 서서 기다린다.'], log: '일곱 사슬의 간수에게 쓰러졌다.', next: 'map' }
+  };
+  SC.events.azra_chains = {
+    art: { sky: 'cave', bg: 'tomb', actors: [{ k: 'hero', x: 0.24 }, { k: 'jailer', x: 0.7, face: -1 }], fx: ['motes'] },
+    title: '일곱 사슬', clock: '숨은 우두머리', place: '별의 무덤 가장 깊은 곳',
+    text: [
+      '그대가 다가가자 수정관 아래 바닥의 별 문양이 갈라지며 계단이 열렸다. 아즈라칸이 낮게 으르렁거린다.',
+      '가장 깊은 방에 일곱 줄의 사슬이 허공에 걸려 있다. 사슬은 모두 아즈라칸의 그림자 끝에 이어져 있다. 그 앞에 은빛 날개의 간수가 서 있다.',
+      '“별이 버린 불을 지키는 것이 나의 맹세다. 대군주여, 그 사슬을 원한다면 나를 넘어라.”',
+      { if: { party: 'orden' }, t: '오르덴이 간수의 갑주를 보고 숨을 삼켰다. “엘레우스보다 오래된 기사단의 문장이다…”' }
+    ],
+    choices: [
+      { id: 1, insp: 'brave', label: '간수에게 맞선다 — 사슬을 끊는다', roll: false, note: '숨은 우두머리 (아주 강하다 · 불에 강하다 · 권장 레벨 8~9) · 이기면 아즈라칸이 해방된다 (진화)',
+        then: { text: ['아즈라칸이 그대 뒤에서 포효했다. 사슬이 울리고, 간수가 검을 뽑았다.'], battle: JAIL, next: 'map' } },
+      { id: 2, label: '아직은 아니다. 계단을 올라간다', roll: false, then: { text: ['간수는 그대를 쫓지 않았다. 사슬만이 오래 울렸다.'], next: 'map' } }
+    ]
+  };
+  SC.locations.tomb.actions.push({ label: '수정관 아래, 아즈라칸을 묶은 일곱 사슬로 내려간다 (숨은 우두머리)', event: 'azra_chains', if: { flag: 'ember_lord', not: 'azra_evolved' }, star: true });
+  SC.quests.push({ name: '일곱 사슬', if: { flag: 'ember_lord', not: 'azra_evolved' },
+    t: '아즈라칸의 힘 절반이 별의 무덤 아래 일곱 사슬에 묶여 있다. 무덤 가장 깊은 곳의 간수를 쓰러뜨리면 아즈라칸이 해방된다 (숨은 우두머리 · 불에 강하다 · 권장 레벨 8~9)' });
 
   // 대군주: 한 싸움 동안만 머문다 (전투 밖에서 미리 불러 두면 다음 싸움에 함께 나선다)
   SC.summons.demonlord = { name: '잿불의 대군주 아즈라칸', art: 'demonlord', row: 'front', fly: true, big: true, hp: 60, hpLv: 14, ac: 18,
@@ -3011,7 +3026,7 @@ window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에
     arrive: { save: '지혜', onFail: { weak: 2 }, name: '군주의 위압' },
     noCap: true, rank: 9,
     desc: '자리를 차지하지 않는 영구 소환수. 싸움이 시작되거나 나타나는 순간 모든 적이 지혜 내성에 실패하면 2턴 동안 겁에 질린다 (명중 -2). 잿불 대검으로 두 번 베고 (돌격 명령에도 두 번), 곧바로, 그 뒤로 두 라운드마다 모든 적에게 잿불 폭풍 6d8+지혜 (민첩 내성에 성공하면 절반, 실패하면 불붙는다). 쓰러져도 긴 휴식을 하면 다시 일어나 곁에 선다' };
-  CS.demonlord = { cls: 'summoner', lv: 6, pact: true, name: '잿불의 대군주 강림', uses: 1, per: 'long', mp: 6, kind: 'summon', summon: ['demonlord'],
+  CS.demonlord = { cls: 'summoner', lv: 1, pact: true, name: '잿불의 대군주 강림', uses: 1, per: 'long', mp: 6, kind: 'summon', summon: ['demonlord'],
     up: [{ lv: 10, hpMul: 0.3, note: '아즈라칸 HP +30%' }, { lv: 12, dmgAdd: 4, note: '아즈라칸 피해 +4' }],
     desc: '권속 아즈라칸을 부른다 (긴 휴식마다 1번) — {sum}' };
 
@@ -3027,6 +3042,12 @@ window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에
     regen: 0.06,
     items: ['잿불 왕관', '대군주의 종'],
     returns: 'demonlord', returnsBy: 'demonlord',
+    // 일곱 사슬의 간수를 쓰러뜨리면 아즈라칸이 해방된다
+    evolve: { flag: 'azra_evolved', id: 'demonlord', T: { name: '해방된 아즈라칸', art: 'demonlord2', hp: 90, hpLv: 20, ac: 21,
+      atk: { name: '지옥의 대검', dice: '4d12', dtype: 'fire' }, multi: 3,
+      breath: { every: 2, dmg: '8d8', dtype: 'fire', save: '민첩', burn: 3, name: '지옥불 폭풍' },
+      arrive: { save: '지혜', onFail: { weak: 3 }, name: '대군주의 군림', allyBuff: { atk: 2, dmg: 3 }, turns: 3 }, rank: 10,
+      desc: '사슬에서 풀려난 온전한 아즈라칸. 싸움이 시작되면 모든 적이 지혜 내성에 실패하면 3턴 동안 명중 -2, 아군 모두 3턴 동안 명중 +2·피해 +3. 지옥의 대검 4d12 불로 세 번 베고 (돌격 명령에도 세 번), 곧바로, 그 뒤로 두 라운드마다 모든 적에게 지옥불 폭풍 8d8+지혜 (민첩 내성에 성공하면 절반, 실패하면 3턴 불붙는다). 쓰러져도 긴 휴식을 하면 다시 일어난다' } },
     skills: {
       spiritbolt: { name: '지옥불 화살', dtype: 'fire', dice: '2d10' },
       callwolf: { name: '지옥불 늑대 부르기', mp: 1 },

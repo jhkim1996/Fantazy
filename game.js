@@ -335,6 +335,7 @@ function applyFx(fx,out){
   if(fx.amp){Object.assign(S.amp,fx.amp);out.push(S.amp.name+' d'+S.amp.die)}
   if(fx.stats)for(const n in fx.stats){const s=S.stats.find(x=>x.n===n);if(s){s.v+=fx.stats[n];out.push(n+' '+sign(fx.stats[n]))}}
   arr(fx.set).forEach(f=>{S.flags[f]=true});
+  if(fx.evolve)evolveAzra(out);
   arr(fx.unset).forEach(f=>{delete S.flags[f]});
   if(fx.add)for(const k in fx.add){S.counters[k]=(S.counters[k]||0)+fx.add[k];const nm=(SC.counterNames||{})[k];if(nm)out.push(nm+' '+sign(fx.add[k]))}
   if(fx.xp){h.xp+=fx.xp;out.push('경험치 '+sign(fx.xp))}
@@ -686,6 +687,13 @@ function readBook(name){
   if(S.hero.level<(it.lvReq||1)){S.notice='아직은 이 책의 문장이 그대에게 열리지 않는다 (레벨 '+it.lvReq+' 필요).';render();return}
   S.items.splice(S.items.indexOf(name),1);S.learned=(S.learned||[]).concat(it.learn);
   logp('「'+name+'」을 읽고 「'+sk.name+'」을 익혔다.');S.notice='「'+sk.name+'」을 익혔다! 전투의 기술 목록에 더해졌다.';save();render();
+}
+// 아즈라칸의 해방: 곁의 아즈라칸이 진화한 모습으로 다시 차오른다 (없으면 곧바로 곁에 선다)
+function evolveAzra(out){
+  const ev=SC.lord&&SC.lord.evolve;if(!ev)return;
+  syncPets();let p=pets().find(x=>x.id===ev.id);
+  if(!p){const x=sumStats(ev.id,abOf(SC.lord.returnsBy));p={id:ev.id,sk:SC.lord.returnsBy,hp:x.hp,hpMax:x.hp};S.pets=pets().concat(p)}
+  p.hp=p.hpMax;out.push(SUMT(ev.id).name+' — HP '+p.hpMax+', '+SUMT(ev.id).atk.name+' '+SUMT(ev.id).atk.dice+' ×'+SUMT(ev.id).multi);logp('아즈라칸이 해방되었다.');
 }
 function becomeLord(out){
   const Lo=SC.lord,h=S.hero;if(!Lo||!h)return;
@@ -1283,6 +1291,8 @@ function attack(a,t,P,o){
 const LORD_T={};
 function SUMT(id){
   const T=(SC.summons||{})[id];if(!T||!lordOn())return T;
+  // 해방된 아즈라칸: 일곱 사슬의 간수를 쓰러뜨리면 진화한 모습으로
+  const ev=SC.lord.evolve;if(ev&&id===ev.id&&S.flags[ev.flag]){if(!LORD_T[id+'+'])LORD_T[id+'+']=Object.assign({},T,ev.T,{burn:true});return LORD_T[id+'+']}
   const L=SC.lord.summons[id];if(!L)return T;
   if(!LORD_T[id])LORD_T[id]=Object.assign({},T,{name:L.name||T.name,art:L.art||T.art,atk:Object.assign({},T.atk,{name:L.atk||T.atk.name,dtype:'fire'}),
     breath:T.breath?Object.assign({},T.breath,{dtype:'fire',name:L.breath||T.breath.name,burn:T.breath.burn||2}):undefined,burn:true,desc:T.desc+' — 대군주의 권속: 모든 공격이 불이고, 맞은 적은 불붙는다'});
@@ -1327,6 +1337,7 @@ function summonArrive(u){
   afx({type:'text',target:u.uid,text:a.name,color:'#ff9a4a'});
   alive().forEach(x=>{if(d(20)+saveMod(x,a.save)<dc){applyOn(x,a.onFail);hit.push(nm(x))}});
   logB(nm(u)+'의 '+a.name+' (내성 DC '+dc+') — '+(hit.length?hit.join(', ')+' 겁에 질렸다':'아무도 굴하지 않았다'),'me');
+  if(a.allyBuff){upPCs().forEach(p=>addBuff(p,a.name,a.allyBuff,a.turns||3));logB('아군 모두 '+(a.turns||3)+'턴 동안 '+buffText(a.allyBuff)+' ('+a.name+')','me')}
 }
 // 소환수의 한 번 공격: 고른 대상이 닿으면 그것을, 아니면 가장 약한 적을
 function summonStrike(s,t){
