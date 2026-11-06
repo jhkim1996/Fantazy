@@ -2881,10 +2881,48 @@ let armed=0;
 function restartGame(b){
   if(Date.now()-armed>3000){armed=Date.now();b.textContent='정말 처음부터? 저장이 지워진다 — 한 번 더 누르세요';b.classList.add('armed');setTimeout(()=>{if(Date.now()-armed>=3000){b.textContent='처음부터 다시';b.classList.remove('armed')}},3000);return}
   armed=0;b.textContent='처음부터 다시';b.classList.remove('armed');
+  resetTo('full');
+}
+// 다시 시작의 세 갈래 (리세마라):
+//  roll — 종족·직업·배경·이름은 그대로, 능력치만 새로 굴린다 (만들기 첫 단계로)
+//  same — 같은 모험가(같은 능력치)로 곧바로 새 모험
+//  full — 모두 지우고 처음부터
+function resetTo(kind){
+  const old=S&&S.mk?copy(S.mk):null,opt=S&&S.opt?copy(S.opt):null;
   try{localStorage.removeItem(KEY)}catch(e){}
   gen++;rolling=false;mkRolling=false;
-  S=fresh();ampOn=foOn=false;cmenu=null;shopOpen=false;wtab='explore';try{localStorage.removeItem(KEY+':tab')}catch(e){}save();render();toTop();
+  S=fresh();ampOn=foOn=false;cmenu=null;shopOpen=false;gearPick=null;wtab='explore';try{localStorage.removeItem(KEY+':tab')}catch(e){}
+  if(old&&kind!=='full'){
+    ['method','buy','race','cls','bg','name'].forEach(k=>{if(old[k]!=null)S.mk[k]=copy(old[k])});
+    if(kind==='same'&&old.rolls){S.mk.rolls=old.rolls;S.mk.assign=old.assign;S.mk.rerolls=old.rerolls}
+    if(kind==='same'&&mkStatsDone()&&cls(S.mk.cls)&&race(S.mk.race)&&bg(S.mk.bg)){startAdventure();if(opt)S.opt=opt}
+    else{S.mk.step=1;if(opt)S.opt=opt}
+  }
+  menuClose();save();render();toTop();
 }
+// 다시 시작 메뉴: 어느 화면에서든 오른쪽 아래 단추로 연다
+let menuArmed=null;
+function menuOpen(){
+  const pop=$('menupop'),fab=$('menufab'),inGame=!!(S&&S.hero),mk=S&&S.mk,canSame=inGame&&mk&&cls(mk.cls)&&race(mk.race)&&bg(mk.bg);
+  pop.innerHTML='';menuArmed=null;
+  pop.appendChild(el('h3',null,'다시 시작'+(inGame?' — 지금 모험은 지워진다':'')));
+  const item=(id,label,small,kind)=>{
+    const b=el('button','opt');b.id=id;b.setAttribute('role','menuitem');b.appendChild(el('b',null,label));const sm=el('small',null,small);b.appendChild(sm);
+    b.onclick=()=>{
+      if(inGame&&menuArmed!==id){menuArmed=id;[...pop.querySelectorAll('.opt')].forEach(x=>x.classList.remove('armed'));b.classList.add('armed');sm.textContent='정말? 한 번 더 누르면 지금 모험이 지워지고 다시 시작한다';return}
+      resetTo(kind);
+    };
+    pop.appendChild(b);
+  };
+  item('rr-roll','새 능력치로 다시 (리세마라)',(mk&&mk.cls?'종족·직업·배경·이름은 그대로, ':'')+'능력치를 처음부터 새로 굴린다','roll');
+  if(canSame)item('rr-same','같은 모험가로 다시','지금 능력치 그대로 곧바로 새 모험을 시작한다','same');
+  item('rr-full','완전히 처음부터','모든 선택을 지우고 모험가 만들기부터','full');
+  const c=el('button','opt','닫기');c.onclick=menuClose;pop.appendChild(c);
+  pop.hidden=false;fab.setAttribute('aria-expanded','true');
+}
+function menuClose(){const pop=$('menupop'),fab=$('menufab');if(pop)pop.hidden=true;if(fab)fab.setAttribute('aria-expanded','false');menuArmed=null}
+$('menufab').onclick=e=>{e.stopPropagation();$('menupop').hidden?menuOpen():menuClose()};
+document.addEventListener('click',e=>{const pop=$('menupop');if(!pop.hidden&&!pop.contains(e.target)&&e.target!==$('menufab'))menuClose()});
 $('restart').onclick=()=>restartGame($('restart'));
 
 // ── 자유 주사위
@@ -2895,6 +2933,7 @@ $('freset').onclick=()=>{fhist=[];ftype=20;$('fres').textContent='';$('fhist').t
 
 // ── 단축키: 숫자로 선택지·행동, Enter로 굴리기·계속 (글자를 입력하는 중에는 쓰지 않는다)
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&!$('menupop').hidden){menuClose();e.preventDefault();return}
   if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test((e.target&&e.target.tagName)||'')||rolling)return;
   const vis=sel=>[...document.querySelectorAll(sel)].filter(b=>!b.disabled&&b.offsetParent!==null);
   const n=/^[1-9]$/.test(e.key)?+e.key:0;let b=null;

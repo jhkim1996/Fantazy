@@ -300,6 +300,15 @@ body.scene-min .scene{padding:8px 12px}
 body.scene-min #stitle{font-size:16px;margin:0}
 .qlink{margin-top:12px}
 .huntb{display:block;width:100%;margin-top:8px;padding:10px}
+/* 다시 시작 단추: 화면 어디서든 오른쪽 아래 (탐험 화면 휴대폰에서는 탭 막대 위) */
+.fab{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:40;width:44px;height:44px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:.9}
+.fab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.fab[aria-expanded="true"]{background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc-text);opacity:1}
+.menupop{position:fixed;right:14px;bottom:calc(68px + env(safe-area-inset-bottom,0px));z-index:41;width:min(320px,calc(100vw - 28px));box-shadow:0 8px 28px rgba(0,0,0,.25);border:1px solid var(--line)}
+.menupop h3{margin:0 0 8px}
+.menupop .opt.armed{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+.menupop .opt.armed small{color:var(--bad)}
+@media (max-width:959.98px){body.world .fab{bottom:calc(86px + env(safe-area-inset-bottom,0px))}body.world .menupop{bottom:calc(138px + env(safe-area-inset-bottom,0px))}}
 .item.pet>div{flex:1 1 200px}
 .item.pet .bar{margin:4px 0 0;height:6px}
 .petcall{margin:10px 0 6px}
@@ -410,6 +419,12 @@ body.bigtext h2{font-size:14px}
 
 <div class="foot row" id="foot"><button id="restart">처음부터 다시</button></div>
 </div>
+
+<!-- 어디서든 다시 시작 (리세마라) -->
+<button id="menufab" class="fab" aria-label="다시 시작 메뉴" aria-haspopup="true" aria-expanded="false" title="다시 시작">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4 4.5v4h4"/></svg>
+</button>
+<div id="menupop" class="menupop card" role="menu" hidden></div>
 
 <script src="chapter1.js"></script>
 <script src="chapter2.js"></script>
