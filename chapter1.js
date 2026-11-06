@@ -2971,11 +2971,12 @@ window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에
     art: { sky: 'cave', bg: 'tomb', fx: ['ash'] },
     intro: '왕관에서 잿불이 일어나 하나의 형체가 되었다. 뿔이 천장에 닿을 듯하다!',
     win: {
-      text: ['그림자가 무릎을 꿇고 잿불로 흩어졌다. 일곱 겹의 사슬이 한꺼번에 끊어지며, 왕관이 그대의 종 속으로 녹아들었다.',
-        '“좋다. 부르면 오겠다 — 한 싸움 동안만. 그리고 부를 때마다 너의 피를 받겠다.” 그대의 손등에 검붉은 왕관 문양이 새겨졌다.'],
-      fx: { learn: 'demonlord', drop: SH, set: ['ember_pact', 'ember_done'], xp: 60 },
+      text: ['그림자가 무릎을 꿇고 잿불로 흩어졌다. 일곱 겹의 사슬이 한꺼번에 끊어지며, 잿불의 왕관이 떠올라 — 그대의 머리 위에 내려앉았다.',
+        '불길이 그대의 핏줄을 타고 흘렀다. 이마에서 두 뿔이 돋고, 등 뒤로 잿불의 날개가 펼쳐졌다. 그대가 부르던 정령들마저 검붉은 불꽃으로 다시 태어났다.',
+        '거대한 그림자가 다시 일어나 그대 앞에 무릎을 꿇었다. “새 군주여. 아즈라칸이 그대의 권속이 되겠다. 부르는 곳 어디든.”'],
+      fx: { lord: true, learn: 'demonlord', drop: SH, set: ['ember_pact', 'ember_done'], xp: 60 },
       approve: { orden: -2, sena: -1 },
-      log: '잿불 왕관의 대군주 아즈라칸과 계약했다.', next: 'map' },
+      log: '계약을 맺고 잿불의 대군주가 되었다. 아즈라칸이 권속이 되었다.', next: 'map' },
     lose: { text: ['잿불이 그대를 계단 위로 내던졌다. 왕관은 여전히 사슬 속에서 기다린다. 뿔 조각은 그대 손에 남아 있다.'],
       log: '대군주의 그림자에게 쓰러졌다.', next: 'map' }
   };
@@ -2985,14 +2986,14 @@ window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에
     text: [
       '수정관 아래, 바닥의 별 문양 하나가 잿빛으로 식어 있다. 그대가 지닌 뿔 조각 셋이 한꺼번에 뜨거워지자, 문양 밑에서 계단이 열렸다.',
       '가장 깊은 방은 별빛 대신 검붉은 잿불로 밝다. 일곱 겹의 사슬이 가운데 놓인 왕관 하나를 묶고 있고, 왕관 위로 거대한 뿔의 그림자가 일렁인다.',
-      '“일곱째 별이 떨어질 때, 그 그림자도 함께 떨어졌다. 나는 아즈라칸, 별이 버린 불이다. 종을 울리는 자여, 내 이름을 불러라. 그 대가로 너의 피를 조금 받겠다.”',
+      '“일곱째 별이 떨어질 때, 그 그림자도 함께 떨어졌다. 나는 아즈라칸, 별이 버린 불이다. 종을 울리는 자여, 이 왕관을 써라. 그러면 네가 잿불의 군주가 되고, 나는 너의 권속이 되리라.”',
       { if: { party: 'orden' }, t: '오르덴의 창끝이 떨렸다. “저것은 맹세를 삼키는 불이다. …그대가 정한다면 막지는 않겠다. 그러나 잊지 마라.”' },
       { if: { party: 'bran' }, t: '브란이 낮게 웃었다. “낙인보다 지독한 계약이로군. 그래도 — 저걸 부릴 수 있다면.”' }
     ],
     choices: [
-      { id: 1, insp: 'brave', label: '왕관에 손을 얹고 계약의 시험을 받는다', roll: false, note: '전투 (매우 강하다 · 권장 레벨 7) · 이기면 「잿불의 대군주 강림」을 익힌다',
+      { id: 1, insp: 'brave', label: '왕관에 손을 얹고 계약의 시험을 받는다', roll: false, note: '전투 (매우 강하다 · 권장 레벨 7) · 이기면 그대가 「잿불의 대군주」가 된다 — 능력치·장비·기술·소환수가 모두 크게 강해지고 아즈라칸을 영영 부린다 (쉬운 길)',
         then: { text: ['왕관이 그대의 손을 태웠다. 잿불이 일어나 하나의 거대한 형체가 되었다 — 대군주의 그림자.'], battle: TRIAL, next: 'map' } },
-      { id: 2, insp: 'mercy', label: '뿔 조각을 수정관의 별빛에 던져 봉인을 영영 닫는다', roll: false, note: '다시는 계약할 수 없다', approve: { orden: 2, sena: 1 },
+      { id: 2, insp: 'mercy', label: '뿔 조각을 수정관의 별빛에 던져 봉인을 영영 닫는다', roll: false, note: '평범한 길로 간다 · 다시는 계약할 수 없다', approve: { orden: 2, sena: 1 },
         then: { text: ['뿔 조각들이 별빛 속에서 하얗게 타올랐다. 왕관이 비명을 지르며 사슬 속으로 가라앉았고, 계단은 다시 닫혔다.', '수정관에 남은 별빛이 그대의 손목에 감겨 작은 맹세가 되었다.'],
           fx: { drop: SH, set: ['ember_done', 'ember_refused'], items: ['봉인지기의 맹세'] }, log: '잿불 봉인을 영영 닫았다.', next: 'map' } },
       { id: 3, label: '아직은 아니다. 계단을 올라간다', roll: false, then: { text: ['그대가 등을 돌리자, 잿불이 낮게 웃었다. “기다리지. 나는 오래 기다리는 데 익숙하다.”'], next: 'map' } }
@@ -3008,9 +3009,51 @@ window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에
     atk: { name: '잿불 대검', dice: '3d12', dtype: 'fire' }, multi: 2,
     breath: { every: 2, dmg: '6d8', dtype: 'fire', save: '민첩', burn: 2, name: '잿불 폭풍' },
     arrive: { save: '지혜', onFail: { weak: 2 }, name: '군주의 위압' },
-    noCap: true, oneBattle: true, rank: 9,
-    desc: '자리를 차지하지 않는다. 나타나는 순간 모든 적이 지혜 내성에 실패하면 2턴 동안 겁에 질린다 (명중 -2). 잿불 대검으로 두 번 베고 (돌격 명령에도 두 번), 곧바로, 그 뒤로 두 라운드마다 모든 적에게 잿불 폭풍 6d8+지혜 (민첩 내성에 성공하면 절반, 실패하면 불붙는다). 그 싸움이 끝나면 심연으로 돌아간다' };
-  CS.demonlord = { cls: 'summoner', lv: 6, pact: true, name: '잿불의 대군주 강림', uses: 1, per: 'long', mp: 6, hpCost: 0.25, kind: 'summon', summon: ['demonlord'],
-    up: [{ lv: 10, hpMul: 0.3, note: '대군주 HP +30%' }, { lv: 12, dmgAdd: 4, note: '대군주 피해 +4' }],
-    desc: '봉인을 풀고 잿불의 대군주를 부른다 (긴 휴식마다 1번). 대가로 그대의 최대 HP의 1/4을 바친다 — {sum}' };
+    noCap: true, rank: 9,
+    desc: '자리를 차지하지 않는 영구 소환수. 싸움이 시작되거나 나타나는 순간 모든 적이 지혜 내성에 실패하면 2턴 동안 겁에 질린다 (명중 -2). 잿불 대검으로 두 번 베고 (돌격 명령에도 두 번), 곧바로, 그 뒤로 두 라운드마다 모든 적에게 잿불 폭풍 6d8+지혜 (민첩 내성에 성공하면 절반, 실패하면 불붙는다). 쓰러져도 긴 휴식을 하면 다시 일어나 곁에 선다' };
+  CS.demonlord = { cls: 'summoner', lv: 6, pact: true, name: '잿불의 대군주 강림', uses: 1, per: 'long', mp: 6, kind: 'summon', summon: ['demonlord'],
+    up: [{ lv: 10, hpMul: 0.3, note: '아즈라칸 HP +30%' }, { lv: 12, dmgAdd: 4, note: '아즈라칸 피해 +4' }],
+    desc: '권속 아즈라칸을 부른다 (긴 휴식마다 1번) — {sum}' };
+
+  // 잿불의 대군주: 계약하면 그대가 바뀐다 (fx.lord). 쉬운 길 — 계약하지 않으면 평범하게 간다
+  Object.assign(SC.items, {
+    '잿불 왕관': { kind: '머리', slot: 'head', rar: 'legendary', cls: 'summoner', nosell: true, ac: 3, fx: { hp: 15, save: 1, check: 2, sumCap: 1, sumDmg: 3 }, desc: '봉인에서 떠올라 그대의 머리에 내려앉은 검붉은 왕관' },
+    '대군주의 종': { kind: '무기', slot: 'weapon', rar: 'legendary', cls: 'summoner', nosell: true, dice: '2d8', bonus: 4, fx: { mp: 8, fire: 4, sumHp: 0.2 }, desc: '잿불로 다시 벼려진 종. 울리면 땅속에서 불이 대답한다' }
+  });
+  SC.lord = {
+    title: '잿불의 대군주',
+    fx: { hp: 40, mp: 12, ac: 3, hit: 2, dmg: 3, save: 3, init: 2, check: 2, resist: ['fire', 'poison', 'psychic'], sumHp: 0.5, sumDmg: 4, sumHit: 2, sumAc: 2, sumCap: 1, sumCost: 1 },
+    stats: { 지혜: 3, 힘: 2, 민첩: 2, 매력: 2 },
+    regen: 0.06,
+    items: ['잿불 왕관', '대군주의 종'],
+    returns: 'demonlord', returnsBy: 'demonlord',
+    skills: {
+      spiritbolt: { name: '지옥불 화살', dtype: 'fire', dice: '2d10' },
+      callwolf: { name: '지옥불 늑대 부르기', mp: 1 },
+      command: { name: '군주의 명령', times: 1 },
+      callgolem: { name: '흑요석 수호자 부르기', mp: 1 },
+      bond: { name: '피의 유대', heal: '2d8' },
+      callember: { name: '지옥불 정령 부르기', mp: 1 },
+      calldrake: { name: '잿불 비룡 부르기', mp: 2 },
+      swarm: { name: '지옥개 무리', mp: 2 },
+      host: { name: '지옥의 군세', uses: 1 },
+      callmoon: { name: '핏빛 달늑대 부르기', mp: 2 },
+      huntcall: { name: '피의 사냥', times: 1 },
+      starchain: { name: '지옥 사슬' },
+      offering: { name: '피의 제물', dice: '2d8' },
+      callherald: { name: '타락한 사도 부르기', uses: 1 },
+      fusion: { name: '잿불 융합', uses: 1 },
+      demonlord: { name: '권속 아즈라칸 부르기', mp: 5 }
+    },
+    summons: {
+      starwolf: { name: '지옥불 늑대', art: 'if_wolf', atk: '불꽃 물기' },
+      golem: { name: '흑요석 수호자', art: 'if_golem', atk: '흑요석 주먹' },
+      ember: { name: '지옥불 정령', art: 'if_wisp', atk: '지옥불' },
+      drake: { name: '잿불 비룡', art: 'if_drake', atk: '불의 이빨', breath: '잿불 숨결' },
+      moonwolf: { name: '핏빛 달늑대', art: 'if_moon', atk: '핏빛 송곳니' },
+      herald: { name: '타락한 사도', art: 'if_herald', atk: '흑염의 검' },
+      colossus: { name: '잿불의 거수', art: 'if_colossus', atk: '지옥의 발톱', breath: '지옥 숨결' },
+      demonlord: { name: '권속 아즈라칸', atk: '잿불 대검', breath: '잿불 폭풍' }
+    }
+  };
 })();

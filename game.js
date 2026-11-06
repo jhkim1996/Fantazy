@@ -165,6 +165,10 @@ function spec(){return S.spec?specsOf().find(x=>x.id===S.spec)||null:null}
 function specP(k){const s=spec();return s&&s.passive?s.passive[k]:undefined}
 function specDue(){return !!(S.hero&&S.hero.level>=SPEC_LV&&!S.spec&&specsOf().length)}
 function heroP(u,k){return u&&u.kind==='hero'?specP(k):undefined}
+// ── 잿불의 대군주: 계약을 맺으면 그대가 대군주가 된다. 능력치·장비·기술·소환수·겉모습이 모두 바뀐다 (쉬운 길)
+function lordOn(){return !!(S&&S.flags&&S.flags.ember_lord&&SC.lord)}
+// 같은 면의 주사위를 더한다: 3d10 + 2d10 = 5d10 (면이 다르면 더하지 않는다)
+function diceAdd(a,b){const x=parseDice(a),y=parseDice(b);if(!x.n)return a;if(y.n&&y.s!==x.s)return a;return (x.n+y.n)+'d'+x.s+(x.z+y.z?sign(x.z+y.z):'')}
 function clsSkills(){const s=spec();return (cls().skills||[]).concat(s?s.skills:[]).concat((S.learned||[]).filter(k=>SC.combatSkills[k]&&SC.combatSkills[k].cls===S.cls)).map((k,i)=>[k,i]).sort((a,b)=>SC.combatSkills[a[0]].lv-SC.combatSkills[b[0]].lv||a[1]-b[1]).map(x=>x[0])}
 function knownSkills(){return clsSkills().filter(k=>SC.combatSkills[k].lv<=S.hero.level)}
 function hasRelic(){return S.items.some(i=>i===cls().relic)}
@@ -229,7 +233,7 @@ function setFx(){const f={};for(const id in (SC.sets||{})){const n=setCount(id);
 // 그대가 입고 찬 모든 장비 + 세트 효과
 function gearFx(){const f={};if(!S.equip)return f;SLOTS.forEach(([k])=>{const it=SC.items[S.equip[k]];if(it)addFx(f,it.fx)});return addFx(f,setFx())}
 // 장비 + 세트 + 전문화의 타고난 힘
-function heroFx(){const s=spec();return addFx(gearFx(),s&&s.fx)}
+function heroFx(){const s=spec();return addFx(addFx(gearFx(),s&&s.fx),lordOn()?SC.lord.fx:null)}
 
 // ── 팔기: 마을의 행상인에게. 전설·세트·이야기 물건은 팔지 않는다
 function wornCount(n){return SLOTS.filter(([k])=>S.equip[k]===n).length+Object.keys(S.comp||{}).filter(id=>S.comp[id].trinket===n).length}
@@ -322,6 +326,7 @@ function applyFx(fx,out){
   if(fx.gold){const g=Array.isArray(fx.gold)?rint(fx.gold[0],fx.gold[1]):fx.gold;S.gold=Math.max(0,S.gold+g);out.push('금화 '+sign(g))}
   arr(fx.drop).forEach(i=>{const k=S.items.indexOf(i);if(k>=0){S.items.splice(k,1);out.push('잃음: '+i)}});
   arr(fx.items).forEach(i=>{S.items.push(i);out.push(gotLine(i))});
+  if(fx.lord&&!lordOn())becomeLord(out);
   // 이야기 속 계약으로 기술을 익힌다
   arr(fx.learn).forEach(k=>{if(!SC.combatSkills[k]||(S.learned||[]).includes(k))return;S.learned=(S.learned||[]).concat(k);out.push('새 기술: '+SC.combatSkills[k].name);logp('「'+SC.combatSkills[k].name+'」을 익혔다.')});
   markNew(fx.items);
@@ -629,6 +634,7 @@ function longRest(){
   h.hp=fill(h.hp,h.hpMax);h.mp=fill(h.mp,h.mpMax);
   for(const id in S.comp)S.comp[id].hp=fill(S.comp[id].hp,S.comp[id].hpMax);
   pets().forEach(p=>{p.hp=fill(p.hp,p.hpMax)});
+  if(lordOn()&&SC.lord.returns&&!pets().some(p=>p.id===SC.lord.returns)&&(S.learned||[]).includes(SC.lord.returnsBy)){const x=sumStats(SC.lord.returns,abOf(SC.lord.returnsBy));S.pets.push({id:SC.lord.returns,sk:SC.lord.returnsBy,hp:x.hp,hpMax:x.hp});logp(SUMT(SC.lord.returns).name+'이 잿불 속에서 다시 일어나 그대 곁에 무릎을 꿇었다.')}
   S.rest={short:2};recharge('long');arr(SC.restClears).forEach(f=>{delete S.flags[f]});
   logp(l.name+'에서 '+(full?'':'빈속으로 ')+'긴 휴식을 했다.');
   const msg=restText(l)+' — '+(full?'밤이 지나고, 모두 HP와 마력을 되찾았다.':'먹을 것이 없어 잠을 설쳤다. 절반만 회복했다.')+(!free&&has?' (야영 물자 -1)':'')+' 짧은 휴식과 기술이 모두 충전되었다.';
@@ -680,6 +686,18 @@ function readBook(name){
   if(S.hero.level<(it.lvReq||1)){S.notice='아직은 이 책의 문장이 그대에게 열리지 않는다 (레벨 '+it.lvReq+' 필요).';render();return}
   S.items.splice(S.items.indexOf(name),1);S.learned=(S.learned||[]).concat(it.learn);
   logp('「'+name+'」을 읽고 「'+sk.name+'」을 익혔다.');S.notice='「'+sk.name+'」을 익혔다! 전투의 기술 목록에 더해졌다.';save();render();
+}
+function becomeLord(out){
+  const Lo=SC.lord,h=S.hero;if(!Lo||!h)return;
+  regear(()=>{S.flags.ember_lord=true});
+  for(const n in Lo.stats){const st=S.stats.find(x=>x.n===n);if(st){st.v+=Lo.stats[n];st.note=(st.note?st.note+' · ':'')+'대군주 +'+Lo.stats[n]}}
+  h.cls=Lo.title;
+  arr(Lo.items).forEach(n=>{const it=SC.items[n];S.items.push(n);markNew([n]);if(it&&it.slot&&it.slot!=='trinket')regear(()=>{S.equip[it.slot]=n})});
+  // 아즈라칸이 그대의 권속으로 곁에 선다 (영구 소환수)
+  if(Lo.returns&&!pets().some(p=>p.id===Lo.returns)){const x=sumStats(Lo.returns,null);S.pets=pets().concat({id:Lo.returns,sk:Lo.returnsBy,hp:x.hp,hpMax:x.hp})}
+  h.hp=h.hpMax;h.mp=h.mpMax;
+  out.push('그대는 '+Lo.title+'가 되었다 — 능력치 +, '+trinketText(Lo.fx));
+  logp('잿불의 대군주가 되었다.');
 }
 function CLS_N(id){const c=SC.classes.find(x=>x.id===id);return c?c.name:id}
 function useItem(name,who){
@@ -1101,6 +1119,7 @@ function startTurn(u){
   if(u.st.prone&&!u.st.stun){delete u.st.prone;B.tr.move=0;logB(josa(nm(u),'이')+' 몸을 일으켰다 (이동을 썼다)','sys')}
   surfHit(u);
   if(up(u)&&u.st.burn){const dm=hurt(u,rollDice('1d4').total,'fire');if(dm)logB(nm(u)+' — 불붙은 몸에서 불 피해 '+wtxt(dm,u),hk(u));if(--u.st.burn<=0)delete u.st.burn}
+  if(u.kind==='hero'&&lordOn()&&up(u)&&S.hero.hp<S.hero.hpMax){const v=heal(u,Math.ceil(S.hero.hpMax*SC.lord.regen));if(v)logB(nm(u)+' — 대군주의 잿불이 몸을 되살린다 (HP +'+v+')','me')}
   if(up(u)&&u.st.poison){const p=u.st.poison,dm=hurt(u,rollDice(p.dmg).total,'poison');if(dm)logB(nm(u)+' — 독 피해 '+wtxt(dm,u),hk(u));if(--p.t<=0)delete u.st.poison}
   if(!up(u))return false;
   if(u.st.stun){if(--u.st.stun<=0){delete u.st.stun;u.thawR=B.round}logB(josa(nm(u),'은')+' 얼어붙어 움직이지 못한다','sys');afx({type:'text',target:u.uid,text:'얼어붙음',color:'#9fd3ff'});return false}
@@ -1261,7 +1280,14 @@ function attack(a,t,P,o){
 
 // ── 소환수: 소환사가 부르는 아군. 자기 차례에 알아서 싸우고(그대가 고른 적을 먼저 노린다), 쓰러지면 흩어진다.
 // 한 번에 부릴 수 있는 수를 넘기면 가장 먼저 부른 것이 자리를 내준다. 전투가 끝나면 모두 돌아간다.
-function SUMT(id){return (SC.summons||{})[id]}
+const LORD_T={};
+function SUMT(id){
+  const T=(SC.summons||{})[id];if(!T||!lordOn())return T;
+  const L=SC.lord.summons[id];if(!L)return T;
+  if(!LORD_T[id])LORD_T[id]=Object.assign({},T,{name:L.name||T.name,art:L.art||T.art,atk:Object.assign({},T.atk,{name:L.atk||T.atk.name,dtype:'fire'}),
+    breath:T.breath?Object.assign({},T.breath,{dtype:'fire',name:L.breath||T.breath.name,burn:T.breath.burn||2}):undefined,burn:true,desc:T.desc+' — 대군주의 권속: 모든 공격이 불이고, 맞은 적은 불붙는다'});
+  return LORD_T[id];
+}
 function summons(){const B=S.battle;return B&&B.units?B.units.filter(u=>u.kind==='summon'&&!u.gone):[]}
 function sumCap(){const L=S.hero.level;return 2+(L>=6?1:0)+(L>=12?1:0)+(specP('sumCap')||0)+(heroFx().sumCap||0)}
 // 자리를 차지하는 소환수 (별의 사도처럼 따로 오는 것은 빼고)
@@ -1389,9 +1415,15 @@ function dismissPet(i){const p=pets()[i];if(!p||rolling)return;S.pets.splice(i,1
 function abOf(k){
   const ab=SC.combatSkills[k];if(!ab||!S.hero)return ab;
   const cost=ab.kind==='summon'&&ab.mp?heroFx().sumCost||0:0;   // 부르기 마력을 깎는 장비 (별지기의 예복)
-  if(!ab.up&&!cost)return ab;
+  const lo=lordOn()&&ab.cls===S.cls?SC.lord.skills[k]:null;      // 대군주가 되면 기술도 바뀐다
+  if(!ab.up&&!cost&&!lo)return ab;
   const r=Object.assign({},ab);arr(ab.up).forEach(x=>{if(S.hero.level>=x.lv)for(const f in x)if(f!=='lv'&&f!=='note')r[f]=x[f]});
   if(cost)r.mp=Math.max(1,r.mp-cost);
+  if(lo){
+    if(lo.name)r.name=lo.name;if(lo.dtype)r.dtype=lo.dtype;
+    if(lo.dice&&r.dmg)r.dmg=diceAdd(r.dmg,lo.dice);if(lo.heal&&r.heal)r.heal=diceAdd(r.heal,lo.heal);if(lo.extra)r.extra=r.extra?diceAdd(r.extra,lo.extra):lo.extra;
+    if(lo.times)r.times=(r.times||1)+lo.times;if(lo.mp&&r.mp)r.mp=Math.max(1,r.mp-lo.mp);if(lo.uses&&r.uses)r.uses+=lo.uses;if(lo.hpMul)r.hpMul=(r.hpMul||0)+lo.hpMul;if(lo.dmgAdd)r.dmgAdd=(r.dmgAdd||0)+lo.dmgAdd;
+  }
   return r;
 }
 // 설명: 지금 값으로 채우고, 아직 오지 않은 강화를 덧붙인다
@@ -1963,7 +1995,7 @@ function campArt(){
 function artInfo(){
   const B=S.mode==='combat'&&S.battle&&S.battle.units?S.battle:null;let bat=null;
   if(B){const cu=curU();bat={over:!!B.over,surf:B.surf,field:B.field,units:B.units.filter(u=>!u.gone).map(u=>({id:u.uid,side:u.side,row:u.row,k:u.art,high:!!u.high,hid:!!u.hid,prone:!!u.st.prone,down:!up(u),cur:cu===u&&!B.over,target:B.target===u.uid}))}}
-  return {cls:S.cls||(S.mk&&S.mk.cls),relic:S.items?hasRelicSafe():false,battle:bat};
+  return {cls:S.cls||(S.mk&&S.mk.cls),relic:S.items?hasRelicSafe():false,lord:lordOn(),battle:bat};
 }
 function hasRelicSafe(){try{return !!S.cls&&hasRelic()}catch(e){return false}}
 
@@ -2341,6 +2373,14 @@ function paneAbil(box){
     if(h.level>=maxLv())spc.appendChild(el('div','sub','최고 레벨 '+maxLv()+'에 이르렀다.'));
   }
 
+  // 잿불의 대군주가 되었다면: 무엇이 바뀌었는지
+  if(lordOn()){
+    const Lo=SC.lord;box.appendChild(el('h2',null,Lo.title));const lc=el('div','card lordcard');box.appendChild(lc);
+    abl(lc,'대군주의 몸','계약',trinketText(Lo.fx));
+    abl(lc,'잿불의 피','계약','능력치 '+Object.entries(Lo.stats).map(([n,v])=>n+' +'+v).join(', ')+' · 그대의 차례마다 최대 HP의 '+Math.round(Lo.regen*100)+'%를 되찾는다');
+    abl(lc,'지옥불 권속','계약','모든 소환수가 불의 권속으로 다시 태어난다 — 공격이 불이 되고, 맞은 적은 불붙는다. 기술도 대군주의 것으로 바뀐다');
+    if(Lo.returns)abl(lc,SUMT(Lo.returns).name,'권속','쓰러져도 긴 휴식을 하면 다시 일어나 곁에 선다');
+  }
   box.appendChild(el('h2',null,'재능과 출신'));
   const tc=el('div','card');box.appendChild(tc);
   S.skills.forEach(id=>{
