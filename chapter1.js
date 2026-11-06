@@ -2939,3 +2939,78 @@ window.SCENARIO.locations.gate.actions.push({ label: '관문 앞의 오르덴에
     up: [{ lv: 10, hpMul: 0.3, note: '사도 HP +30%' }, { lv: 14, dmgAdd: 5, note: '사도 피해 +5' }],
     desc: '보조 행동으로 별의 사도를 부른다 (긴 휴식마다 1번) — {sum}' };
 })();
+
+// ── 소환사의 숨은 계약: 「잿불 왕관의 대군주 아즈라칸」 (1장, 별의 무덤 아래)
+// 잿불 뿔 조각 셋을 모아(소환사일 때만 아주 드물게 떨어진다) 봉인 앞에서 대군주의 그림자를 이기면 기술을 익힌다.
+(function () {
+  const SC = window.SCENARIO, CS = SC.combatSkills, E = SC.enemies;
+  const SH = ['잿불 뿔 조각 · 왼뿔', '잿불 뿔 조각 · 오른뿔', '잿불 뿔 조각 · 왕관'];
+  const desc = ['검붉게 식은 뿔의 왼쪽 끝. 쥐면 손바닥이 뜨겁다', '오른쪽 뿔의 조각. 귀에 대면 먼 불길 소리가 난다', '왕관의 가시 하나. 종을 울리면 함께 떨린다'];
+  SH.forEach((n, i) => { SC.items[n] = { kind: '증표', cls: 'summoner', rar: 'legendary', nosell: true, desc: desc[i] + ' (셋을 모아 별의 무덤으로)' }; });
+  const NOT_DONE = { not: 'ember_done' };
+  E.hound.drops.push({ item: SH[0], p: 0.03, pity: 40, uniq: true, if: NOT_DONE });
+  E.leech.drops.push({ item: SH[1], p: 0.03, pity: 40, uniq: true, if: NOT_DONE });
+  E.captain.drops.push({ item: SH[2], p: 0.08, pity: 14, uniq: true, if: NOT_DONE });
+
+  E.imp = { art: 'imp', name: '잿불 임프', lv: 3, hp: 18, ac: 13, atk: 5, dmg: '1d6+2', dtype: 'fire', xp: 10, gold: [1, 4], fly: true, row: 'back', ranged: true, resist: ['fire'],
+    desc: '불꽃을 튀기며 날아다니는 작은 악마.' };
+  E.embershade = { art: 'embershade', name: '대군주의 그림자', where: '별의 무덤 아래 잿불 봉인', people: true, lv: 8, hp: 200, ac: 17, atk: 9, dmg: '2d10+5', dtype: 'fire', xp: 150, gold: [40, 80],
+    boss: true, big: true, multi: 2, init: 2, resist: ['fire', 'poison'], vuln: ['radiant'],
+    skills: [
+      { name: '잿불 휩쓸기', p: 0.3, dmg: '2d10+4', hit: -2, sweep: true, dtype: 'fire' },
+      { name: '지옥불 화살', p: 0.2, ranged: true, dmg: '2d8', dtype: 'fire', onHit: { burn: 3 } },
+      { name: '군주의 포효', p: 0.15, debuff: { atk: -2, turns: 2 }, text: '그림자가 포효한다. 무덤 전체가 떨린다! (2턴 동안 모두 명중 -2)' },
+      { name: '임프 부르기', p: 0.25, summon: 'imp', once: true }
+    ],
+    drops: [{ item: '푸른 물약', p: 0.6 }, { item: '은빛 물약', p: 0.6 }],
+    desc: '봉인 너머에서 대군주가 보낸 그림자. 잿불을 두른 거대한 뿔의 형체. 한 번에 두 번 베고, 동료가 둘 이상이면 한 라운드에 두 번 움직인다. 불과 독에 강하고 별빛에 약하다.' };
+  SC.items['봉인지기의 맹세'] = { kind: '장신구', slot: 'trinket', rar: 'rare', fx: { hp: 8, save: 2, resist: ['fire'] }, desc: '잿불 봉인을 영영 닫은 자가 받은 별빛의 맹세' };
+
+  const TRIAL = {
+    enemies: ['embershade'], noFlee: true, perPC: { hp: 30 }, extraTurn: 2,
+    art: { sky: 'cave', bg: 'tomb', fx: ['ash'] },
+    intro: '왕관에서 잿불이 일어나 하나의 형체가 되었다. 뿔이 천장에 닿을 듯하다!',
+    win: {
+      text: ['그림자가 무릎을 꿇고 잿불로 흩어졌다. 일곱 겹의 사슬이 한꺼번에 끊어지며, 왕관이 그대의 종 속으로 녹아들었다.',
+        '“좋다. 부르면 오겠다 — 한 싸움 동안만. 그리고 부를 때마다 너의 피를 받겠다.” 그대의 손등에 검붉은 왕관 문양이 새겨졌다.'],
+      fx: { learn: 'demonlord', drop: SH, set: ['ember_pact', 'ember_done'], xp: 60 },
+      approve: { orden: -2, sena: -1 },
+      log: '잿불 왕관의 대군주 아즈라칸과 계약했다.', next: 'map' },
+    lose: { text: ['잿불이 그대를 계단 위로 내던졌다. 왕관은 여전히 사슬 속에서 기다린다. 뿔 조각은 그대 손에 남아 있다.'],
+      log: '대군주의 그림자에게 쓰러졌다.', next: 'map' }
+  };
+  SC.events.ember_seal = {
+    art: { sky: 'cave', bg: 'tomb', actors: [{ k: 'hero', x: 0.24 }, { k: 'embershade', x: 0.7, face: -1 }], fx: ['ash'] },
+    title: '잿불 봉인', clock: '숨겨진 계약', place: '별의 무덤 아래',
+    text: [
+      '수정관 아래, 바닥의 별 문양 하나가 잿빛으로 식어 있다. 그대가 지닌 뿔 조각 셋이 한꺼번에 뜨거워지자, 문양 밑에서 계단이 열렸다.',
+      '가장 깊은 방은 별빛 대신 검붉은 잿불로 밝다. 일곱 겹의 사슬이 가운데 놓인 왕관 하나를 묶고 있고, 왕관 위로 거대한 뿔의 그림자가 일렁인다.',
+      '“일곱째 별이 떨어질 때, 그 그림자도 함께 떨어졌다. 나는 아즈라칸, 별이 버린 불이다. 종을 울리는 자여, 내 이름을 불러라. 그 대가로 너의 피를 조금 받겠다.”',
+      { if: { party: 'orden' }, t: '오르덴의 창끝이 떨렸다. “저것은 맹세를 삼키는 불이다. …그대가 정한다면 막지는 않겠다. 그러나 잊지 마라.”' },
+      { if: { party: 'bran' }, t: '브란이 낮게 웃었다. “낙인보다 지독한 계약이로군. 그래도 — 저걸 부릴 수 있다면.”' }
+    ],
+    choices: [
+      { id: 1, insp: 'brave', label: '왕관에 손을 얹고 계약의 시험을 받는다', roll: false, note: '전투 (매우 강하다 · 권장 레벨 7) · 이기면 「잿불의 대군주 강림」을 익힌다',
+        then: { text: ['왕관이 그대의 손을 태웠다. 잿불이 일어나 하나의 거대한 형체가 되었다 — 대군주의 그림자.'], battle: TRIAL, next: 'map' } },
+      { id: 2, insp: 'mercy', label: '뿔 조각을 수정관의 별빛에 던져 봉인을 영영 닫는다', roll: false, note: '다시는 계약할 수 없다', approve: { orden: 2, sena: 1 },
+        then: { text: ['뿔 조각들이 별빛 속에서 하얗게 타올랐다. 왕관이 비명을 지르며 사슬 속으로 가라앉았고, 계단은 다시 닫혔다.', '수정관에 남은 별빛이 그대의 손목에 감겨 작은 맹세가 되었다.'],
+          fx: { drop: SH, set: ['ember_done', 'ember_refused'], items: ['봉인지기의 맹세'] }, log: '잿불 봉인을 영영 닫았다.', next: 'map' } },
+      { id: 3, label: '아직은 아니다. 계단을 올라간다', roll: false, then: { text: ['그대가 등을 돌리자, 잿불이 낮게 웃었다. “기다리지. 나는 오래 기다리는 데 익숙하다.”'], next: 'map' } }
+    ]
+  };
+  SC.locations.tomb.actions.push({ label: '수정관 아래 잿불 봉인으로 내려간다', event: 'ember_seal', if: { cls: 'summoner', item: SH, not: 'ember_done' }, star: true });
+  // 일지: 조각을 하나라도 얻으면 무엇을 더 모아야 하는지 보인다
+  SC.quests.push({ name: '잿불 뿔', if: { cls: 'summoner', not: 'ember_done', or: SH.map(n => ({ item: n })) },
+    t: '왼뿔 {@' + SH[0] + '} · 오른뿔 {@' + SH[1] + '} · 왕관 {@' + SH[2] + '} — 셋을 모아 별의 무덤으로. 왼뿔은 잿빛 사냥개, 오른뿔은 수로 거머리, 왕관 조각은 가라앉은 기사단장이 아주 드물게 지닌다' });
+
+  // 대군주: 한 싸움 동안만 머문다 (전투 밖에서 미리 불러 두면 다음 싸움에 함께 나선다)
+  SC.summons.demonlord = { name: '잿불의 대군주 아즈라칸', art: 'demonlord', row: 'front', fly: true, big: true, hp: 60, hpLv: 14, ac: 18,
+    atk: { name: '잿불 대검', dice: '3d12', dtype: 'fire' }, multi: 2,
+    breath: { every: 2, dmg: '6d8', dtype: 'fire', save: '민첩', burn: 2, name: '잿불 폭풍' },
+    arrive: { save: '지혜', onFail: { weak: 2 }, name: '군주의 위압' },
+    noCap: true, oneBattle: true, rank: 9,
+    desc: '자리를 차지하지 않는다. 나타나는 순간 모든 적이 지혜 내성에 실패하면 2턴 동안 겁에 질린다 (명중 -2). 잿불 대검으로 두 번 베고 (돌격 명령에도 두 번), 곧바로, 그 뒤로 두 라운드마다 모든 적에게 잿불 폭풍 6d8+지혜 (민첩 내성에 성공하면 절반, 실패하면 불붙는다). 그 싸움이 끝나면 심연으로 돌아간다' };
+  CS.demonlord = { cls: 'summoner', lv: 6, pact: true, name: '잿불의 대군주 강림', uses: 1, per: 'long', mp: 6, hpCost: 0.25, kind: 'summon', summon: ['demonlord'],
+    up: [{ lv: 10, hpMul: 0.3, note: '대군주 HP +30%' }, { lv: 12, dmgAdd: 4, note: '대군주 피해 +4' }],
+    desc: '봉인을 풀고 잿불의 대군주를 부른다 (긴 휴식마다 1번). 대가로 그대의 최대 HP의 1/4을 바친다 — {sum}' };
+})();

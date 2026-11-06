@@ -314,6 +314,41 @@ window.Art=(function(){
     g.lineWidth=L*.035;seg(x-L*.08,y+L*.06,x-L*.1,gy-L*.02);seg(x+L*.08,y+L*.06,x+L*.1,gy-L*.02);
     g.fillStyle='#fff1c4';circ(x+f*L*.36,y-L*.24,2);glow(x+f*L*.36,y-L*.24,L*.05,'#fff1c4',.7);
   }
+  // 대악마: 굽은 두 뿔, 날개, 등 가시, 짐승 다리, 잿불 대검 (shadow면 그림자)
+  function demon(x,gy,L,f,t,o){
+    o=o||{};const col=o.col||'#2a0e0c',fire='#ff7a2c',fl=motion?Math.sin(t*3)*.04:0,br=motion?Math.sin(t*1.6)*L*.01:0;
+    glow(x,gy-L*.55,L*.8,fire,o.shadow?.22:.42);
+    g.fillStyle=col;g.strokeStyle=col;g.lineCap='round';g.lineJoin='round';
+    // 날개 (뒤쪽은 크게, 앞쪽은 작게)
+    poly([[x-f*L*.08,gy-L*.76],[x-f*L*.66,gy-L*(1.22+fl)],[x-f*L*.55,gy-L*1.02],[x-f*L*.74,gy-L*(.94+fl)],[x-f*L*.5,gy-L*.82],[x-f*L*.64,gy-L*(.66+fl)],[x-f*L*.2,gy-L*.56]]);
+    poly([[x+f*L*.06,gy-L*.76],[x+f*L*.42,gy-L*(1.12+fl)],[x+f*L*.36,gy-L*.94],[x+f*L*.14,gy-L*.62]]);
+    // 꼬리: 등 아래에서 땅으로, 끝은 가시
+    g.lineWidth=L*.035;g.beginPath();g.moveTo(x-f*L*.08,gy-L*.42);g.quadraticCurveTo(x-f*L*.42,gy-L*.3,x-f*L*.46,gy-L*.06);g.stroke();
+    poly([[x-f*L*.46,gy-L*.02],[x-f*L*.52,gy-L*.1],[x-f*L*.4,gy-L*.09]]);
+    // 짐승 다리: 엉덩이 → 앞무릎 → 뒤로 꺾인 발목 → 발
+    g.lineWidth=L*.07;[-1,1].forEach(sd=>{const hx0=x+sd*L*.08,kx=x+sd*L*.15,ax_=x+sd*L*.07,fx_=x+sd*L*.15;seg(hx0,gy-L*.44,kx,gy-L*.27);g.lineWidth=L*.055;seg(kx,gy-L*.27,ax_,gy-L*.1);seg(ax_,gy-L*.1,fx_,gy);g.lineWidth=L*.07});
+    // 몸통: 넓은 가슴, 좁은 허리
+    poly([[x-L*.25,gy-L*.8+br],[x+L*.25,gy-L*.8+br],[x+L*.16,gy-L*.55],[x+L*.1,gy-L*.42],[x-L*.1,gy-L*.42],[x-L*.16,gy-L*.55]]);
+    // 어깨 가시와 등 가시
+    [-1,1].forEach(sd=>{poly([[x+sd*L*.17,gy-L*.8+br],[x+sd*L*.27,gy-L*.95+br],[x+sd*L*.25,gy-L*.79+br]]);poly([[x+sd*L*.22,gy-L*.8+br],[x+sd*L*.34,gy-L*.88+br],[x+sd*L*.27,gy-L*.76+br]])});
+    for(let i=0;i<4;i++){const sx=x-f*L*(.16-i*.02),sy=gy-L*(.76-i*.08);poly([[sx,sy],[sx-f*L*.09,sy-L*.07],[sx,sy-L*.025]])}
+    // 머리: 앞으로 숙인 뾰족한 턱
+    const hx=x+f*L*.05,hy=gy-L*.86+br;
+    poly([[hx-L*.07,hy-L*.06],[hx+L*.07,hy-L*.06],[hx+L*.06,hy+L*.03],[hx+f*L*.03,hy+L*.1],[hx-L*.06,hy+L*.03]]);
+    // 두 뿔: 바깥으로 휘었다가 위로, 끝이 안쪽으로 굽는다 (밑동이 굵다)
+    [-1,1].forEach(sd=>{const bx=hx+sd*L*.06,by=hy-L*.05;
+      g.lineWidth=L*.05;g.beginPath();g.moveTo(bx,by);g.quadraticCurveTo(bx+sd*L*.16,by+L*.02,bx+sd*L*.2,by-L*.12);g.stroke();
+      g.lineWidth=L*.03;g.beginPath();g.moveTo(bx+sd*L*.2,by-L*.12);g.quadraticCurveTo(bx+sd*L*.22,by-L*.26,bx+sd*L*.12,by-L*.32);g.stroke();
+      g.lineWidth=L*.014;seg(bx+sd*L*.12,by-L*.32,bx+sd*L*.07,by-L*.33)});
+    // 팔: 대검을 쥔 팔과 발톱 손
+    g.lineWidth=L*.065;const ay=gy-L*.76;seg(x+f*L*.22,ay,x+f*L*.36,gy-L*.56);seg(x-f*L*.22,ay,x-f*L*.32,gy-L*.5);
+    g.lineWidth=L*.014;for(let i=-1;i<=1;i++)seg(x-f*L*.32,gy-L*.5,x-f*L*(.36+.02*i),gy-L*(.42-.02*i));
+    g.strokeStyle=o.shadow?'#c9532c':fire;g.lineWidth=L*.04;seg(x+f*L*.36,gy-L*.56,x+f*L*.6,gy-L*1.04);glow(x+f*L*.48,gy-L*.8,L*.18,fire,o.shadow?.35:.68);
+    // 눈, 가슴의 잿불 심장, 불티
+    g.fillStyle='#ffcf6a';circ(hx+f*L*.01,hy-L*.015,L*.013);circ(hx+f*L*.045,hy-L*.015,L*.013);glow(hx+f*L*.03,hy-L*.01,L*.07,'#ffb347',.85);
+    glow(x,gy-L*.64,L*.1,fire,motion?.5+.3*Math.sin(t*4):.6);
+    if(!o.shadow&&!o.small)for(let i=0;i<9;i++){const ex=x+Math.sin(i*2.3+(motion?t*.8:0))*L*.44,ey=gy-((i*37+(motion?t*40:0))%(L*1.15));glow(ex,ey,3,'#ff9a4a',.85)}
+  }
   function crone(x,gy,h,f){g.save();g.translate(x,gy);g.rotate(f*.16);figure(0,0,h,f,{robe:true,hood:true,weapon:'lantern'});g.restore()}
 
   // 그리기 가능한 것들
@@ -365,6 +400,9 @@ window.Art=(function(){
     else if(k==='sp_golem'){knight(x,gy,122*s,f,{stone:true});glow(x,gy-62*s,52*s,'#8fb6ff',.28)}
     else if(k==='sp_wisp')wisp(x,gy,s,t);
     else if(k==='sp_drake')drake(x,gy,150*s,f,t);
+    else if(k==='demonlord')demon(x,gy,196*s,f,t,{});
+    else if(k==='embershade')demon(x,gy,176*s,f,t,{shadow:true,col:'#1b1214'});
+    else if(k==='imp')demon(x,gy-26*s,50*s,f,t,{col:'#3a1410',small:true});
     else if(k==='sp_herald'){const h=112*s,fl=motion?Math.sin(t*2.4)*.06:0;glow(x,gy-h*.6,h*.7,'#ffe6a0',.32);g.fillStyle='rgba(230,236,255,.55)';
       poly([[x-f*h*.02,gy-h*.68],[x-f*h*.42,gy-h*(1.02+fl)],[x-f*h*.3,gy-h*.55]]);poly([[x-f*h*.02,gy-h*.64],[x-f*h*.34,gy-h*(.82+fl)],[x-f*h*.22,gy-h*.42]]);
       figure(x,gy-(motion?Math.sin(t*2)*3:0),h,f,{robe:true,col:'#8fa6cc',weapon:'sword',eyes:'#fff1c4'});g.strokeStyle='#ffe6a0';g.lineWidth=2;g.beginPath();g.ellipse(x+f*h*.01,gy-h*.9,h*.08,h*.025,0,0,Math.PI*2);g.stroke()}
@@ -417,7 +455,7 @@ window.Art=(function(){
 
   // ── 전투 배치: 열마다 자리를 나눈다 (왼쪽이 아군, 오른쪽이 적)
   const ZX={'pc-front':{c:.34,w:.08,rx:.12},'pc-back':{c:.135,w:.07,rx:.11},'foe-front':{c:.665,w:.09,rx:.17},'foe-back':{c:.885,w:.07,rx:.1}};
-  const HT={sp_herald:120,sp_colossus:120,spiritking:150,sp_wolf:64,sp_moon:80,sp_golem:122,sp_wisp:84,sp_drake:112,wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,captain:136,brandwolf:62,brandbear:100,hunter:94,rine:90,vask:112,villager:86,smith:96,boy:58,hawk:110,moths:110,stag:120,shade:128,acolyte:98,hero:96,orden:118,sena:90,bran:96};
+  const HT={demonlord:205,embershade:185,imp:76,sp_herald:120,sp_colossus:120,spiritking:150,sp_wolf:64,sp_moon:80,sp_golem:122,sp_wisp:84,sp_drake:112,wolf:60,scout:62,hound:70,alpha:120,pup:30,boar:56,bear:100,spider:52,bats:110,leech:60,drowned:112,captain:136,brandwolf:62,brandbear:100,hunter:94,rine:90,vask:112,villager:86,smith:96,boy:58,hawk:110,moths:110,stag:120,shade:128,acolyte:98,hero:96,orden:118,sena:90,bran:96};
   function battleLayout(info){
     const B=info.battle,list=[];if(!B)return list;
     const groups={};B.units.forEach(u=>{const z=u.side+'-'+u.row;(groups[z]=groups[z]||[]).push(u)});

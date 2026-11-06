@@ -322,6 +322,8 @@ function applyFx(fx,out){
   if(fx.gold){const g=Array.isArray(fx.gold)?rint(fx.gold[0],fx.gold[1]):fx.gold;S.gold=Math.max(0,S.gold+g);out.push('금화 '+sign(g))}
   arr(fx.drop).forEach(i=>{const k=S.items.indexOf(i);if(k>=0){S.items.splice(k,1);out.push('잃음: '+i)}});
   arr(fx.items).forEach(i=>{S.items.push(i);out.push(gotLine(i))});
+  // 이야기 속 계약으로 기술을 익힌다
+  arr(fx.learn).forEach(k=>{if(!SC.combatSkills[k]||(S.learned||[]).includes(k))return;S.learned=(S.learned||[]).concat(k);out.push('새 기술: '+SC.combatSkills[k].name);logp('「'+SC.combatSkills[k].name+'」을 익혔다.')});
   markNew(fx.items);
   if(fx.items||fx.drop)autoEquip(fx.items);
   newTrinkets(fx.items);
@@ -1068,6 +1070,7 @@ function startBattle(def,kind,ambush){
   logB(def.intro?tpl(def.intro):(ambush?'매복이다! ':'')+josa(nameList(ids),'이')+' 나타났다!','sys');
   if(pids.length)logB('함께 싸운다: '+pids.map(id=>COMP(id).name).join(', '),'sys');
   if(petU.length)logB('곁의 소환수: '+petU.map(u=>nm(u)+' (HP '+u.hp+'/'+u.hpMax+')').join(', '),'sys');
+  petU.forEach(summonArrive);
   mods.forEach(m=>logB('▸ '+m,'sys'));
   if(S.flags.shield)logB('별빛 방벽이 그대를 감싸고 있다. (첫 피해를 막는다)','sys');
   if(B.surprise==='foe')logB('적이 기습당했다! 첫 라운드에 적은 움직이지 못한다','sys');
@@ -1286,9 +1289,18 @@ function addSummon(id,ab,o){
   const u=summonUnit(id,ab,o);
   B.units.push(u);B.order.splice(B.turn+1,0,u.uid);
   afx({type:'heal',target:u.uid,val:u.hp,delay:fxDelay+200});
+  summonArrive(u);
   // 동료가 늘면 우두머리가 단단해지듯, 소환수 하나마다 동료 반 몫만큼 (perPC의 절반)
   const pp=!noScale&&B.def&&B.def.perPC;if(pp)alive().filter(e=>E_(e).boss||E_(e).elite).forEach(e=>{const add=Math.round(pp.hp/2);e.hp+=add;e.hpMax+=add;logB(josa(nm(e),'이')+' 소환수를 보고 버틴다 (HP +'+add+')','sys')});
   return u;
+}
+// 나타날 때의 위압 (대군주): 적이 내성에 실패하면 겁에 질린다
+function summonArrive(u){
+  const T=SUMT(u.id),a=T.arrive;if(!a||!S.battle)return;
+  const dc=spellDC(U('hero'),{stat:'지혜'}),hit=[];
+  afx({type:'text',target:u.uid,text:a.name,color:'#ff9a4a'});
+  alive().forEach(x=>{if(d(20)+saveMod(x,a.save)<dc){applyOn(x,a.onFail);hit.push(nm(x))}});
+  logB(nm(u)+'의 '+a.name+' (내성 DC '+dc+') — '+(hit.length?hit.join(', ')+' 겁에 질렸다':'아무도 굴하지 않았다'),'me');
 }
 // 소환수의 한 번 공격: 고른 대상이 닿으면 그것을, 아니면 가장 약한 적을
 function summonStrike(s,t){
@@ -1308,9 +1320,11 @@ function summonTurn(u){
   // 비룡의 숨결: 몇 라운드마다 모든 적에게
   if(T.breath&&B.round>=(u.breathR||0)){
     u.breathR=B.round+T.breath.every;const dc=spellDC(U('hero'),{stat:'지혜'}),parts=[];
-    afx({type:'text',target:u.uid,text:'숨결',color:'#ffe6a0'});
-    alive().forEach((x,i)=>{const base=rollDice(T.breath.dmg).total+statVal('지혜'),okS=d(20)+saveMod(x,T.breath.save)>=dc,v=okS?Math.floor(base/2):base;afx({type:'cast',from:u.uid,to:x.uid,color:'#ffe6a0'});const dm=hurt(x,v,T.breath.dtype,{d:300+i*90});parts.push(nm(x)+' '+(okS?'(내성 성공) ':'')+wtxt(dm,x)+(up(x)?'':' 쓰러짐'))});
-    logB(nm(u)+'의 별빛 숨결 (내성 DC '+dc+') — '+parts.join(' · '),'me');return;
+    const bn=T.breath.name||'별빛 숨결',fire=T.breath.dtype==='fire';
+    afx({type:'text',target:u.uid,text:bn,color:fire?'#ff9a4a':'#ffe6a0'});
+    alive().forEach((x,i)=>{const base=rollDice(T.breath.dmg).total+statVal('지혜'),okS=d(20)+saveMod(x,T.breath.save)>=dc,v=okS?Math.floor(base/2):base;afx({type:'cast',from:u.uid,to:x.uid,color:fire?'#ff8a3c':'#ffe6a0'});const dm=hurt(x,v,T.breath.dtype,{d:300+i*90});parts.push(nm(x)+' '+(okS?'(내성 성공) ':'')+wtxt(dm,x)+(up(x)?'':' 쓰러짐'));if(!okS&&T.breath.burn)applyOn(x,{burn:T.breath.burn})});
+    if(fire)[...new Set(alive().map(zk))].forEach(fireTouch);
+    logB(nm(u)+'의 '+bn+' (내성 DC '+dc+') — '+parts.join(' · '),'me');return;
   }
   const t=tgtU();
   for(let i=0;i<(u.multi||1)&&up(u)&&alive().length;i++)summonStrike(u,t&&t.side==='foe'?t:null);
@@ -1337,7 +1351,8 @@ function syncPets(){
 // 싸움이 끝날 때: 살아남은 소환수가 영구 소환수로 남는다 (먼저 부른 것이 앞에)
 function keepPets(){
   if(S.cls!=='summoner'||!S.battle)return;
-  S.pets=summons().filter(up).map(u=>{const p={id:u.id,sk:u.sk,hp:u.hp,hpMax:u.hpMax};if(u.fixed){p.fixed=true;p.dmgB=u.dmgB}return p});
+  summons().filter(u=>up(u)&&SUMT(u.id).oneBattle).forEach(u=>logp(josa(SUMT(u.id).name,'이')+' 싸움을 마치고 심연으로 돌아갔다.'));
+  S.pets=summons().filter(u=>up(u)&&!SUMT(u.id).oneBattle).map(u=>{const p={id:u.id,sk:u.sk,hp:u.hp,hpMax:u.hpMax};if(u.fixed){p.fixed=true;p.dmgB=u.dmgB}return p});
 }
 // 전투 밖에서 부를 수 없는 까닭 (없으면 null)
 function outWhy(k){
@@ -1345,11 +1360,13 @@ function outWhy(k){
   if(ab.mp&&S.hero.mp<ab.mp)return '마력 부족';
   if(ab.uses&&usesLeft({kind:'hero'},k)<=0)return '다 썼다 (휴식으로 충전)';
   if(ab.kind==='fuse'&&petCapN()<2)return '합칠 소환수가 둘 이상 있어야 한다';
+  if(ab.hpCost&&S.hero.hp<=bloodCost(ab))return '피가 모자란다 (HP '+(bloodCost(ab)+1)+' 이상)';
   return null;
 }
 function summonOutside(k){
   const ab=abOf(k);if(rolling||S.mode!=='world'||outWhy(k))return;
   if(ab.mp)S.hero.mp-=ab.mp;if(ab.uses){const c=chOf({kind:'hero'});c[k]=usesLeft({kind:'hero'},k)-1}
+  if(ab.hpCost){const c=bloodCost(ab);S.hero.hp=Math.max(1,S.hero.hp-c);logp('피의 대가로 HP '+c+'을 바쳤다.')}
   const made=[],left=[];
   if(ab.kind==='fuse'){
     const ms=pets().filter(p=>!SUMT(p.id).noCap),sum=ms.reduce((a,p)=>a+p.hp,0),dB=Math.max(...ms.map(p=>petStats(p).dmgB)),x=sumStats(ab.into,ab),mx=Math.max(x.hp,Math.round(sum*(ab.hpMul2||2)));
@@ -1393,8 +1410,10 @@ function unitSkills(u){
   return (COMP(u.id).skills||[]).filter(k=>abOf(k).lv<=S.hero.level);
 }
 // 쓸 수 없는 이유 (쓸 수 있으면 null)
+function bloodCost(ab){return Math.floor(S.hero.hpMax*(ab.hpCost||0))}
 function resWhy(u,k){
   const ab=abOf(k),B=S.battle;
+  if(ab.hpCost&&u.kind==='hero'&&S.hero.hp<=bloodCost(ab))return '피가 모자란다 (HP '+(bloodCost(ab)+1)+' 이상)';
   if(!B.tr[costKey(ab)])return (ab.cost==='bonus'?'보조 행동':'행동')+'을 이미 썼다';
   if(ab.mp&&S.hero.mp<ab.mp)return '마력 부족';
   if(ab.uses&&usesLeft(u,k)<=0)return '다 썼다 (휴식으로 충전)';
@@ -1621,10 +1640,11 @@ function useAb(u,k,t,au){
   }
   // 소환: 부르고, 자리가 모자라면 가장 먼저 부른 것을 돌려보낸다
   if(ab.kind==='summon'){
+    if(ab.hpCost){const c=bloodCost(ab);h.hp=Math.max(1,h.hp-c);logB(nm(u)+' — 피의 대가 (HP -'+c+')','foe');afx({type:'hit',target:u.uid,val:c,delay:fxDelay+100})}
     const made=arr(ab.summon).map(id=>addSummon(id,ab,{sk:k}));
     if(ab.buff)summons().forEach(x=>addBuff(x,ab.name,ab.buff,ab.turns));
     fx_(u,ab.name,'#9fc8ff');B.last={r:null,txt:ab.name+' — '+made.map(nm).join(', ')+' 나타났다'};
-    logB(lab+'! '+made.map(x=>nm(x)+' (HP '+x.hp+')').join(', ')+' — 소환수 '+summons().length+'/'+sumCap(),'me');return;
+    logB(lab+'! '+made.map(x=>nm(x)+' (HP '+x.hp+')').join(', ')+' — 소환수 '+capSummons().length+'/'+sumCap(),'me');return;
   }
   // 별의 융합: 자리를 차지한 소환수를 모두 하나의 거수로 합친다 (남은 HP를 모아 더 크게)
   if(ab.kind==='fuse'){
@@ -1824,7 +1844,10 @@ function aiTurn(u){
       else if(ab.kind==='pierce'){const x=bestFoe(u,profile(u,ab));if(x)opts.push({s:x.row==='front'&&alive().some(y=>y.row==='back')?4:2.5,go:()=>{setT(x);useAb(u,k,x)}})}
       else if(ab.kind==='debuffAll'&&n>=3)opts.push({s:3,go:()=>useAb(u,k)});
       else if(ab.kind==='summon'){
-        if(arr(ab.summon).some(id=>SUMT(id).noCap)){if(!summons().some(x=>arr(ab.summon).includes(x.id)))opts.push({k,s:9,go:()=>useAb(u,k)});return}   // 별의 사도: 없으면 먼저
+        if(arr(ab.summon).some(id=>SUMT(id).noCap)){
+          const big_=alive().some(e=>E_(e).boss||E_(e).elite)||n>=4;
+          if(ab.hpCost&&(!big_||S.hero.hp<bloodCost(ab)*2))return;   // 대군주: 큰 싸움에서, 피가 넉넉할 때만
+          if(!summons().some(x=>arr(ab.summon).includes(x.id)))opts.push({k,s:ab.hpCost?12:9,go:()=>useAb(u,k)});return}   // 별의 사도: 없으면 먼저
         const rk=arr(ab.summon).reduce((a,id)=>a+(SUMT(id).rank||1),0),ss=capSummons(),room=sumCap()-ss.length,minR=ss.length?Math.min(...ss.map(x=>SUMT(x.id).rank||1)):0;
         const dup=arr(ab.summon).filter(id=>ss.some(x=>x.id===id)).length;   // 같은 소환수만 거듭 부르지 않게
         const sc=(room>=arr(ab.summon).length?4+rk:room>0?3+rk*0.5:(rk>minR+1?2+rk*0.3:0))-(room>0?dup*1.5:dup*3);if(sc>0)opts.push({k,s:sc-(ab.mp||0)*0.02,go:()=>useAb(u,k)});
@@ -1851,7 +1874,7 @@ function winBattle(){
     xp+=x;gold+=rint(E.gold[0],E.gold[1]);
     // uniq: 이미 가진 것은 다시 나오지 않는다. pity: 그만큼 못 얻으면 다음에는 반드시 나온다
     arr(E.drops).forEach(dr=>{
-      const item=tpl(dr.item);if(!SC.items[item]||!clsOK(SC.items[item])||(dr.once&&S.flags[dr.once])||(dr.uniq&&(hasGot(item)||got.includes(item))))return;
+      const item=tpl(dr.item);if((dr.if&&!ok(dr.if))||!SC.items[item]||!clsOK(SC.items[item])||(dr.once&&S.flags[dr.once])||(dr.uniq&&(hasGot(item)||got.includes(item))))return;
       let hit=Math.random()<dr.p;
       if(!hit&&dr.pity){S.pity[item]=(S.pity[item]||0)+1;if(S.pity[item]>=dr.pity)hit=true}
       if(hit){got.push(item);delete S.pity[item];if(dr.once)S.flags[dr.once]=true}
@@ -2387,7 +2410,7 @@ function petsPane(box){
   if(!pets().length)c.appendChild(el('div','sub','곁에 소환수가 없다. 아래에서 부르면 다음 싸움부터 처음부터 함께 나선다.'));
   pets().forEach((p,i)=>{
     const T=SUMT(p.id),x=petStats(p),r=el('div','item pet'),info=el('div');
-    info.appendChild(el('b',null,T.name));info.appendChild(el('span','mini',' HP '+p.hp+'/'+p.hpMax+' · 방어 '+x.ac+' · '+T.atk.name+' 명중 +'+x.hit+' 피해 '+T.atk.dice+'+'+x.dmgB+(T.multi?' ×'+T.multi:'')+(T.noCap?' · 자리를 차지하지 않는다':'')));
+    info.appendChild(el('b',null,T.name));info.appendChild(el('span','mini',' HP '+p.hp+'/'+p.hpMax+' · 방어 '+x.ac+' · '+T.atk.name+' 명중 +'+x.hit+' 피해 '+T.atk.dice+'+'+x.dmgB+(T.multi?' ×'+T.multi:'')+(T.noCap?' · 자리를 차지하지 않는다':'')+(T.oneBattle?' · 다음 싸움이 끝나면 돌아간다':'')));
     info.appendChild(bar('#8fb6ff',p.hp,p.hpMax));r.appendChild(info);
     const b=el('button',null,'돌려보내기');b.onclick=()=>dismissPet(i);r.appendChild(b);c.appendChild(r);
   });
@@ -2396,7 +2419,8 @@ function petsPane(box){
     ks.forEach(k=>{
       const a=abOf(k),w=outWhy(k),ids=arr(a.summon).concat(a.into?[a.into]:[]);
       const what=ids.map(id=>{const x=sumStats(id,a);return SUMT(id).name+(a.kind==='fuse'?'':' HP '+x.hp)}).join(', ');
-      actBtn(c,a.name,(a.mp?'마력 '+a.mp:'')+(a.uses?(a.mp?' · ':'')+(a.per==='long'?'긴':'짧은')+' 휴식마다 '+a.uses+'번 (남은 '+usesLeft({kind:'hero'},k)+')':'')+' · '+(a.kind==='fuse'?'곁의 소환수를 모두 합쳐 '+what+'로 (HP 두 배)':what)+(w?' · '+w:''),()=>summonOutside(k),{disabled:!!w});
+      const one=ids.some(id=>SUMT(id).oneBattle);
+      actBtn(c,a.name,(a.mp?'마력 '+a.mp:'')+(a.uses?(a.mp?' · ':'')+(a.per==='long'?'긴':'짧은')+' 휴식마다 '+a.uses+'번 (남은 '+usesLeft({kind:'hero'},k)+')':'')+(a.hpCost?' · 피의 대가 HP '+bloodCost(a):'')+' · '+(a.kind==='fuse'?'곁의 소환수를 모두 합쳐 '+what+'로 (HP 두 배)':what)+(one?' · 다음 싸움 한 번만 함께한다':'')+(w?' · '+w:''),()=>summonOutside(k),{disabled:!!w,star:!!a.hpCost});
     });
   }
 }
